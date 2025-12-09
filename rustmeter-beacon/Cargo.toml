@@ -1,0 +1,15 @@
+[package]
+name = "rustmeter-beacon"
+version = "0.0.1"
+edition = "2024"
+license = "MIT"
+authors = ["Christopher Kock"]
+description = "Contains the beacon application for RustMeter."
+
+[dependencies]
+function-monitor = { path = "function-monitor" }
+tracing-core = { path = "tracing-core" }
+embassy-executor = { version = "0.9", features = ["defmt", "trace"] }
+defmt = { version = "1" }
+
+[features]
