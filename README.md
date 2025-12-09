@@ -29,7 +29,7 @@ The repository consists of two main components:
 Install the host tool locally:
 
 ```bash
-cargo install rustmeter-cli
+cargo install rustmeter
 ```
 
 ### 2. Prepare Embedded Project
@@ -42,7 +42,7 @@ rustmeter-beacon = { version = "X" } # Adjust path accordingly
 defmt = "1"
 
 # IMPORTANT: Enable the `trace` feature of embassy-executor!
-embassy-executor = { version = "X", features = [, "trace"] }
+embassy-executor = { version = "X", features = ["trace", ..] }
 ```
 
 **Attention**: Ensure that `defmt` with `rtt` is already set up in your project, as `rustmeter-beacon` relies on it for logging. All defmt logs need a timestamp. So make sure you defmt ist configured properly with a timer source (See [defmt documentation](https://defmt.ferrous-systems.com/timestamps) for more details).
@@ -115,7 +115,7 @@ You should see your normal defmt logs in the terminal. Press Ctrl+C to stop reco
 
 1. After stopping, you will find a file named `rustmeter-perfetto-debug.json` (or `-release.json`) in your directory.
 
-2. Open ui.perfetto.dev in your browser
+2. Open [ui.perfetto.dev](https://ui.perfetto.dev/) in your browser
 
 3. Click on "Open trace file" and select the generated JSON file
 
