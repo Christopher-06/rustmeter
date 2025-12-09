@@ -38,11 +38,11 @@ Add rustmeter-beacon to your firmware's dependencies and enable the `trace` feat
 
 ```toml
 [dependencies]
-rustmeter-beacon = { version = "X" } # Adjust path accordingly
-defmt = "1"
+rustmeter-beacon = { version = "X" }
+defmt = "X"
 
 # IMPORTANT: Enable the `trace` feature of embassy-executor!
-embassy-executor = { version = "X", features = ["trace", ..] }
+embassy-executor = { version = "X", features = ["trace", ... ] }
 ```
 
 **Attention**: Ensure that `defmt` with `rtt` is already set up in your project, as `rustmeter-beacon` relies on it for logging. All defmt logs need a timestamp. So make sure you defmt ist configured properly with a timer source (See [defmt documentation](https://defmt.ferrous-systems.com/timestamps) for more details).
