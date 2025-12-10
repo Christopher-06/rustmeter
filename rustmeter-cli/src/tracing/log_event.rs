@@ -1,6 +1,7 @@
 use crate::{time::EmbassyTime, tracing::log_line::LogLine};
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::enum_variant_names)]
 pub enum LogEventType {
     EventEmbassyTaskExecEnd { executor_id: u32, task_id: u32 },
     EventEmbassyTaskReadyBegin { executor_id: u32, task_id: u32 },
@@ -128,7 +129,7 @@ impl LogEventType {
                     .ok_or(anyhow::anyhow!("Missing parameter 'value'"))?
                     .parse()?,
             }),
-            _ => Err(anyhow::anyhow!("Unknown LogEvent type: {}", name)),
+            _ => Err(anyhow::anyhow!("Unknown LogEvent type: {name}")),
         }
     }
 }
@@ -154,19 +155,16 @@ impl LogEvent {
         let message = log_line.message.trim();
         if !message.starts_with("@") {
             return Err(anyhow::anyhow!(
-                "LogEvent message does not start with '@': {}",
-                message
+                "LogEvent message does not start with '@': {message}"
             ));
         }
 
         // Find event type name and parameters
         let opening_bracket = message.find('(').ok_or(anyhow::anyhow!(
-            "Invalid LogEvent message format (found no opening bracket): {}",
-            message
+            "Invalid LogEvent message format (found no opening bracket): {message}"
         ))?;
         let closing_bracket = message.find(')').ok_or(anyhow::anyhow!(
-            "Invalid LogEvent message format (found no closing bracket): {}",
-            message
+            "Invalid LogEvent message format (found no closing bracket): {message}"
         ))?;
         let event_type_name = &message[1..opening_bracket];
         let params_str = &message[opening_bracket + 1..closing_bracket];
@@ -208,7 +206,7 @@ mod tests {
                 assert_eq!(executor_id, 1073610704);
                 assert_eq!(task_id, 1073425160);
             }
-            e => panic!("Unexpected LogEventType: {:?}", e),
+            e => panic!("Unexpected LogEventType: {e:?}"),
         }
     }
 }

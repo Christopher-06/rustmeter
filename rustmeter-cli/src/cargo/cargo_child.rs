@@ -109,7 +109,7 @@ fn read_to_channel_threaded<R: std::io::Read + Send + 'static>(
                     }
                 }
                 Err(e) => {
-                    eprintln!("Error reading cargo run output: {}", e);
+                    eprintln!("Error reading cargo run output: {e}");
                     break;
                 }
             }
@@ -120,7 +120,7 @@ fn read_to_channel_threaded<R: std::io::Read + Send + 'static>(
                 if !last_build_status.has_finished() {
                     // Parse Build line to CargoBuildStatus
                     last_build_status =
-                        CargoBuildStatus::from_build_line(last_build_status.clone(), &line);
+                        CargoBuildStatus::update_from_build_line(last_build_status, &line);
                     let ch_closed = build_status_sender.send(last_build_status.clone()).is_err();
 
                     if ch_closed || last_build_status.has_failed() {

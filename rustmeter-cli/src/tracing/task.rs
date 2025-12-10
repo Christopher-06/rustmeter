@@ -23,9 +23,9 @@
 //! 2. A task is enqueued for the first time, `_embassy_trace_task_ready_begin` is called
 //! 3. A task is polled, `_embassy_trace_task_exec_begin` is called
 //! 4. WHILE a task is polled, the task is re-awoken, and `_embassy_trace_task_ready_begin` is
-//!      called. The task does not IMMEDIATELY move state, until polling is complete and the
-//!      RUNNING state is existed. `_embassy_trace_task_exec_end` is called when polling is
-//!      complete, marking the transition to WAITING
+//!    called. The task does not IMMEDIATELY move state, until polling is complete and the
+//!    RUNNING state is existed. `_embassy_trace_task_exec_end` is called when polling is
+//!    complete, marking the transition to WAITING
 //! 5. Polling is complete, `_embassy_trace_task_exec_end` is called
 //! 6. The task has completed, and `_embassy_trace_task_end` is called
 //! 7. A task is awoken, `_embassy_trace_task_ready_begin` is called
@@ -34,7 +34,7 @@
 //!
 //! We added the Preempted state to indicate that a task was preempted by another executor task with higher priority (Interrupt context).
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use crossbeam::channel::Sender;
 
@@ -58,17 +58,17 @@ pub enum TaskTraceState {
     Ended,
 }
 
-impl TaskTraceState {
-    pub fn to_string(&self) -> String {
+impl Display for TaskTraceState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TaskTraceState::Spawned => "Spawned".to_string(),
-            TaskTraceState::Waiting => "Waiting".to_string(),
-            TaskTraceState::Running => "Running".to_string(),
+            TaskTraceState::Spawned => write!(f, "Spawned"),
+            TaskTraceState::Waiting => write!(f, "Waiting"),
+            TaskTraceState::Running => write!(f, "Running"),
             TaskTraceState::Preempted { by_executor_id } => {
-                format!("Preempted (by {})", by_executor_id)
+                write!(f, "Preempted (by {by_executor_id})")
             }
-            TaskTraceState::Idle => "Idle".to_string(),
-            TaskTraceState::Ended => "Ended".to_string(),
+            TaskTraceState::Idle => write!(f, "Idle"),
+            TaskTraceState::Ended => write!(f, "Ended"),
         }
     }
 }
@@ -99,7 +99,7 @@ impl TaskTracing {
         let task_name = firmware_addr_map.get_symbol_name(task_id as u64);
         let display_name = match task_name.as_ref() {
             Some(name) => name.clone(),
-            None => format!("Task 0x{:X}", task_id),
+            None => format!("Task 0x{task_id:X}"),
         };
 
         // Send task metadata
@@ -121,16 +121,14 @@ impl TaskTracing {
             args: HashMap::new(),
         });
 
-        let instance = TaskTracing {
+        TaskTracing {
             task_id,
             executor_id,
             core_id,
             trace_event_sender,
             state: TaskTraceState::Spawned,
             state_start_time: created_at,
-        };
-
-        instance
+        }
     }
 
     pub fn get_pid(&self) -> u32 {

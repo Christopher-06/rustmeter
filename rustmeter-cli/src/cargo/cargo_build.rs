@@ -22,14 +22,11 @@ pub enum CargoBuildMessage {
 }
 
 impl CargoBuildMessage {
-    pub fn from_build_line(line: &String) -> anyhow::Result<CargoBuildMessage> {
+    pub fn from_build_line(line: &str) -> anyhow::Result<CargoBuildMessage> {
         // Try parse
-        match serde_json::from_str::<CargoBuildMessage>(&line) {
+        match serde_json::from_str::<CargoBuildMessage>(line) {
             Ok(message) => Ok(message),
-            Err(e) => Err(anyhow::anyhow!(
-                "Failed to parse cargo build message: {}",
-                e
-            )),
+            Err(e) => Err(anyhow::anyhow!("Failed to parse cargo build message: {e}")),
         }
     }
 }
@@ -66,7 +63,7 @@ impl CargoBuildStatus {
         }
     }
 
-    pub fn from_build_line(self, line: &String) -> Self {
+    pub fn update_from_build_line(self, line: &str) -> Self {
         if self.has_finished() {
             return self; // already finished
         }
@@ -89,7 +86,7 @@ impl CargoBuildStatus {
             Err(_) => {
                 // Parse Error means normal build log line, print and return
                 if !line.trim().starts_with("{") {
-                    println!("{}", line);
+                    println!("{line}");
                 }
                 self
             }

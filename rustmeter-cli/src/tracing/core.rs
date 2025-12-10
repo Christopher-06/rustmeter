@@ -32,7 +32,7 @@ impl CoreTracing {
             name: "thread_name".to_string(),
             cat: None,
             args: HashMap::from([
-                ("name".to_string(), format!("CORE {}", core_id)),
+                ("name".to_string(), format!("CORE {core_id}")),
                 ("core".to_string(), core_id.to_string()),
             ]),
             pid: 0,
@@ -98,7 +98,7 @@ impl CoreTracing {
             (None, Some(exe_id)) => {
                 // Executor started running
                 let _ = self.trace_event_sender.send(TracingEvent::Begin {
-                    name: format!("{}", self.executors.get(&exe_id).unwrap().get_name()),
+                    name: self.executors.get(&exe_id).unwrap().get_name().to_string(),
                     cat: Some("executor".to_string()),
                     pid: 0,
                     tid: Some(self.core_id as u32),
@@ -109,10 +109,7 @@ impl CoreTracing {
             (Some(exe_id), None) => {
                 // Executor stopped running
                 let _ = self.trace_event_sender.send(TracingEvent::End {
-                    name: Some(format!(
-                        "{}",
-                        self.executors.get(&exe_id).unwrap().get_name()
-                    )),
+                    name: Some(self.executors.get(&exe_id).unwrap().get_name().to_string()),
                     cat: Some("executor".to_string()),
                     pid: 0,
                     tid: Some(self.core_id as u32),
@@ -124,10 +121,13 @@ impl CoreTracing {
                 // Executor switch
                 // End previous
                 let _ = self.trace_event_sender.send(TracingEvent::End {
-                    name: Some(format!(
-                        "{}",
-                        self.executors.get(&prev_exe).unwrap().get_name()
-                    )),
+                    name: Some(
+                        self.executors
+                            .get(&prev_exe)
+                            .unwrap()
+                            .get_name()
+                            .to_string(),
+                    ),
                     cat: Some("executor".to_string()),
                     pid: 0,
                     tid: Some(self.core_id as u32),
@@ -136,7 +136,12 @@ impl CoreTracing {
                 });
                 // Begin current
                 let _ = self.trace_event_sender.send(TracingEvent::Begin {
-                    name: format!("{}", self.executors.get(&curr_exe).unwrap().get_name()),
+                    name: self
+                        .executors
+                        .get(&curr_exe)
+                        .unwrap()
+                        .get_name()
+                        .to_string(),
                     cat: Some("executor".to_string()),
                     pid: 0,
                     tid: Some(self.core_id as u32),
@@ -189,7 +194,7 @@ impl CoreTracing {
                     pid,
                     name: name.to_string(),
                     ts: log_event.timestamp.as_micros(),
-                    args: HashMap::from([("value".to_string(), value.clone())]),
+                    args: HashMap::from([("value".to_string(), *value)]),
                     cat: None,
                 };
                 let _ = self.trace_event_sender.send(tracing_event);

@@ -57,38 +57,33 @@ fn main() -> anyhow::Result<()> {
     let (log_line_sender, log_line_recver) = crossbeam::channel::unbounded();
     let (log_event_sender, log_event_recver) = crossbeam::channel::unbounded();
     std::thread::spawn(move || {
-        loop {
-            match raw_logs_recver.recv() {
-                Ok(log) => {
-                    // try to parse log line as LogEvent or just print it
-                    if let Ok(log_line) = tracing::log_line::LogLine::from_str(&log) {
-                        // Check if it is a LogEvent
-                        if let Ok(log_event) =
-                            tracing::log_event::LogEvent::from_log_line(&log_line)
-                        {
-                            // successfully parsed LogEvent ==> send it as log event
-                            if log_event_sender.send(log_event).is_err() {
-                                break; // channel closed
-                            }
+        while let Ok(log) = raw_logs_recver.recv() {
+            // try to parse log line as LogEvent or just print it
+            if let Ok(log_line) = tracing::log_line::LogLine::from_str(&log) {
+                // Check if it is a LogEvent
+                if let Ok(log_event) = tracing::log_event::LogEvent::from_log_line(&log_line) {
+                    // successfully parsed LogEvent ==> send it as log event
+                    if log_event_sender.send(log_event).is_err() {
+                        break; // channel closed
+                    }
 
-                            continue;
-                        } else {
-                            // send log line as well for raw logging
-                            println!("{}", log_line);
+                    continue;
+                } else {
+                    // send log line as well for raw logging
+                    println!("{log_line}");
 
-                            // is log line ==> send log line
-                            if log_line_sender.send(log_line).is_err() {
-                                break; // channel closed
-                            }
-                        }
-                    } else {
-                        // cannot parse it correctly ==> just print the raw log
-                        print!("{}", log);
+                    // is log line ==> send log line
+                    if log_line_sender.send(log_line).is_err() {
+                        break; // channel closed
                     }
                 }
-                Err(_) => break, // channel closed
+            } else {
+                // cannot parse it correctly ==> just print the raw log
+                print!("{log}");
             }
         }
+
+        // error returned because channel closed
     });
 
     // Create tracing instance and start processing log events
@@ -135,8 +130,7 @@ fn main() -> anyhow::Result<()> {
         // Check if cargo child process has exited
         if let Some(status_code) = cargo_child_process.get_status_code()? {
             return Err(anyhow::anyhow!(
-                "Cargo process exited with status: {}",
-                status_code
+                "Cargo process exited with status: {status_code}"
             ));
         }
 
@@ -147,8 +141,7 @@ fn main() -> anyhow::Result<()> {
                 Ok(result) => {
                     if let Err(e) = result {
                         return Err(anyhow::anyhow!(
-                            "Perfetto file writer thread exited with error: {}",
-                            e
+                            "Perfetto file writer thread exited with error: {e}"
                         ));
                     } else {
                         return Ok(()); // normal exit
@@ -156,8 +149,7 @@ fn main() -> anyhow::Result<()> {
                 }
                 Err(e) => {
                     return Err(anyhow::anyhow!(
-                        "Perfetto file writer thread panicked: {:?}",
-                        e
+                        "Perfetto file writer thread panicked: {e:?}"
                     ));
                 }
             }

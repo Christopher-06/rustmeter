@@ -17,24 +17,20 @@
 /// # Examples
 ///
 /// ```rust
-/// fn main() {
-///     // Example 1: Simple block without a return value (Type `()`)
-///     monitor_scoped!("SensorInit", {
-///         // Your code goes here
-///         let i = 0;
-///         // do_something(i);
-///     });
+///// Example 1: Simple block without a return value (Type `()`)
+///monitor_scoped!("SensorInit", {
+///    // Your code goes here
+///    let i = 0;
+///    do_something(i);
+///});
 ///
-///     // Example 2: Block with a return value
-///     // The value of the last expression (a + b) is stored in 'result'.
-///     let result = monitor_scoped!("Calculation", {
-///         let a = 10;
-///         let b = 20;
-///         a + b
-///     });
-///    
-///     defmt::info!("Result was: {}", result);
-/// }
+///// Example 2: Block with a return value
+///// The value of the last expression (a + b) is stored in 'result'.
+///let result = monitor_scoped!("Calculation", {
+///    let a = 10;
+///    let b = 20;
+///    a + b
+///});
 /// ```
 macro_rules! monitor_scoped {
     ($name:literal, $body:block) => {{

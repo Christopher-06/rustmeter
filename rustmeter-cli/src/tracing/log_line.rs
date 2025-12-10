@@ -21,7 +21,7 @@ impl LogLevel {
             "info" => Ok(LogLevel::Info),
             "warn" => Ok(LogLevel::Warn),
             "error" => Ok(LogLevel::Error),
-            _ => Err(anyhow::anyhow!("Unknown log level string: {}", level_str)),
+            _ => Err(anyhow::anyhow!("Unknown log level string: {level_str}")),
         }
     }
 
@@ -45,7 +45,7 @@ impl Display for LogLevel {
             LogLevel::Warn => "WARN",
             LogLevel::Error => "ERROR",
         };
-        write!(f, "{}", level_str)
+        write!(f, "{level_str}")
     }
 }
 
@@ -69,17 +69,14 @@ impl LogLine {
     pub fn from_str(line: &str) -> anyhow::Result<LogLine> {
         // Find open / close brackets for log level
         let open_bracket = line.find('[').ok_or(anyhow::anyhow!(
-            "Invalid log line format (found no opening bracket): {}",
-            line
+            "Invalid log line format (found no opening bracket): {line}"
         ))?;
         let close_bracket = line.find(']').ok_or(anyhow::anyhow!(
-            "Invalid log line format (found no closing bracket): {}",
-            line
+            "Invalid log line format (found no closing bracket): {line}"
         ))?;
         if open_bracket > close_bracket.saturating_sub(3) {
             return Err(anyhow::anyhow!(
-                "Invalid log line format (malformed log level brackets): {}",
-                line
+                "Invalid log line format (malformed log level brackets): {line}"
             ));
         }
 

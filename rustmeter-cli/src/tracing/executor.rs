@@ -15,8 +15,8 @@
 //!
 //! 1. The executor is started (no associated trace)
 //! 2. A task on this executor is awoken. `_embassy_trace_task_ready_begin` is called
-//!      when this occurs, and `_embassy_trace_poll_start` is called when the executor
-//!      actually begins running
+//!    when this occurs, and `_embassy_trace_poll_start` is called when the executor
+//!    actually begins running
 //! 3. The executor has decided a task to poll. `_embassy_trace_task_exec_begin` is called
 //! 4. The executor finishes polling the task. `_embassy_trace_task_exec_end` is called
 //! 5. The executor has finished polling tasks. `_embassy_trace_executor_idle` is called
@@ -24,7 +24,7 @@
 //! (taken from embassy-executor/src/raw/trace.rs)
 //!
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use crossbeam::channel::Sender;
 
@@ -44,9 +44,9 @@ pub enum PreemptedPrevState {
     Polling { task_id: u32 },
 }
 
-impl Into<ExecutorState> for PreemptedPrevState {
-    fn into(self) -> ExecutorState {
-        match self {
+impl From<PreemptedPrevState> for ExecutorState {
+    fn from(val: PreemptedPrevState) -> Self {
+        match val {
             PreemptedPrevState::Scheduling => ExecutorState::Scheduling,
             PreemptedPrevState::Polling { task_id } => ExecutorState::Polling { task_id },
         }
@@ -67,16 +67,15 @@ pub enum ExecutorState {
     },
 }
 
-impl ExecutorState {
-    pub fn to_string(&self) -> String {
+impl Display for ExecutorState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ExecutorState::Idle => "Idle".to_string(),
-            ExecutorState::Scheduling => "Scheduling".to_string(),
-            ExecutorState::Preempted {
-                by_executor_id,
-                prev_state: _,
-            } => format!("Preempted (by {})", by_executor_id),
-            ExecutorState::Polling { .. } => "Polling".to_string(),
+            ExecutorState::Idle => write!(f, "Idle"),
+            ExecutorState::Scheduling => write!(f, "Scheduling"),
+            ExecutorState::Preempted { by_executor_id, .. } => {
+                write!(f, "Preempted (by {by_executor_id})")
+            }
+            ExecutorState::Polling { .. } => write!(f, "Polling"),
         }
     }
 }
@@ -109,7 +108,7 @@ impl ExecutorTracing {
         let executor_name = firmware_addr_map.get_symbol_name(executor_id as u64);
         let display_name = match &executor_name {
             Some(name) => name.clone(),
-            None => format!("Executor 0x{:X}", executor_id),
+            None => format!("Executor 0x{executor_id:X}"),
         };
 
         // Send executor metadata
@@ -119,7 +118,7 @@ impl ExecutorTracing {
             args: HashMap::from([
                 (
                     "name".to_string(),
-                    format!("[CORE {}] {}", core_id, display_name),
+                    format!("[CORE {core_id}] {display_name}"),
                 ),
                 ("core".to_string(), core_id.to_string()),
             ]),

@@ -38,12 +38,14 @@ impl FirmwareAddressMap {
     }
 
     pub fn get_symbol_name(&self, addr: u64) -> Option<String> {
-        self.0.get(&addr).map(try_extract_short_name)
+        self.0
+            .get(&addr)
+            .map(|arg0: &String| try_extract_short_name(arg0.as_str()))
     }
 }
 
 /// Helper function to extract short name from full symbol name
-fn try_extract_short_name(full_name: &String) -> String {
+fn try_extract_short_name(full_name: &str) -> String {
     let pool_index = full_name.find("::POOL").unwrap_or(full_name.len());
     full_name[0..pool_index].to_string()
 }

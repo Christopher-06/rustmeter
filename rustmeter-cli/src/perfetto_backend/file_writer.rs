@@ -57,6 +57,6 @@ pub fn spawn_perfetto_file_writer(
         // finalise file and exit
         file.write_all(b"\n]}\n")
             .context("Failed to finalise perfetto trace file")?;
-        return Ok(());
+        Ok(())
     })
 }
