@@ -11,8 +11,8 @@ categories = ["embedded", "development-tools::profiling", "no-std"]
 exclude = ["/debug", "/target", ".gitignore"]
 
 [dependencies]
-function-monitor = { path = "function-monitor", version = "0.1.0" }
-tracing-core = { path = "tracing-core", version = "0.1.0" }
+rustmeter-beacon-function-monitor = { path = "rustmeter-beacon-function-monitor", version = "0.1.0" }
+rustmeter-beacon-core = { path = "rustmeter-beacon-core", version = "0.1.0" }
 embassy-executor = { version = "0.9", features = ["defmt", "trace"] }
 defmt = { version = "1" }
 

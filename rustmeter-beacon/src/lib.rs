@@ -1,6 +1,6 @@
 #![no_std]
 
-pub use function_monitor::*;
-pub use tracing_core::*;
+pub use rustmeter_beacon_function_monitor::*;
+pub use rustmeter_beacon_core::*;
 
 mod embassy;

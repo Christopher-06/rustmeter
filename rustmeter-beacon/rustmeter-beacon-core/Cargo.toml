@@ -1,0 +1,17 @@
+[package]
+name = "rustmeter-beacon-core"
+version = "0.1.0"
+edition = "2024"
+exclude = ["/debug", "/target", ".gitignore"]
+license = "MIT"
+authors = ["Christopher Kock"]
+description = "Core library for rustmeter-beacon"
+repository = "https://github.com/Christopher-06/rustmeter"
+
+[dependencies]
+defmt = { version = "1" }
+
+[target.'cfg(target_arch = "xtensa")'.dependencies]
+esp-hal = "1"
+[target.'cfg(target_arch = "riscv32")'.dependencies]
+esp-hal = "1"

@@ -532,16 +532,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "function-monitor"
-version = "0.1.0"
-dependencies = [
- "darling 0.23.0",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "futures-core"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -802,8 +792,26 @@ version = "0.1.0"
 dependencies = [
  "defmt",
  "embassy-executor",
- "function-monitor",
- "tracing-core",
+ "rustmeter-beacon-core",
+ "rustmeter-beacon-function-monitor",
+]
+
+[[package]]
+name = "rustmeter-beacon-core"
+version = "0.1.0"
+dependencies = [
+ "defmt",
+ "esp-hal",
+]
+
+[[package]]
+name = "rustmeter-beacon-function-monitor"
+version = "0.1.0"
+dependencies = [
+ "darling 0.23.0",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -977,14 +985,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0cbe268d35bdb4bb5a56a2de88d0ad0eb70af5384a99d648cd4b3d04039800e"
 dependencies = [
  "winnow",
-]
-
-[[package]]
-name = "tracing-core"
-version = "0.1.0"
-dependencies = [
- "defmt",
- "esp-hal",
 ]
 
 [[package]]

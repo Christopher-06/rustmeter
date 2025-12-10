@@ -1,0 +1,18 @@
+[package]
+name = "rustmeter-beacon-function-monitor"
+version = "0.1.0"
+edition = "2024"
+exclude = ["/debug", "/target", ".gitignore"]
+license = "MIT"
+authors = ["Christopher Kock"]
+description = "Proc-macro to monitor function execution times for rustmeter-beacon"
+repository = "https://github.com/Christopher-06/rustmeter"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+darling = "0.23.0"
+proc-macro2 = "1.0.103"
+quote = "1.0.42"
+syn = { version = "2.0.111", features = ["full", "extra-traits"] }

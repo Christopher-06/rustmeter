@@ -1,4 +1,4 @@
-use tracing_core::get_current_core_id;
+use rustmeter_beacon_core::get_current_core_id;
 
 #[unsafe(no_mangle)]
 fn _embassy_trace_poll_start(executor_id: u32) {
