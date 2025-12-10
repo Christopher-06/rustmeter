@@ -40,14 +40,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Rust Nightly 
+
+      # --- Step A: Standard Rust Targets (RISC-V & ARM) ---
+      # These are included in the official Rust Nightly
+      - name: Install Official Rust Nightly (RISC-V & ARM)
         uses: dtolnay/rust-toolchain@nightly
         with:
-            #   ESP32-C3 (RISC-V), ESP32-S2 (Xtensa) and STM32 (ARM Cortex-M)
-          targets: riscv32imc-unknown-none-elf, xtensa-esp32-none-elf, thumbv7em-none-eabi        
-      - name: Build Beacon (RISC-V)
+          targets: riscv32imc-unknown-none-elf, thumbv7em-none-eabi
+      
+      - name: Build Beacon (RISC-V / ESP32-C3)
         run: cargo build --package rustmeter-beacon --target riscv32imc-unknown-none-elf --no-default-features
-      - name: Build Beacon (Xtensa)
-        run: cargo build --package rustmeter-beacon --target xtensa-esp32-none-elf --no-default-features
-      - name: Build Beacon (Cortex-M)
+
+      - name: Build Beacon (Cortex-M / STM32)
         run: cargo build --package rustmeter-beacon --target thumbv7em-none-eabi --no-default-features
+
+      # --- Step B: Xtensa Targets (ESP32 Classic, S2, S3) ---
+      # These require a custom toolchain installation
+      - name: Install Xtensa Toolchain
+        uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          default: true
+          buildtargets: esp32, esp32s2, esp32s3
+          ldproxy: false
+
+      - name: Build Beacon (Xtensa / ESP32 Classic)
+        run: cargo build --package rustmeter-beacon --target xtensa-esp32-none-elf --no-default-features
