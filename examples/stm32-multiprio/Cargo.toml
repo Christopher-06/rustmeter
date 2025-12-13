@@ -1,0 +1,43 @@
+# This file was automatically generated.
+
+[package]
+edition = "2024"
+name = "stm32-multiprio"
+version = "0.1.0"
+
+[dependencies]
+cortex-m = { version = "0.7.7", features = ["inline-asm", "critical-section-single-core"] }
+cortex-m-rt = "0.7.5"
+panic-probe = { version = "1.0.0", features = ["print-defmt"] }
+
+defmt = { version = "1.0.1" }
+defmt-rtt = { version = "1.1.0" }
+
+embassy-executor = { version = "0.9.1", features = ["arch-cortex-m", "executor-thread",  "executor-interrupt", "defmt"] }
+embassy-futures = { version = "0.1.2", features = ["defmt"] }
+embassy-stm32 = { version = "0.4.0", features = ["memory-x", "stm32f446rc", "time-driver-any", "exti", "unstable-pac", "defmt"] }
+embassy-sync = {version = "0.7.2", features = ["defmt"] }
+embassy-time = { version = "0.5.0", features = ["tick-hz-32_768", "defmt", "defmt-timestamp-uptime"] }
+rustmeter-beacon = { path = "../../rustmeter-beacon" }
+
+static_cell = "2.1.1"
+
+
+[[bin]]
+name = "stm32-multiprio"
+test = false
+bench = false
+
+[profile.dev]
+debug = true
+lto = true
+opt-level = "z"
+incremental = true
+
+[profile.release]
+debug = false
+lto = true
+opt-level = "z"
+incremental = true
+
+

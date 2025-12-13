@@ -5,6 +5,5 @@ members = [
     "rustmeter-cli",
     "rustmeter-beacon",
     "rustmeter-beacon/rustmeter-beacon-function-monitor",
-    "rustmeter-beacon/rustmeter-beacon-core",
-    "examples/esp32-multicore",
+    "rustmeter-beacon/rustmeter-beacon-core"
 ]
