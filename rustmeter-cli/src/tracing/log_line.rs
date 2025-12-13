@@ -25,6 +25,18 @@ impl LogLevel {
         }
     }
 
+    /// Get colored string representation of the log level
+    pub fn colored_string(&self) -> String {
+        use colored::Colorize;
+        match self {
+            LogLevel::Trace => "TRACE".to_string(),
+            LogLevel::Debug => "DEBUG".green().to_string(),
+            LogLevel::Info => "INFO".blue().to_string(),
+            LogLevel::Warn => "WARN".yellow().to_string(),
+            LogLevel::Error => "ERROR".red().to_string(),
+        }
+    }
+
     pub fn get_cname(&self) -> CName {
         match self {
             LogLevel::Trace => CName::Good,
@@ -103,7 +115,7 @@ impl Display for LogLine {
             f,
             "{:.6} [{}] {}",
             self.timestamp.as_secs_f64(),
-            self.level,
+            self.level.colored_string(),
             self.message
         )
     }
