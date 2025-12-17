@@ -54,7 +54,7 @@ impl TimeDelta {
     }
 }
 
-#[cfg(any(feature = "std"))]
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
     use super::*;
