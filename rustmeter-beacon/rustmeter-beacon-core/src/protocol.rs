@@ -6,42 +6,55 @@ pub enum EventPayload {
     /// Embassy Task is ready to be polled (Waker called).
     /// CoreID is not included here because ISR can run on any core (mostly core 0).
     /// ExecutorID is not included here because the lookup of the short executor ID takes time and this event is called often (Task-Executor mapping is done via TaskNewEvent).
-    EmbassyTaskReady {
-        task_id: u16,
-    },
-    EmbassyTaskExecBeginCore0 {
-        task_id: u16,
-    },  
-    EmbassyTaskExecBeginCore1 {
-        task_id: u16,
-    },
+    EmbassyTaskReady { task_id: u16 },
+    /// Embassy Task execution began (poll called).
+    /// CoreID is included via Variant (Core0/Core1).
+    /// ExecutorID is not included here because Task-Executor mapping is done via TaskNewEvent.
+    EmbassyTaskExecBeginCore0 { task_id: u16 },
+    /// Embassy Task execution began (poll called).
+    /// CoreID is included via Variant (Core0/Core1).
+    /// ExecutorID is not included here because Task-Executor mapping is done via TaskNewEvent
+    EmbassyTaskExecBeginCore1 { task_id: u16 },
     /// Embassy Task execution ended (returned Poll::Ready or yielded Poll::Pending).
-    /// CoreID is included via Suffix.
+    /// CoreID is included via Variant (Core0/Core1).
     /// ExecutorID is included because it is shorter to transmit than TaskID and we know the executor from the TaskExecBegin event.
-    EmbassyTaskExecEndCore0 {
-        executor_id: u3,
-    },
-    EmbassyTaskExecEndCore1 {
-        executor_id: u3,
-    },
-    EmbassyExecutorPollStart {
-        executor_id: u3,
-    },
-    EmbassyExecutorIdle {
-        executor_id: u3,
-    },
-    MonitorStartCore0 {
-        monitor_id: u8,
-    },
-    MonitorStartCore1 {
-        monitor_id: u8,
-    },
+    EmbassyTaskExecEndCore0 { executor_id: u3 },
+    /// Embassy Task execution ended (returned Poll::Ready or yielded Poll::Pending).
+    /// CoreID is included via Variant (Core0/Core1).
+    /// ExecutorID is included because it is shorter to transmit than TaskID and we know the executor from the TaskExecBegin event.
+    EmbassyTaskExecEndCore1 { executor_id: u3 },
+    /// Embassy Executor started polling tasks.
+    /// ExecutorID is included because it is the only identifier for the executor.
+    /// CoreID is not included here because executor than calls TaskExecBegin events that include the core ID (so this event can be taken out if not needed)
+    EmbassyExecutorPollStart { executor_id: u3 },
+    /// Embassy Executor is idle (no tasks to poll).
+    /// ExecutorID is included because it is the only identifier for the executor.
+    EmbassyExecutorIdle { executor_id: u3 },
+    /// Function or Scope Monitor started
+    /// CoreID is included via Variant (Core0/Core1).
+    /// MonitorID identifies the monitor instance (was assigned via previous TypeDefinition event).
+    MonitorStartCore0 { monitor_id: u8 },
+    /// Function or Scope Monitor started
+    /// CoreID is included via Variant (Core0/Core1).
+    /// MonitorID identifies the monitor instance (was assigned via previous TypeDefinition event).
+    MonitorStartCore1 { monitor_id: u8 },
+    /// Function or Scope Monitor ended
+    /// CoreID is included via Variant (Core0/Core1).
+    /// MonitorID are not included here because they can be inferred from the corresponding MonitorStart event on the same core.
     MonitorEndCore0,
+    /// Function or Scope Monitor ended
+    /// CoreID is included via Variant (Core0/Core1).
+    /// MonitorID are not included here because they can be inferred from the corresponding MonitorStart event
     MonitorEndCore1,
+    /// Value Monitor reported a value
+    /// ValueID identifies the monitor instance (was assigned via previous TypeDefinition event).
+    /// Value is the reported value payload.
+    /// CoreID is not relevant for value monitors and thus not included.
     MonitorValue {
         value_id: u8,
         value: MonitorValuePayload,
     },
+    /// Type Definition Event
     TypeDefinition(TypeDefinitionPayload),
 }
 
@@ -118,27 +131,39 @@ impl EventPayload {
     }
 }
 
+/// Type Definition Event Payloads
 pub enum TypeDefinitionPayload {
+    /// New Embassy Task created.
+    /// TaskID is the full task ID used in TaskReady events. (Can be compressed on host side to gather shorter taskid)
+    /// ExecutorIDLong is the full executor ID used to identify the executor instance.
+    /// ExecutorIDShort is the short executor ID used in events to identify the executor instance
     EmbassyTaskCreated {
         task_id: u32,
         executor_id_long: u32,
         executor_id_short: u3,
     },
+    /// Embassy Task ended
+    /// TaskID is the full task ID used in TaskReady events. (Can be compressed on host side to gather shorter taskid)
+    /// ExecutorIDLong is the full executor ID used to identify the executor instance.
+    /// ExecutorIDShort is the short executor ID used in events to identify the executor instance
+    /// This event indicates that the task will not be scheduled again.
     EmbassyTaskEnded {
         task_id: u32,
         executor_id_long: u32,
         executor_id_short: u3,
     },
-    FunctionMonitor {
-        monitor_id: u8,
-        fn_address: u32,
-    },
-    // TODO: Name can only be ???? length?
-    ScopeMonitor {
-        monitor_id: u8,
-        name: &'static str,
-    },
-    // TODO: Name can only be ???? length?
+    /// New Function Monitor defined
+    /// MonitorID identifies the monitor instance in future events.
+    /// FnAddress is the function address being monitored.
+    FunctionMonitor { monitor_id: u8, fn_address: u32 },
+    /// New Scope Monitor defined
+    /// MonitorID identifies the monitor instance in future events.
+    /// Name is a null-terminated string representing the name of the scope (max. 20 Characters).
+    ScopeMonitor { monitor_id: u8, name: &'static str },
+    /// New Value Monitor defined
+    /// ValueID identifies the monitor instance in future events.
+    /// TypeID identifies the type of the value being monitored (see MonitorValueType).
+    /// Name is a null-terminated string representing the name of the value (max. 20 Characters).
     ValueMonitor {
         value_id: u8,
         type_id: u8,
@@ -207,6 +232,7 @@ impl TypeDefinitionPayload {
     }
 }
 
+/// Payloads for Monitor Value Events
 pub enum MonitorValuePayload {
     U8(u8),
     U16(u16),
