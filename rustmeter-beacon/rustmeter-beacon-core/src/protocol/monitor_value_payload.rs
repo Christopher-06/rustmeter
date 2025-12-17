@@ -1,6 +1,7 @@
 use crate::buffer::{BufferReader, BufferWriter};
 
 /// Payloads for Monitor Value Events
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MonitorValuePayload {
     U8(u8),
     U16(u16),
@@ -217,25 +218,17 @@ mod tests {
         ];
 
         for value in values {
+            // Write the value to a buffer
             let mut writer = BufferWriter::new();
             value.write_bytes(&mut writer);
             let data = writer.as_slice();
 
+            // Read the value back from the buffer
             let mut reader = BufferReader::new(&data);
             let type_id = value.type_id();
             let read_value = MonitorValuePayload::from_bytes(type_id, &mut reader).unwrap();
 
-            match (value, read_value) {
-                (MonitorValuePayload::U8(v1), MonitorValuePayload::U8(v2)) => assert_eq!(v1, v2),
-                (MonitorValuePayload::U16(v1), MonitorValuePayload::U16(v2)) => assert_eq!(v1, v2),
-                (MonitorValuePayload::U32(v1), MonitorValuePayload::U32(v2)) => assert_eq!(v1, v2),
-                (MonitorValuePayload::U64(v1), MonitorValuePayload::U64(v2)) => assert_eq!(v1, v2),
-                (MonitorValuePayload::I8(v1), MonitorValuePayload::I8(v2)) => assert_eq!(v1, v2),
-                (MonitorValuePayload::I16(v1), MonitorValuePayload::I16(v2)) => assert_eq!(v1, v2),
-                (MonitorValuePayload::I32(v1), MonitorValuePayload::I32(v2)) => assert_eq!(v1, v2),
-                (MonitorValuePayload::I64(v1), MonitorValuePayload::I64(v2)) => assert_eq!(v1, v2),
-                _ => panic!("Mismatched types"),
-            }
+            assert_eq!(value, read_value);
         }
     }
 }

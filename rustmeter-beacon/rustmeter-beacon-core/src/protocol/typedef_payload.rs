@@ -3,6 +3,7 @@ use arbitrary_int::{traits::Integer, u3};
 use crate::buffer::{BufferReader, BufferWriter};
 
 /// Type Definition Event Payloads
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TypeDefinitionPayload {
     /// New Embassy Task created.
     /// TaskID is the full task ID used in TaskReady events. (Can be compressed on host side to gather shorter taskid)
@@ -235,143 +236,46 @@ mod tests {
     use crate::buffer::{BufferReader, BufferWriter};
 
     #[test]
-    fn test_type_definition_payload_task_created() {
-        let typedef = TypeDefinitionPayload::EmbassyTaskCreated {
-            task_id: 0x12345678,
-            executor_id_long: 0x9ABCDEF0,
-            executor_id_short: u3::new(5),
-        };
-
-        let mut writer = BufferWriter::new();
-        typedef.write_bytes(&mut writer);
-        let bytes = writer.as_slice();
-
-        let mut reader = BufferReader::new(bytes);
-        let typedef_id = reader.read_byte().unwrap();
-        let parsed_typedef = TypeDefinitionPayload::from_bytes(typedef_id, &mut reader).unwrap();
-
-        match parsed_typedef {
+    fn test_type_definition_read_and_write() {
+        let typedefs = vec![
             TypeDefinitionPayload::EmbassyTaskCreated {
-                task_id,
-                executor_id_long,
-                executor_id_short,
-            } => {
-                assert_eq!(task_id, 0x12345678);
-                assert_eq!(executor_id_long, 0x9ABCDEF0);
-                assert_eq!(executor_id_short, u3::new(5));
-            }
-            _ => panic!("Parsed typedef does not match original"),
-        }
-    }
-
-    #[test]
-    fn test_type_definition_payload_task_ended() {
-        let typedef = TypeDefinitionPayload::EmbassyTaskEnded {
-            task_id: 0x87654321,
-            executor_id_long: 0x0FEDCBA9,
-            executor_id_short: u3::new(3),
-        };
-
-        let mut writer = BufferWriter::new();
-        typedef.write_bytes(&mut writer);
-        let bytes = writer.as_slice();
-
-        let mut reader = BufferReader::new(bytes);
-        let typedef_id = reader.read_byte().unwrap();
-        let parsed_typedef = TypeDefinitionPayload::from_bytes(typedef_id, &mut reader).unwrap();
-
-        match parsed_typedef {
+                task_id: 0x12345678,
+                executor_id_long: 0x9ABCDEF0,
+                executor_id_short: u3::new(5),
+            },
             TypeDefinitionPayload::EmbassyTaskEnded {
-                task_id,
-                executor_id_long,
-                executor_id_short,
-            } => {
-                assert_eq!(task_id, 0x87654321);
-                assert_eq!(executor_id_long, 0x0FEDCBA9);
-                assert_eq!(executor_id_short, u3::new(3));
-            }
-            _ => panic!("Parsed typedef does not match original"),
-        }
-    }
-
-    #[test]
-    fn test_type_definition_payload_function_monitor() {
-        let typedef = TypeDefinitionPayload::FunctionMonitor {
-            monitor_id: 42,
-            fn_address: 0xDEADBEEF,
-        };
-
-        let mut writer = BufferWriter::new();
-        typedef.write_bytes(&mut writer);
-        let bytes = writer.as_slice();
-
-        let mut reader = BufferReader::new(bytes);
-        let typedef_id = reader.read_byte().unwrap();
-        let parsed_typedef = TypeDefinitionPayload::from_bytes(typedef_id, &mut reader).unwrap();
-
-        match parsed_typedef {
+                task_id: 0x87654321,
+                executor_id_long: 0x0FEDCBA9,
+                executor_id_short: u3::new(3),
+            },
             TypeDefinitionPayload::FunctionMonitor {
-                monitor_id,
-                fn_address,
-            } => {
-                assert_eq!(monitor_id, 42);
-                assert_eq!(fn_address, 0xDEADBEEF);
-            }
-            _ => panic!("Parsed typedef does not match original"),
-        }
-    }
-
-    #[test]
-    fn test_type_definition_payload_scope_monitor() {
-        let typedef = TypeDefinitionPayload::ScopeMonitor {
-            monitor_id: 7,
-            name: "TestScope".to_string(),
-        };
-
-        let mut writer = BufferWriter::new();
-        typedef.write_bytes(&mut writer);
-        let bytes = writer.as_slice();
-
-        let mut reader = BufferReader::new(bytes);
-        let typedef_id = reader.read_byte().unwrap();
-        let parsed_typedef = TypeDefinitionPayload::from_bytes(typedef_id, &mut reader).unwrap();
-
-        match parsed_typedef {
-            TypeDefinitionPayload::ScopeMonitor { monitor_id, name } => {
-                assert_eq!(monitor_id, 7);
-                assert_eq!(name, "TestScope");
-            }
-            _ => panic!("Parsed typedef does not match original"),
-        }
-    }
-
-    #[test]
-    fn test_type_definition_payload_value_monitor() {
-        let typedef = TypeDefinitionPayload::ValueMonitor {
-            value_id: 15,
-            type_id: 3,
-            name: "TestValue".to_string(),
-        };
-
-        let mut writer = BufferWriter::new();
-        typedef.write_bytes(&mut writer);
-        let bytes = writer.as_slice();
-
-        let mut reader = BufferReader::new(bytes);
-        let typedef_id = reader.read_byte().unwrap();
-        let parsed_typedef = TypeDefinitionPayload::from_bytes(typedef_id, &mut reader).unwrap();
-
-        match parsed_typedef {
+                monitor_id: 42,
+                fn_address: 0xDEADBEEF,
+            },
+            TypeDefinitionPayload::ScopeMonitor {
+                monitor_id: 7,
+                name: "TestScope".to_string(),
+            },
             TypeDefinitionPayload::ValueMonitor {
-                value_id,
-                type_id,
-                name,
-            } => {
-                assert_eq!(value_id, 15);
-                assert_eq!(type_id, 3);
-                assert_eq!(name, "TestValue");
-            }
-            _ => panic!("Parsed typedef does not match original"),
+                value_id: 13,
+                type_id: 2,
+                name: "TestValue".to_string(),
+            },
+        ];
+
+        for typedef in typedefs {
+            // Write typedef to bytes
+            let mut writer = BufferWriter::new();
+            typedef.write_bytes(&mut writer);
+            let bytes = writer.as_slice();
+
+            // Read typedef from bytes
+            let mut reader = BufferReader::new(bytes);
+            let typedef_id = reader.read_byte().unwrap();
+            let parsed_typedef =
+                TypeDefinitionPayload::from_bytes(typedef_id, &mut reader).unwrap();
+
+            assert_eq!(typedef, parsed_typedef);
         }
     }
 }
