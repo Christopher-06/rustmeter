@@ -4,6 +4,9 @@ use crate::{
 };
 use arbitrary_int::{traits::Integer, u3, u5};
 
+pub type MonitorValueReaderFn =
+    fn(monitor_id: u8, buffer: &mut BufferReader) -> Option<MonitorValuePayload>;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EventPayload {
     /// Embassy Task is ready to be polled (Waker called).
@@ -139,10 +142,7 @@ impl EventPayload {
     pub(crate) fn from_bytes(
         event_type: u8,
         buffer: &mut BufferReader,
-        monitor_value_reader: fn(
-            monitor_id: u8,
-            buffer: &mut BufferReader,
-        ) -> Option<MonitorValuePayload>,
+        monitor_value_reader: MonitorValueReaderFn,
     ) -> Option<EventPayload> {
         let event_id = u5::new(event_type >> 3);
         let _executor_short_id = u3::new(event_type & 0x07);
