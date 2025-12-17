@@ -119,9 +119,7 @@ impl EventPayload {
             EventPayload::MonitorEndCore1 => {}
             EventPayload::MonitorValue { value_id, value } => {
                 writer.write_byte(*value_id);
-                let mut data_buffer = [0u8; 8]; // Max size needed for u64/i64
-                let data_size = value.data_bytes(&mut data_buffer);
-                writer.write_bytes(&data_buffer[..data_size]);
+                value.write_bytes(writer);
             }
             EventPayload::TypeDefinition(def) => {
                 def.write_bytes(writer);

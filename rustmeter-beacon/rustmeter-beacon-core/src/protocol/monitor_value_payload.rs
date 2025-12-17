@@ -27,41 +27,34 @@ impl MonitorValuePayload {
 
     /// Write the payload data into the provided buffer.
     /// Returns the number of data bytes written into the provided buffer. Assumes the buffer is large enough.
-    pub fn data_bytes(&self, buffer: &mut [u8]) -> usize {
+    pub(crate) fn write_bytes(&self, buffer: &mut crate::tracing::BufferWriter) {
         match self {
             MonitorValuePayload::U8(v) => {
-                buffer[0] = *v;
-                1
+                buffer.write_byte(*v);
             }
             MonitorValuePayload::U16(v) => {
-                buffer[0..2].copy_from_slice(&v.to_le_bytes());
-                2
+                buffer.write_bytes(&v.to_le_bytes());
             }
             MonitorValuePayload::U32(v) => {
-                buffer[0..4].copy_from_slice(&v.to_le_bytes());
-                4
+                buffer.write_bytes(&v.to_le_bytes());
             }
             MonitorValuePayload::U64(v) => {
-                buffer[0..8].copy_from_slice(&v.to_le_bytes());
-                8
+                buffer.write_bytes(&v.to_le_bytes());
             }
             MonitorValuePayload::I8(v) => {
-                buffer[0] = *v as u8;
-                1
+                buffer.write_byte(*v as u8);
             }
             MonitorValuePayload::I16(v) => {
-                buffer[0..2].copy_from_slice(&v.to_le_bytes());
-                2
+                buffer.write_bytes(&v.to_le_bytes());
             }
             MonitorValuePayload::I32(v) => {
-                buffer[0..4].copy_from_slice(&v.to_le_bytes());
-                4
+                buffer.write_bytes(&v.to_le_bytes());
             }
             MonitorValuePayload::I64(v) => {
-                buffer[0..8].copy_from_slice(&v.to_le_bytes());
-                8
+                buffer.write_bytes(&v.to_le_bytes());
             }
-        }
+
+        };
     }
 }
 
