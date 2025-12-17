@@ -1,5 +1,4 @@
-#![cfg(not(feature = "std"))]
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 pub mod protocol;
 pub mod time_delta;

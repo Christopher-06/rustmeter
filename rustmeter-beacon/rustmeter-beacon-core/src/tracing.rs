@@ -52,3 +52,37 @@ pub fn write_tracing_event(event: EventPayload) {
     // Send the data over RTT
     unsafe { write_tracing_data(buffer.as_slice()) };
 }
+
+pub struct BufferReader<'a> {
+    buffer: &'a [u8],
+    position: usize,
+}
+
+/// Simple buffer reader for reading bytes from a slice
+impl<'a> BufferReader<'a> {
+    pub fn new(buffer: &'a [u8]) -> Self {
+        BufferReader { buffer, position: 0 }
+    }
+
+    /// Reads a single byte from the buffer. Returns None if end of buffer is reached.
+    pub fn read_byte(&mut self) -> Option<u8> {
+        if self.position >= self.buffer.len() {
+            return None;
+        }
+
+        let byte = self.buffer[self.position];
+        self.position += 1;
+        Some(byte)
+    }
+
+    /// Reads a slice of bytes of the given length from the buffer. Returns None if not enough data is available.
+    pub fn read_bytes(&mut self, length: usize) -> Option<&[u8]> {
+        if self.position + length > self.buffer.len() {
+            return None;
+        }
+
+        let bytes = &self.buffer[self.position..self.position + length];
+        self.position += length;
+        Some(bytes)
+    }
+}

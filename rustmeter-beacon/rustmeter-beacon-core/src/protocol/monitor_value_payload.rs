@@ -56,6 +56,57 @@ impl MonitorValuePayload {
 
         };
     }
+
+    /// Reads a MonitorValuePayload from the provided buffer based on the given type ID.
+    pub(crate) fn from_bytes(type_id : u8, buffer : &mut crate::tracing::BufferReader) -> Option<MonitorValuePayload> {
+        match type_id {
+            0 => buffer.read_byte().map(MonitorValuePayload::U8),
+            1 => {
+                let mut data = [0u8; 2];
+                for byte in data.iter_mut() {
+                    *byte = buffer.read_byte()?;
+                }
+                Some(MonitorValuePayload::U16(u16::from_le_bytes(data)))
+            }
+            2 => {
+                let mut data = [0u8; 4];
+                for byte in data.iter_mut() {
+                    *byte = buffer.read_byte()?;
+                }
+                Some(MonitorValuePayload::U32(u32::from_le_bytes(data)))
+            }
+            3 => {
+                let mut data = [0u8; 8];
+                for byte in data.iter_mut() {
+                    *byte = buffer.read_byte()?;
+                }
+                Some(MonitorValuePayload::U64(u64::from_le_bytes(data)))
+            }
+            4 => buffer.read_byte().map(|b| MonitorValuePayload::I8(b as i8)),
+            5 => {
+                let mut data = [0u8; 2];
+                for byte in data.iter_mut() {
+                    *byte = buffer.read_byte()?;
+                }
+                Some(MonitorValuePayload::I16(i16::from_le_bytes(data)))
+            }
+            6 => {
+                let mut data = [0u8; 4];
+                for byte in data.iter_mut() {
+                    *byte = buffer.read_byte()?;
+                }
+                Some(MonitorValuePayload::I32(i32::from_le_bytes(data)))
+            }
+            7 => {
+                let mut data = [0u8; 8];
+                for byte in data.iter_mut() {
+                    *byte = buffer.read_byte()?;
+                }
+                Some(MonitorValuePayload::I64(i64::from_le_bytes(data)))
+            }
+            _ => None,
+        }
+    }
 }
 
 pub trait MonitorValueType {
@@ -140,5 +191,49 @@ impl MonitorValueType for i64 {
 
     fn get_monitor_value_type_id(&self) -> u8 {
         7
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tracing::BufferWriter;
+    use crate::tracing::BufferReader;
+
+    #[test]
+    fn test_monitor_value_payload_write_and_read() {
+        let values: std::vec::Vec<MonitorValuePayload> = vec![
+            42u8.to_payload(),
+            65535u16.to_payload(),
+            4294967295u32.to_payload(),
+            18446744073709551615u64.to_payload(),
+            (-42i8).to_payload(),
+            (-32768i16).to_payload(),
+            (-2147483648i32).to_payload(),
+            (-9223372036854775808i64).to_payload(),
+        ];
+
+        for value in values {
+            let mut writer = BufferWriter::new();
+            value.write_bytes(&mut writer);
+            let data = writer.as_slice();
+
+            let mut reader = BufferReader::new(&data);
+            let type_id = value.type_id();
+            let read_value = MonitorValuePayload::from_bytes(type_id, &mut reader).unwrap();
+
+            match (value, read_value) {
+                (MonitorValuePayload::U8(v1), MonitorValuePayload::U8(v2)) => assert_eq!(v1, v2),
+                (MonitorValuePayload::U16(v1), MonitorValuePayload::U16(v2)) => assert_eq!(v1, v2),
+                (MonitorValuePayload::U32(v1), MonitorValuePayload::U32(v2)) => assert_eq!(v1, v2),
+                (MonitorValuePayload::U64(v1), MonitorValuePayload::U64(v2)) => assert_eq!(v1, v2),
+                (MonitorValuePayload::I8(v1), MonitorValuePayload::I8(v2)) => assert_eq!(v1, v2),
+                (MonitorValuePayload::I16(v1), MonitorValuePayload::I16(v2)) => assert_eq!(v1, v2),
+                (MonitorValuePayload::I32(v1), MonitorValuePayload::I32(v2)) => assert_eq!(v1, v2),
+                (MonitorValuePayload::I64(v1), MonitorValuePayload::I64(v2)) => assert_eq!(v1, v2),
+                _ => panic!("Mismatched types"),
+            }
+        }
     }
 }
