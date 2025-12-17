@@ -1,5 +1,7 @@
 use arbitrary_int::{traits::Integer, u3};
 
+use crate::buffer::BufferWriter;
+
 /// Type Definition Event Payloads
 pub enum TypeDefinitionPayload {
     /// New Embassy Task created.
@@ -51,7 +53,7 @@ impl TypeDefinitionPayload {
         }
     }
 
-    pub(crate) fn write_bytes(&self, writer: &mut crate::tracing::BufferWriter) {
+    pub(crate) fn write_bytes(&self, writer: &mut BufferWriter) {
         // Write the type definition ID as first byte
         writer.write_byte(self.type_id());
 

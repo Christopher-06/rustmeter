@@ -1,4 +1,4 @@
-use crate::tracing;
+use crate::buffer::BufferWriter;
 
 static mut LAST_TIMESTAMP: u32 = 0;
 
@@ -34,7 +34,7 @@ impl TimeDelta {
     /// Write the TimeDelta into the provided writer. It will use either 2 or 4 bytes depending on the size:
     /// - If the delta is less than 2^15, it will be written as a 2-byte value with the highest bit set to 0.
     /// - If the delta is 2^15 or more, it will be written as a 4-byte value with the highest bit set to 1. If the delta exceeds 2^31 - 1, it will be capped to that value.
-    pub fn write(&self, writer: &mut tracing::BufferWriter) {
+    pub fn write(&self, writer: &mut BufferWriter) {
         if self.is_extended() {
             // Cap value at 2^31 - 1
             let capped_delta = if self.delta > (2u32.pow(31) - 1) {
@@ -54,11 +54,11 @@ impl TimeDelta {
     }
 }
 
-#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
+
     use super::*;
-    use crate::tracing::BufferWriter;
+    use crate::buffer::BufferWriter;
 
     #[test]
     fn test_time_delta_write() {

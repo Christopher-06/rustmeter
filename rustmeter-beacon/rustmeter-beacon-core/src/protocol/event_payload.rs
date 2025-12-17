@@ -1,5 +1,8 @@
+use crate::{
+    buffer::BufferWriter,
+    protocol::{MonitorValuePayload, TypeDefinitionPayload},
+};
 use arbitrary_int::{traits::Integer, u3, u5};
-use crate::protocol::{TypeDefinitionPayload, MonitorValuePayload};
 
 pub enum EventPayload {
     /// Embassy Task is ready to be polled (Waker called).
@@ -88,7 +91,7 @@ impl EventPayload {
         }
     }
 
-    pub(crate) fn write_bytes(&self, writer: &mut crate::tracing::BufferWriter) {
+    pub(crate) fn write_bytes(&self, writer: &mut BufferWriter) {
         // Write the event ID (5 bits) and executor short ID (3 bits) as a single byte
         let executor_short_id = self.get_executor_id().map_or(u8::ZERO, |id| id.as_u8());
         let event_type = u8::from(self.event_id()) << 3 | executor_short_id;

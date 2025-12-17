@@ -1,3 +1,5 @@
+use crate::buffer::{BufferReader, BufferWriter};
+
 /// Payloads for Monitor Value Events
 pub enum MonitorValuePayload {
     U8(u8),
@@ -27,7 +29,7 @@ impl MonitorValuePayload {
 
     /// Write the payload data into the provided buffer.
     /// Returns the number of data bytes written into the provided buffer. Assumes the buffer is large enough.
-    pub(crate) fn write_bytes(&self, buffer: &mut crate::tracing::BufferWriter) {
+    pub(crate) fn write_bytes(&self, buffer: &mut BufferWriter) {
         match self {
             MonitorValuePayload::U8(v) => {
                 buffer.write_byte(*v);
@@ -53,12 +55,14 @@ impl MonitorValuePayload {
             MonitorValuePayload::I64(v) => {
                 buffer.write_bytes(&v.to_le_bytes());
             }
-
         };
     }
 
     /// Reads a MonitorValuePayload from the provided buffer based on the given type ID.
-    pub(crate) fn from_bytes(type_id : u8, buffer : &mut crate::tracing::BufferReader) -> Option<MonitorValuePayload> {
+    pub(crate) fn from_bytes(
+        type_id: u8,
+        buffer: &mut BufferReader,
+    ) -> Option<MonitorValuePayload> {
         match type_id {
             0 => buffer.read_byte().map(MonitorValuePayload::U8),
             1 => {
@@ -194,12 +198,10 @@ impl MonitorValueType for i64 {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tracing::BufferWriter;
-    use crate::tracing::BufferReader;
+    use crate::buffer::{BufferReader, BufferWriter};
 
     #[test]
     fn test_monitor_value_payload_write_and_read() {
