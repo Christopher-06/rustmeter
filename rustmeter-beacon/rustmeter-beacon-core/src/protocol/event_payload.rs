@@ -1,9 +1,10 @@
 use crate::{
-    buffer::BufferWriter,
+    buffer::{BufferReader, BufferWriter},
     protocol::{MonitorValuePayload, TypeDefinitionPayload},
 };
 use arbitrary_int::{traits::Integer, u3, u5};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EventPayload {
     /// Embassy Task is ready to be polled (Waker called).
     /// CoreID is not included here because ISR can run on any core (mostly core 0).
@@ -127,6 +128,166 @@ impl EventPayload {
             EventPayload::TypeDefinition(def) => {
                 def.write_bytes(writer);
             }
+        }
+    }
+
+    #[cfg(feature = "std")]
+    /// Reads an EventPayload from the provided buffer based on the given type ID. Params:
+    /// - event_type: The combined event type byte containing event ID and executor short ID.
+    /// - buffer: The buffer reader to read additional event data from.
+    /// - monitor_value_reader: A function to read MonitorValuePayloads, since they require additional context (e.q. Value Type of the monitor).
+    pub(crate) fn from_bytes(
+        event_type: u8,
+        buffer: &mut BufferReader,
+        monitor_value_reader: fn(
+            monitor_id: u8,
+            buffer: &mut BufferReader,
+        ) -> Option<MonitorValuePayload>,
+    ) -> Option<EventPayload> {
+        let event_id = u5::new(event_type >> 3);
+        let _executor_short_id = u3::new(event_type & 0x07);
+
+        match event_id.as_u8() {
+            // EmbassyTaskReady
+            0 => {
+                let mut data = [0u8; 2];
+                for byte in data.iter_mut() {
+                    *byte = buffer.read_byte()?;
+                }
+                Some(EventPayload::EmbassyTaskReady {
+                    task_id: u16::from_le_bytes(data),
+                })
+            }
+            // EmbassyTaskExecBeginCore0
+            1 => {
+                let mut data = [0u8; 2];
+                for byte in data.iter_mut() {
+                    *byte = buffer.read_byte()?;
+                }
+                Some(EventPayload::EmbassyTaskExecBeginCore0 {
+                    task_id: u16::from_le_bytes(data),
+                })
+            }
+            // EmbassyTaskExecBeginCore
+            2 => {
+                let mut data = [0u8; 2];
+                for byte in data.iter_mut() {
+                    *byte = buffer.read_byte()?;
+                }
+                Some(EventPayload::EmbassyTaskExecBeginCore1 {
+                    task_id: u16::from_le_bytes(data),
+                })
+            }
+            // EmbassyTaskExecEndCore0
+            3 => Some(EventPayload::EmbassyTaskExecEndCore0 {
+                executor_id: _executor_short_id,
+            }),
+            // EmbassyTaskExecEndCore1
+            4 => Some(EventPayload::EmbassyTaskExecEndCore1 {
+                executor_id: _executor_short_id,
+            }),
+            // EmbassyExecutorPollStart
+            5 => Some(EventPayload::EmbassyExecutorPollStart {
+                executor_id: _executor_short_id,
+            }),
+            // EmbassyExecutorIdle
+            6 => Some(EventPayload::EmbassyExecutorIdle {
+                executor_id: _executor_short_id,
+            }),
+            // MonitorStartCore0
+            7 => {
+                let monitor_id = buffer.read_byte()?;
+                Some(EventPayload::MonitorStartCore0 { monitor_id })
+            }
+            // MonitorStartCore1
+            8 => {
+                let monitor_id = buffer.read_byte()?;
+                Some(EventPayload::MonitorStartCore1 { monitor_id })
+            }
+            // MonitorEndCore0
+            9 => Some(EventPayload::MonitorEndCore0),
+            // MonitorEndCore1
+            10 => Some(EventPayload::MonitorEndCore1),
+            // MonitorValue
+            11 => {
+                let value_id = buffer.read_byte()?;
+                let value = monitor_value_reader(value_id, buffer)?;
+                Some(EventPayload::MonitorValue { value_id, value })
+            }
+            // TypeDefinition
+            12 => {
+                let typedef_it = buffer.read_byte()?;
+                let def = TypeDefinitionPayload::from_bytes(typedef_it, buffer)?;
+                Some(EventPayload::TypeDefinition(def))
+            }
+            _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "std")]
+mod tests {
+    use super::*;
+    use crate::{
+        buffer::{BufferReader, BufferWriter},
+        protocol::{MonitorValuePayload, monitor_value_payload::MonitorValueType},
+    };
+
+    #[test]
+    fn test_event_payload_write_and_read() {
+        let events = vec![
+            EventPayload::EmbassyTaskReady { task_id: 42 },
+            EventPayload::EmbassyTaskExecBeginCore0 { task_id: 43 },
+            EventPayload::EmbassyTaskExecBeginCore1 { task_id: 44 },
+            EventPayload::EmbassyTaskExecEndCore0 {
+                executor_id: u3::new(1),
+            },
+            EventPayload::EmbassyTaskExecEndCore1 {
+                executor_id: u3::new(2),
+            },
+            EventPayload::EmbassyExecutorPollStart {
+                executor_id: u3::new(3),
+            },
+            EventPayload::EmbassyExecutorIdle {
+                executor_id: u3::new(4),
+            },
+            EventPayload::MonitorStartCore0 { monitor_id: 5 },
+            EventPayload::MonitorStartCore1 { monitor_id: 6 },
+            EventPayload::MonitorEndCore0,
+            EventPayload::MonitorEndCore1,
+            EventPayload::MonitorValue {
+                value_id: 7,
+                value: MonitorValuePayload::U32(123456),
+            },
+            EventPayload::TypeDefinition(TypeDefinitionPayload::ScopeMonitor {
+                monitor_id: 8,
+                name: "test_scope".to_string(),
+            }),
+        ];
+
+        // create a closure to read MonitorValuePayloads for testing
+        let monitor_value_reader = |monitor_id: u8, buffer: &mut BufferReader| {
+            assert_eq!(monitor_id, 7); // we only test with monitor_id 7 here
+            MonitorValuePayload::from_bytes(u32::ZERO.get_monitor_value_type_id(), buffer)
+        };
+
+        for event in events {
+            // Write the event to bytes
+            let mut writer = BufferWriter::new();
+            event.write_bytes(&mut writer);
+            let bytes = writer.as_slice();
+
+            // Read the event back from bytes
+            let mut reader = BufferReader::new(bytes);
+            let read_event = EventPayload::from_bytes(
+                reader.read_byte().unwrap(),
+                &mut reader,
+                monitor_value_reader,
+            )
+            .unwrap();
+
+            assert_eq!(event, read_event);
         }
     }
 }
