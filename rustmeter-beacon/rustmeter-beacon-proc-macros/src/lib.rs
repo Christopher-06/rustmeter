@@ -91,31 +91,72 @@ pub fn monitor_fn(attr: TokenStream, item: TokenStream) -> TokenStream {
         output_name = custom_name;
     }
 
-    // TODO: Send one event when function is done and measure duration from start ==> less defmt messages BUT long computation inside function do not get logged when
-    //       function is running for a long time and we exit while it is still running
-    //          - which timestamp method to use for that?
-
     if input.sig.asyncness.is_some() {
         // ASYNC FUNCTION
         quote! {
-            let core_id = rustmeter_beacon::get_current_core_id();
-            async move {
-                    defmt::info!("@EVENT_MONITOR_START(function_name={=istr},core_id={})", defmt::intern!(#output_name), core_id);
-                    let result = { #block };
-                    defmt::info!("@EVENT_MONITOR_END(function_name={=istr},core_id={})", defmt::intern!(#output_name), core_id);
-                    result
-                }
-            }.into()
+        let core_id = rustmeter_beacon::core_id::get_current_core_id();
+        async move {
+                // defmt::info!("@EVENT_MONITOR_START(function_name={=istr},core_id={})", defmt::intern!(#output_name), core_id);
+                let result = { #block };
+                // defmt::info!("@EVENT_MONITOR_END(function_name={=istr},core_id={})", defmt::intern!(#output_name), core_id);
+                result
+            }
+        }
+        .into()
     } else {
         // SYNC FUNCTION
         quote! {
             #(#attrs)*
             #vis #sig {
-                let core_id = rustmeter_beacon::get_current_core_id();
-                defmt::info!("@EVENT_MONITOR_START(function_name={=istr},core_id={})", defmt::intern!(#output_name), core_id);
-                let result = (move || { #block })();
-                defmt::info!("@EVENT_MONITOR_END(function_name={=istr},core_id={})", defmt::intern!(#output_name), core_id);
-                result
+                {
+                    let core_id = rustmeter_beacon::core_id::get_current_core_id();
+
+                    // Get or register monitor ID
+                    use rustmeter_beacon::monitors::VALUE_MONITOR_REGISTRY;
+                    let (local_id, registered_newly) = rustmeter_beacon::get_static_id_by_registry!(
+                        rustmeter_beacon::monitors::CODE_MONITOR_REGISTRY
+                    );
+
+                    // Send TypeDefinition event if newly registered
+                    if registered_newly {
+                        let fn_addr = #fn_name as usize;
+                        let payload = rustmeter_beacon::protocol::TypeDefinitionPayload::FunctionMonitor {
+                            monitor_id: local_id as u8,
+                            fn_address: fn_addr as u32,
+                        };
+                        rustmeter_beacon::tracing::write_tracing_event(
+                            rustmeter_beacon::protocol::EventPayload::TypeDefinition(payload)
+                        );
+                    
+                        rustmeter_beacon::monitors::defmt_trace_new_function_monitor(#output_name, local_id);
+                    }
+
+                    // Create guard to signal end of scope
+                    let _guard = rustmeter_beacon::monitors::DropGuard::new(|| {
+                        // Create and send MonitorEnd event
+                        let payload = match core_id {
+                            0 => rustmeter_beacon::protocol::EventPayload::MonitorEndCore0 {},
+                            1 => rustmeter_beacon::protocol::EventPayload::MonitorEndCore1 {},
+                            _ => rustmeter_beacon::core_id::unreachable_core_id(core_id),
+                        };
+                        rustmeter_beacon::tracing::write_tracing_event(payload);
+                    });
+
+                // Send MonitorStart event (after guard-created to lower tracing impact on measured scope)
+                let payload = match core_id {
+                    0 => rustmeter_beacon::protocol::EventPayload::MonitorStartCore0 {
+                        monitor_id: local_id as u8
+                    },
+                    1 => rustmeter_beacon::protocol::EventPayload::MonitorStartCore1 {
+                        monitor_id: local_id as u8
+                    },
+                    _ => rustmeter_beacon::core_id::unreachable_core_id(core_id),
+                };
+                rustmeter_beacon::tracing::write_tracing_event(payload);
+            }
+
+                // Execute original function body
+                {#block }
             }
         }.into()
     }

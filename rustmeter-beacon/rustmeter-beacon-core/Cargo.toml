@@ -9,9 +9,8 @@ description = "Core library for rustmeter-beacon"
 repository = "https://github.com/Christopher-06/rustmeter"
 
 [dependencies]
-defmt = { version = "1" }
+portable-atomic = "1"
+arbitrary-int = "2"
 
-[target.'cfg(target_arch = "xtensa")'.dependencies]
-esp-hal = "1"
-[target.'cfg(target_arch = "riscv32")'.dependencies]
-esp-hal = "1"
+[features]
+std = ["portable-atomic/std"]

@@ -23,3 +23,11 @@ pub fn get_current_core_id() -> u8 {
     //
     0
 }
+
+#[allow(unused_variables, unreachable_code)]
+pub fn unreachable_core_id(core_id: u8) -> ! {
+    #[cfg(feature = "defmt")]
+    defmt::panic!("Unsupported core ID: {}", core_id);
+
+    loop {}
+}

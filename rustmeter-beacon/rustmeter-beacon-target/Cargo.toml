@@ -1,0 +1,25 @@
+[package]
+name = "rustmeter-beacon-target"
+version = "0.1.0"
+edition = "2024"
+exclude = ["/debug", "/target", ".gitignore"]
+license = "MIT"
+authors = ["Christopher Kock"]
+description = "Target side library for rustmeter-beacon"
+repository = "https://github.com/Christopher-06/rustmeter"
+
+[dependencies]
+rtt-target = { version = "0.6.2" }
+defmt = { version = "1", optional = true }
+rustmeter-beacon-core = { path = "../rustmeter-beacon-core" }
+portable-atomic = "1"
+arbitrary-int = "2"
+embassy-time = { version = "0.5" }
+
+esp-hal = { version = "1", optional = true }
+
+[features]
+defmt = ["dep:defmt", "rtt-target/defmt"]
+esp32 = ["dep:esp-hal"]
+stm32 = []
+rp2040 = []
