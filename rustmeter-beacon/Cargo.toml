@@ -4,16 +4,22 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 authors = ["Christopher Kock"]
-description = "Lightweight tracing library for embedded Rust applications, integrated with embassy and defmt."
+description = "Lightweight tracing library for embedded Rust applications"
 repository = "https://github.com/Christopher-06/rustmeter"
 keywords = ["embedded", "tracing", "profiling", "no-std", "embassy"]
 categories = ["embedded", "development-tools::profiling", "no-std"]
 exclude = ["/debug", "/target", ".gitignore"]
 
 [dependencies]
-rustmeter-beacon-function-monitor = { path = "rustmeter-beacon-function-monitor", version = "0.1.0" }
+rustmeter-beacon-proc-macros = { path = "rustmeter-beacon-proc-macros", version = "0.1.0" }
 rustmeter-beacon-core = { path = "rustmeter-beacon-core", version = "0.1.0" }
-embassy-executor = { version = "0.9", features = ["defmt", "trace"] }
-defmt = { version = "1" }
+rustmeter-beacon-target = { path = "rustmeter-beacon-target", version = "0.1.0", optional = true }
+
+defmt = { version = "1", optional = true }
 
 [features]
+stm32 = ["dep:rustmeter-beacon-target", "rustmeter-beacon-target/stm32"]
+esp32 = ["dep:rustmeter-beacon-target", "rustmeter-beacon-target/esp32"]
+rp2040 = ["dep:rustmeter-beacon-target", "rustmeter-beacon-target/rp2040"]
+defmt = ["dep:defmt", "rustmeter-beacon-target/defmt"]
+std = ["rustmeter-beacon-core/std"]
