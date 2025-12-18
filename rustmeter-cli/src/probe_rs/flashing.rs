@@ -1,11 +1,11 @@
 use std::{path::PathBuf, time::Duration};
 
-use probe_rs::{
-    Core, Session,
-    flashing::{self, DownloadOptions, ElfOptions, FlashProgress},
-};
+use probe_rs::flashing::{self, DownloadOptions, ElfOptions, FlashProgress};
 
-use crate::probe_rs::flash_progress::{progress_handler, reset_progress};
+use crate::probe_rs::{
+    atomic_session::AtomicSession,
+    flash_progress::{progress_handler, reset_progress},
+};
 
 fn define_download_options<'a>() -> DownloadOptions<'a> {
     reset_progress();
@@ -20,12 +20,14 @@ fn define_download_options<'a>() -> DownloadOptions<'a> {
 
 /// Flash the given ELF file to the target and start the controller core.
 pub fn flash_and_start_controller<'a>(
-    session: &'a mut Session,
+    session: &AtomicSession,
     elf_path: &PathBuf,
-) -> anyhow::Result<Core<'a>> {
+) -> anyhow::Result<()> {
+    let mut session = session.lock();
+
     // Start flashing the ELF file
     probe_rs::flashing::download_file_with_options(
-        session,
+        &mut session,
         elf_path,
         flashing::Format::Elf(ElfOptions::default()),
         define_download_options(),
@@ -37,5 +39,5 @@ pub fn flash_and_start_controller<'a>(
     core.run()?;
     println!("Flashing completed successfully.");
 
-    Ok(core)
+    Ok(())
 }

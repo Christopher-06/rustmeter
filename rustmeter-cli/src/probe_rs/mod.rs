@@ -3,6 +3,8 @@ use probe_rs::probe::{Probe, list::Lister};
 
 mod flash_progress;
 pub mod flashing;
+pub mod rtt_listener;
+pub mod atomic_session;
 
 /// Connects to the first available probe.
 pub fn connect_to_first_probe() -> anyhow::Result<Probe> {
