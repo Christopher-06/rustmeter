@@ -1,5 +1,5 @@
 #[cfg(feature = "std")]
-use crate::protocol::MonitorValueReaderFn;
+use crate::buffer::BufferReader;
 use crate::{buffer::BufferWriter, protocol::EventPayload, time_delta::TimeDelta};
 
 unsafe extern "Rust" {
@@ -21,15 +21,16 @@ pub fn write_tracing_event(event: EventPayload) {
 }
 
 #[cfg(feature = "std")]
-pub fn read_tracing_event(
-    data: &[u8],
-    monitor_value_reader: MonitorValueReaderFn,
-) -> Option<(TimeDelta, EventPayload)> {
-    let mut reader = crate::buffer::BufferReader::new(data);
-
-    let timestamp = TimeDelta::read_bytes(&mut reader)?;
-    let event_type = reader.read_byte()?;
-    let event = EventPayload::from_bytes(event_type, &mut reader, monitor_value_reader)?;
+pub fn read_tracing_event<F>(
+    buffer: &mut BufferReader,
+    monitor_type_fn: &F,
+) -> Option<(TimeDelta, EventPayload)>
+where
+    F: Fn(u8) -> Option<u8>,
+{
+    let timestamp = TimeDelta::read_bytes(buffer)?;
+    let event_type = buffer.read_byte()?;
+    let event = EventPayload::from_bytes(event_type, buffer, monitor_type_fn)?;
 
     Some((timestamp, event))
 }
@@ -76,9 +77,9 @@ mod tests {
             },
         ];
 
-        let monitor_value_reader = |monitor_id: u8, buffer: &mut BufferReader| {
+        let monitor_value_reader = |monitor_id: u8| {
             assert_eq!(monitor_id, 1);
-            MonitorValuePayload::from_bytes(u16::ZERO.get_monitor_value_type_id(), buffer)
+            Some(u16::ZERO.get_monitor_value_type_id())
         };
 
         for event in events {
@@ -90,8 +91,10 @@ mod tests {
             let data = buffer.as_slice();
 
             // Read event
-            let (read_timestamp, read_event) = read_tracing_event(data, monitor_value_reader)
-                .expect("Failed to read tracing event");
+            let mut buffer = BufferReader::new(data);
+            let (read_timestamp, read_event) =
+                read_tracing_event(&mut buffer, &monitor_value_reader)
+                    .expect("Failed to read tracing event");
 
             assert_eq!(timestamp, read_timestamp);
             assert_eq!(event, read_event);

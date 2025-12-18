@@ -4,9 +4,6 @@ use crate::{
 };
 use arbitrary_int::{traits::Integer, u3, u5};
 
-pub type MonitorValueReaderFn =
-    fn(monitor_id: u8, buffer: &mut BufferReader) -> Option<MonitorValuePayload>;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EventPayload {
     /// Embassy Task is ready to be polled (Waker called).
@@ -138,12 +135,15 @@ impl EventPayload {
     /// Reads an EventPayload from the provided buffer based on the given type ID. Params:
     /// - event_type: The combined event type byte containing event ID and executor short ID.
     /// - buffer: The buffer reader to read additional event data from.
-    /// - monitor_value_reader: A function to read MonitorValuePayloads, since they require additional context (e.q. Value Type of the monitor).
-    pub(crate) fn from_bytes(
+    /// - monitor_value_reader: A function to map monitor IDs to their corresponding ValueTypes.
+    pub fn from_bytes<F>(
         event_type: u8,
         buffer: &mut BufferReader,
-        monitor_value_reader: MonitorValueReaderFn,
-    ) -> Option<EventPayload> {
+        monitor_type_fn: &F,
+    ) -> Option<EventPayload>
+    where
+        F: Fn(u8) -> Option<u8>,
+    {
         let event_id = u5::new(event_type >> 3);
         let _executor_short_id = u3::new(event_type & 0x07);
 
@@ -211,7 +211,9 @@ impl EventPayload {
             // MonitorValue
             11 => {
                 let value_id = buffer.read_byte()?;
-                let value = monitor_value_reader(value_id, buffer)?;
+                let type_id = monitor_type_fn(value_id)?;
+                let value = MonitorValuePayload::from_bytes(type_id, buffer)?;
+
                 Some(EventPayload::MonitorValue { value_id, value })
             }
             // TypeDefinition
@@ -267,9 +269,9 @@ mod tests {
         ];
 
         // create a closure to read MonitorValuePayloads for testing
-        let monitor_value_reader = |monitor_id: u8, buffer: &mut BufferReader| {
+        let monitor_value_reader = |monitor_id: u8| {
             assert_eq!(monitor_id, 7); // we only test with monitor_id 7 here
-            MonitorValuePayload::from_bytes(u32::ZERO.get_monitor_value_type_id(), buffer)
+            Some(u32::ZERO.get_monitor_value_type_id())
         };
 
         for event in events {
@@ -283,7 +285,7 @@ mod tests {
             let read_event = EventPayload::from_bytes(
                 reader.read_byte().unwrap(),
                 &mut reader,
-                monitor_value_reader,
+                &monitor_value_reader,
             )
             .unwrap();
 
