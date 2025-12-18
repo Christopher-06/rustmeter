@@ -21,3 +21,9 @@ rustc-demangle = "0.1"
 color-print = "0.3.7"
 ctrlc = "3.5.1"
 colored = "3.0.0"
+probe-rs = "0.30.0"
+
+rustmeter-beacon = { path = "../rustmeter-beacon", features = ["std"]}
+indicatif = "0.18.3"
+defmt-decoder = "1.0.0"
+defmt-parser = "1.0.0"

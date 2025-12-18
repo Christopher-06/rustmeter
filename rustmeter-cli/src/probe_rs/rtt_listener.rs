@@ -39,16 +39,16 @@ impl RttListener {
         })
     }
 
-    pub fn get_defmt_bytes_recver(&self) -> &Receiver<Box<[u8]>> {
-        &self.defmt_bytes_recver
+    pub fn get_defmt_bytes_recver(&self) -> Receiver<Box<[u8]>> {
+        self.defmt_bytes_recver.clone()
     }
 
-    pub fn get_tracing_bytes_recver(&self) -> &Receiver<Box<[u8]>> {
-        &self.tracing_bytes_recver
+    pub fn get_tracing_bytes_recver(&self) -> Receiver<Box<[u8]>> {
+        self.tracing_bytes_recver.clone()
     }
 
-    pub fn get_error_recver(&self) -> &Receiver<anyhow::Error> {
-        &self.error_recver
+    pub fn get_error_recver(&self) -> Receiver<anyhow::Error> {
+        self.error_recver.clone()
     }
 }
 
