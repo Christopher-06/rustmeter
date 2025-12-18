@@ -10,6 +10,10 @@ pub struct CommandLineArgs {
     // Choose Embedded Project Directory
     #[clap(long, default_value = ".")]
     pub project: String,
+
+    // Choose Chip (required)
+    #[clap(long)]
+    pub chip: String,
 }
 
 impl CommandLineArgs {
