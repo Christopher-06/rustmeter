@@ -78,6 +78,10 @@ impl TimeDelta {
             Some(TimeDelta { delta })
         }
     }
+
+    pub fn get_delta_us(&self) -> u32 {
+        self.delta
+    }
 }
 
 #[cfg(test)]
