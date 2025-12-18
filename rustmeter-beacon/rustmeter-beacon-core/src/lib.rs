@@ -3,7 +3,7 @@
 pub mod protocol;
 pub mod time_delta;
 pub mod tracing;
-mod buffer;
+pub mod buffer;
 
 pub fn compressed_task_id(task_id: u32) -> u16 {
     // Step 1: Ignore alignment.

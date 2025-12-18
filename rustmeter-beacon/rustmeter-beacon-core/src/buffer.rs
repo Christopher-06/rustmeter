@@ -65,6 +65,10 @@ impl<'a> BufferReader<'a> {
         self.position += length;
         Some(bytes)
     }
+
+    pub fn get_position(&self) -> usize {
+        self.position
+    }
 }
 
 
