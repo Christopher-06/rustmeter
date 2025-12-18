@@ -1865,6 +1865,7 @@ name = "rustmeter"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arbitrary-int",
  "clap",
  "color-print",
  "colored 3.0.0",
