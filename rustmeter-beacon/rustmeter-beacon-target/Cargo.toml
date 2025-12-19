@@ -16,10 +16,19 @@ portable-atomic = "1"
 arbitrary-int = "2"
 embassy-time = { version = "0.5" }
 
-esp-hal = { version = "1", optional = true }
+esp-hal = { version = "1", optional = true}
+embassy-rp = { version = "0.9", optional = true}
 
 [features]
 defmt = ["dep:defmt", "rtt-target/defmt"]
-esp32 = ["dep:esp-hal"]
 stm32 = []
-rp2040 = []
+esp32 = ["dep:esp-hal", "esp-hal/esp32"]
+esp32c2 = ["dep:esp-hal", "esp-hal/esp32c2"]
+esp32c3 = ["dep:esp-hal", "esp-hal/esp32c3"]
+esp32c6 = ["dep:esp-hal", "esp-hal/esp32c6"]
+esp32h2 = ["dep:esp-hal", "esp-hal/esp32h2"]
+esp32s2 = ["dep:esp-hal", "esp-hal/esp32s2"]
+esp32s3 = ["dep:esp-hal", "esp-hal/esp32s3"]
+rp2040 = ["dep:embassy-rp", "embassy-rp/rp2040"]
+rp235xa = ["dep:embassy-rp", "embassy-rp/rp235xa"]
+rp235xb = ["dep:embassy-rp", "embassy-rp/rp235xb"]

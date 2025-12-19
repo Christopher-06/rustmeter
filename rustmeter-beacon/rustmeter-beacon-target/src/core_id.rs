@@ -4,19 +4,35 @@
 /// Supports various architectures including ESP32 (Xtensa and RISC-V), RP2040, and STM32 (single or H7 dual-core).
 pub fn get_current_core_id() -> u8 {
     //
-    // 1. ESP32 via esp-hal (xtensa or riscv32) [can be dual-core]
+    // ESP32 via esp-hal (xtensa or riscv32) [can be dual-core]
     //
-    #[cfg(target_arch = "xtensa")]
+    #[cfg(any(
+        feature = "esp32",
+        feature = "esp32c2",
+        feature = "esp32c3",
+        feature = "esp32c6",
+        feature = "esp32h2",
+        feature = "esp32s2",
+        feature = "esp32s3"
+    ))]
     {
         return esp_hal::system::Cpu::current() as u8;
     }
 
-    #[cfg(target_arch = "riscv32")]
+    // STM32 (most likely single-core)
+    #[cfg(feature = "stm32")]
     {
-        return esp_hal::system::Cpu::current() as u8;
+        return 0;
     }
 
-    // TODO: Handle RP2040 dual-core case
+    // RP2040 via rp-hal [dual-core]
+    #[cfg(any(feature = "rp2040", feature = "rp235xa", feature = "rp235xb"))]
+    {
+        return match embassy_rp::multicore::current_core() {
+            embassy_rp::multicore::CoreId::Core0 => 0,
+            embassy_rp::multicore::CoreId::Core1 => 1,
+        };
+    }
 
     //
     // Fallback: Unknown target, probably single-core
