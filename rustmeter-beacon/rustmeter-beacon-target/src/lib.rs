@@ -1,6 +1,7 @@
 #![no_std]
 
 use rtt_target::UpChannel;
+use rustmeter_beacon_core::{buffer::BufferWriter, protocol::EventPayload, time_delta::TimeDelta};
 
 pub mod core_id;
 mod embassy_trace;
@@ -16,12 +17,54 @@ pub fn set_tracing_channel(channel: UpChannel) {
     }
 }
 
+static DROPPED_EVENTS_COUNTER: portable_atomic::AtomicU32 = portable_atomic::AtomicU32::new(0);
+
 #[unsafe(no_mangle)]
 fn write_tracing_data(data: &[u8]) {
     unsafe {
         let channel = core::ptr::addr_of_mut!(TRACING_CHANNEL);
         if let Some(Some(c)) = channel.as_mut() {
-            c.write(data);
+            // Check if there were previously dropped bytes (Buffer full situation)
+            if DROPPED_EVENTS_COUNTER.load(portable_atomic::Ordering::Relaxed) > 0 {
+                // Try to write dropped bytes event
+                let previously_dropped =
+                    DROPPED_EVENTS_COUNTER.swap(0, portable_atomic::Ordering::Relaxed);
+
+                // Create a data loss event manually
+                let mut buffer = BufferWriter::new();
+                TimeDelta::from_now().write_bytes(&mut buffer);
+                let event = EventPayload::DataLossEvent {
+                    dropped_events: previously_dropped,
+                };
+                event.write_bytes(&mut buffer);
+
+                // Check if we can write the dropped event
+                let dropped_data = buffer.as_slice();
+                let bytes_written = c.write(dropped_data);
+                if bytes_written < dropped_data.len() {
+                    // restore the dropped count
+                    DROPPED_EVENTS_COUNTER
+                        .fetch_add(previously_dropped, portable_atomic::Ordering::Relaxed);
+                } else {
+                    #[cfg(feature = "defmt")]
+                    defmt::warn!(
+                        "Recovered from dropped events: {} events were lost",
+                        previously_dropped
+                    );
+                }
+            }
+
+            // Try to write original data to the channel
+            let bytes_written = c.write(data);
+            if bytes_written < data.len() {
+                // Not all bytes were written
+                #[cfg(feature = "defmt")] // Only log once when the first event is dropped
+                if DROPPED_EVENTS_COUNTER.load(portable_atomic::Ordering::Relaxed) == 0 {
+                    defmt::warn!("Tracing channel buffer full, dropping events...",);
+                }
+
+                DROPPED_EVENTS_COUNTER.fetch_add(1, portable_atomic::Ordering::Relaxed);
+            }
         } else {
             #[cfg(feature = "defmt")]
             defmt::warn!("Tracing channel not initialized, cannot write tracing data");

@@ -1,7 +1,7 @@
 use core::mem::MaybeUninit;
 
 /// Internal buffer writer for tracing events using a fixed-size buffer with uninitialized memory for efficiency
-pub(crate) struct BufferWriter {
+pub struct BufferWriter {
     buffer: [MaybeUninit<u8>; 32],
     position: usize,
 }
@@ -41,7 +41,10 @@ pub struct BufferReader<'a> {
 
 impl<'a> BufferReader<'a> {
     pub fn new(buffer: &'a [u8]) -> Self {
-        BufferReader { buffer, position: 0 }
+        BufferReader {
+            buffer,
+            position: 0,
+        }
     }
 
     /// Reads a single byte from the buffer. Returns None if end of buffer is reached.
@@ -70,7 +73,6 @@ impl<'a> BufferReader<'a> {
         self.position
     }
 }
-
 
 #[cfg(test)]
 mod tests {

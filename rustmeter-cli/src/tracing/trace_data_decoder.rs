@@ -150,6 +150,7 @@ mod tests {
                 executor_id: u3::new(5),
             },
             EventPayload::EmbassyTaskExecBeginCore0 { task_id: 7 },
+            EventPayload::DataLossEvent { dropped_events: 17 }
         ];
 
         let mut decoder = TraceDataDecoder::new();
@@ -195,6 +196,7 @@ mod tests {
                 executor_id: u3::new(5),
             },
             EventPayload::EmbassyTaskExecBeginCore0 { task_id: 7 },
+            EventPayload::DataLossEvent { dropped_events: 17 }
         ];
 
         // Write tracing events

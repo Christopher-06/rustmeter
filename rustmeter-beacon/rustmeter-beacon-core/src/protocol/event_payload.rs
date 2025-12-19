@@ -59,6 +59,8 @@ pub enum EventPayload {
     },
     /// Type Definition Event
     TypeDefinition(TypeDefinitionPayload),
+    /// Data Loss Event because of buffer full situation
+    DataLossEvent { dropped_events: u32 },
 }
 
 impl EventPayload {
@@ -77,6 +79,7 @@ impl EventPayload {
             EventPayload::MonitorEndCore1 => 10,
             EventPayload::MonitorValue { .. } => 11,
             EventPayload::TypeDefinition(_) => 12,
+            EventPayload::DataLossEvent { .. } => 13,
         };
 
         u5::new(id)
@@ -92,7 +95,7 @@ impl EventPayload {
         }
     }
 
-    pub(crate) fn write_bytes(&self, writer: &mut BufferWriter) {
+    pub fn write_bytes(&self, writer: &mut BufferWriter) {
         // Write the event ID (5 bits) and executor short ID (3 bits) as a single byte
         let executor_short_id = self.get_executor_id().map_or(u8::ZERO, |id| id.as_u8());
         let event_type = u8::from(self.event_id()) << 3 | executor_short_id;
@@ -127,6 +130,9 @@ impl EventPayload {
             }
             EventPayload::TypeDefinition(def) => {
                 def.write_bytes(writer);
+            }
+            EventPayload::DataLossEvent { dropped_events } => {
+                writer.write_bytes(&dropped_events.to_le_bytes());
             }
         }
     }
@@ -222,6 +228,17 @@ impl EventPayload {
                 let def = TypeDefinitionPayload::from_bytes(typedef_it, buffer)?;
                 Some(EventPayload::TypeDefinition(def))
             }
+            // DataLossEvent
+            13 => {
+                let mut data = [0u8; 4];
+                for byte in data.iter_mut() {
+                    *byte = buffer.read_byte()?;
+                }
+
+                Some(EventPayload::DataLossEvent {
+                    dropped_events: u32::from_le_bytes(data),
+                })
+            }
             _ => None,
         }
     }
@@ -266,6 +283,7 @@ mod tests {
                 monitor_id: 8,
                 name: "test_scope".to_string(),
             }),
+            EventPayload::DataLossEvent { dropped_events: 10 },
         ];
 
         // create a closure to read MonitorValuePayloads for testing
