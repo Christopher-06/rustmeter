@@ -90,9 +90,10 @@ fn _embassy_trace_task_exec_end(executor_id: u32, _task_id: u32) {
 }
 
 #[unsafe(no_mangle)]
-fn _embassy_trace_task_ready_begin(_executor_id: u32, task_id: u32) {
+fn _embassy_trace_task_ready_begin(executor_id: u32, task_id: u32) {
     let payload = EventPayload::EmbassyTaskReady {
         task_id: compressed_task_id(task_id),
+        executor_id: EXECUTOR_REGISTRY.lookup_or_register(executor_id).unwrap(),
     };
 
     write_tracing_event(payload);

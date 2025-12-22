@@ -8,15 +8,15 @@ use arbitrary_int::{traits::Integer, u3, u5};
 pub enum EventPayload {
     /// Embassy Task is ready to be polled (Waker called).
     /// CoreID is not included here because ISR can run on any core (mostly core 0).
-    /// ExecutorID is not included here because the lookup of the short executor ID takes time and this event is called often (Task-Executor mapping is done via TaskNewEvent).
-    EmbassyTaskReady { task_id: u16 },
+    /// ExecutorID will also be included
+    EmbassyTaskReady { task_id: u16, executor_id: u3 },
     /// Embassy Task execution began (poll called).
     /// CoreID is included via Variant (Core0/Core1).
-    /// ExecutorID is not included here because Task-Executor mapping is done via TaskNewEvent.
+    /// ExecutorID is not included here because Task-Executor mapping is done via TaskNewEvent / Ready.
     EmbassyTaskExecBeginCore0 { task_id: u16 },
     /// Embassy Task execution began (poll called).
     /// CoreID is included via Variant (Core0/Core1).
-    /// ExecutorID is not included here because Task-Executor mapping is done via TaskNewEvent
+    /// ExecutorID is not included here because Task-Executor mapping is done via TaskNewEvent / Ready.
     EmbassyTaskExecBeginCore1 { task_id: u16 },
     /// Embassy Task execution ended (returned Poll::Ready or yielded Poll::Pending).
     /// CoreID is included via Variant (Core0/Core1).
@@ -87,6 +87,7 @@ impl EventPayload {
 
     pub const fn get_executor_id(&self) -> Option<u3> {
         match self {
+            EventPayload::EmbassyTaskReady { executor_id, .. } => Some(*executor_id),
             EventPayload::EmbassyTaskExecEndCore0 { executor_id, .. } => Some(*executor_id),
             EventPayload::EmbassyTaskExecEndCore1 { executor_id, .. } => Some(*executor_id),
             EventPayload::EmbassyExecutorPollStart { executor_id, .. } => Some(*executor_id),
@@ -103,7 +104,7 @@ impl EventPayload {
 
         // Write event-specific data
         match self {
-            EventPayload::EmbassyTaskReady { task_id } => {
+            EventPayload::EmbassyTaskReady { task_id, executor_id : _ } => {
                 writer.write_bytes(&task_id.to_le_bytes());
             }
             EventPayload::EmbassyTaskExecBeginCore0 { task_id } => {
@@ -162,6 +163,7 @@ impl EventPayload {
                 }
                 Some(EventPayload::EmbassyTaskReady {
                     task_id: u16::from_le_bytes(data),
+                    executor_id: _executor_short_id,
                 })
             }
             // EmbassyTaskExecBeginCore0
@@ -256,7 +258,7 @@ mod tests {
     #[test]
     fn test_event_payload_write_and_read() {
         let events = vec![
-            EventPayload::EmbassyTaskReady { task_id: 42 },
+            EventPayload::EmbassyTaskReady { task_id: 42, executor_id: u3::new(5) },
             EventPayload::EmbassyTaskExecBeginCore0 { task_id: 43 },
             EventPayload::EmbassyTaskExecBeginCore1 { task_id: 44 },
             EventPayload::EmbassyTaskExecEndCore0 {

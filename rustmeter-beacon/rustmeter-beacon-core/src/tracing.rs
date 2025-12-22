@@ -59,7 +59,7 @@ mod tests {
     #[test]
     fn test_tracing_event_write_and_read() {
         let events = vec![
-            EventPayload::EmbassyTaskReady { task_id: 1234 },
+            EventPayload::EmbassyTaskReady { task_id: 1234, executor_id: u3::new(2) },
             EventPayload::EmbassyExecutorPollStart {
                 executor_id: u3::new(5),
             },
