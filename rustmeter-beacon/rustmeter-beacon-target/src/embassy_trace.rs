@@ -56,15 +56,17 @@ fn _embassy_trace_task_end(executor_id: u32, task_id: u32) {
 }
 
 #[unsafe(no_mangle)]
-fn _embassy_trace_task_exec_begin(_executor_id: u32, task_id: u32) {
+fn _embassy_trace_task_exec_begin(executor_id: u32, task_id: u32) {
     let core_id = get_current_core_id();
 
     let payload = match core_id {
         0 => EventPayload::EmbassyTaskExecBeginCore0 {
             task_id: compressed_task_id(task_id),
+            executor_id: EXECUTOR_REGISTRY.lookup_or_register(executor_id).unwrap(),
         },
         1 => EventPayload::EmbassyTaskExecBeginCore1 {
             task_id: compressed_task_id(task_id),
+            executor_id: EXECUTOR_REGISTRY.lookup_or_register(executor_id).unwrap(),
         },
         c => unreachable_core_id(c),
     };
