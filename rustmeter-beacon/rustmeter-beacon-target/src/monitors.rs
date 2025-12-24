@@ -6,19 +6,19 @@ pub static CODE_MONITOR_REGISTRY: NumericRegistry = NumericRegistry::new();
 #[macro_export]
 macro_rules! get_static_id_by_registry {
     ($registry:expr) => {{
-        use portable_atomic::AtomicUsize;
+        use rustmeter_beacon::_private::portable_atomic::{AtomicUsize, Ordering};
         static LOCAL_MONITOR_VALUE_ID: AtomicUsize = AtomicUsize::new(0);
 
         // Get or allocate monitor ID
-        match LOCAL_MONITOR_VALUE_ID.load(portable_atomic::Ordering::Relaxed) {
+        match LOCAL_MONITOR_VALUE_ID.load(Ordering::Relaxed) {
             0 => {
                 // Allocate new ID
                 let id = VALUE_MONITOR_REGISTRY.allocate_new_id();
                 let res = LOCAL_MONITOR_VALUE_ID.compare_exchange(
                     0,
                     id,
-                    portable_atomic::Ordering::Relaxed,
-                    portable_atomic::Ordering::Relaxed,
+                    Ordering::Relaxed,
+                    Ordering::Relaxed,
                 );
 
                 match res {
@@ -54,7 +54,7 @@ macro_rules! monitor_value {
 
         // Limit name length to 20 characters (BufferWriter is only 32 bytes and we need space for TimeDelta and other fields)
         const _: () = {
-            assert!($name.len() <= 20, "Name of value to be monitored must be 20 characters or less");
+            core::assert!($name.len() <= 20, "Name of value to be monitored must be 20 characters or less");
         };
 
         use crate::monitors::{CODE_MONITOR_REGISTRY, VALUE_MONITOR_REGISTRY};
@@ -119,7 +119,7 @@ macro_rules! monitor_scoped {
     ($name:literal, $body:block) => {{
         // Limit name length to 20 characters (BufferWriter is only 32 bytes and we need space for TimeDelta and other fields)
         const _: () = {
-            assert!($name.len() <= 20, "Scope name must be 20 characters or less");
+            core::assert!($name.len() <= 20, "Scope name must be 20 characters or less");
         };
 
         use crate::monitors::{CODE_MONITOR_REGISTRY, VALUE_MONITOR_REGISTRY};
