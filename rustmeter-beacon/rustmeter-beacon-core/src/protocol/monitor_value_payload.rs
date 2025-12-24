@@ -112,6 +112,20 @@ impl MonitorValuePayload {
             _ => None,
         }
     }
+
+    #[cfg(feature = "std")]
+    pub fn as_f64(&self) -> f64 {
+        match self {
+            MonitorValuePayload::U8(v) => *v as f64,
+            MonitorValuePayload::U16(v) => *v as f64,
+            MonitorValuePayload::U32(v) => *v as f64,
+            MonitorValuePayload::U64(v) => *v as f64,
+            MonitorValuePayload::I8(v) => *v as f64,
+            MonitorValuePayload::I16(v) => *v as f64,
+            MonitorValuePayload::I32(v) => *v as f64,
+            MonitorValuePayload::I64(v) => *v as f64,
+        }
+    }
 }
 
 pub trait MonitorValueType {
