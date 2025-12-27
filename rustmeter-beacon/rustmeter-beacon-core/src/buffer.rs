@@ -31,6 +31,10 @@ impl BufferWriter {
     pub fn as_slice(&self) -> &[u8] {
         &unsafe { core::mem::transmute::<&[MaybeUninit<u8>], &[u8]>(&self.buffer[..self.position]) }
     }
+
+    pub fn len(&self) -> usize {
+        self.position
+    }
 }
 
 /// Simple buffer reader for reading bytes from a slice
