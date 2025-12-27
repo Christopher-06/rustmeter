@@ -4,7 +4,7 @@ use anyhow::Context;
 use crossbeam::channel::{Receiver, Sender};
 use probe_rs::rtt::Rtt;
 
-use crate::probe_rs::atomic_session::AtomicSession;
+use crate::{flash_and_monitor::ChipMonitoringTool, probe_rs::atomic_session::AtomicSession};
 
 /// This struct aggressively reads RTT data from the target to ensure that the RTT Channels do not overflow.
 /// It spawns a thread that continuously reads from all up channels and sends the data to defmt_bytes or tracing_bytes
@@ -38,16 +38,18 @@ impl RttListener {
             error_recver,
         })
     }
+}
 
-    pub fn get_defmt_bytes_recver(&self) -> Receiver<Box<[u8]>> {
+impl ChipMonitoringTool for RttListener {
+    fn get_defmt_bytes_recver(&self) -> Receiver<Box<[u8]>> {
         self.defmt_bytes_recver.clone()
     }
 
-    pub fn get_tracing_bytes_recver(&self) -> Receiver<Box<[u8]>> {
+    fn get_tracing_bytes_recver(&self) -> Receiver<Box<[u8]>> {
         self.tracing_bytes_recver.clone()
     }
 
-    pub fn get_error_recver(&self) -> Receiver<anyhow::Error> {
+    fn get_error_recver(&self) -> Receiver<anyhow::Error> {
         self.error_recver.clone()
     }
 }

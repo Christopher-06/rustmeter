@@ -3,7 +3,7 @@ use espflash::connection::Connection;
 
 use std::io::{ErrorKind, Read};
 
-use crate::ChipMonitoringTool;
+use crate::flash_and_monitor::ChipMonitoringTool;
 
 pub struct SerialListener {
     defmt_bytes_recver: Receiver<Box<[u8]>>,
