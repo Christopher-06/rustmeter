@@ -9,26 +9,35 @@ description = "Target side library for rustmeter-beacon"
 repository = "https://github.com/Christopher-06/rustmeter"
 
 [dependencies]
-rtt-target = { version = "0.6.2" }
-defmt = { version = "1", optional = true }
 rustmeter-beacon-core = { path = "../rustmeter-beacon-core" }
 portable-atomic = "1"
 arbitrary-int = "2"
 embassy-time = { version = "0.5" }
 
+rtt-target = { version = "0.6.2", optional = true}
 esp-hal = { version = "1", optional = true}
 embassy-rp = { version = "0.9", optional = true}
+defmt = { version = "1" , optional = true }
+embassy-sync = "0.7.2"
+critical-section = "1.2.0"
+esp-sync ={ version = "0.1", optional = true }
+embassy-executor = "0.9"
+embassy-futures = "0.1.2"
+cfg-if = "1.0.4"
 
 [features]
-defmt = ["dep:defmt", "rtt-target/defmt"]
-stm32 = []
-esp32 = ["dep:esp-hal", "esp-hal/esp32"]
-esp32c2 = ["dep:esp-hal", "esp-hal/esp32c2"]
-esp32c3 = ["dep:esp-hal", "esp-hal/esp32c3"]
-esp32c6 = ["dep:esp-hal", "esp-hal/esp32c6"]
-esp32h2 = ["dep:esp-hal", "esp-hal/esp32h2"]
-esp32s2 = ["dep:esp-hal", "esp-hal/esp32s2"]
-esp32s3 = ["dep:esp-hal", "esp-hal/esp32s3"]
-rp2040 = ["dep:embassy-rp", "embassy-rp/rp2040"]
-rp235xa = ["dep:embassy-rp", "embassy-rp/rp235xa"]
-rp235xb = ["dep:embassy-rp", "embassy-rp/rp235xb"]
+defmt = ["dep:defmt", "rtt-target?/defmt"]
+
+esp32   = ["dep:esp-hal", "esp-hal/esp32",   "esp-sync/esp32"  ]
+esp32c2 = ["dep:esp-hal", "esp-hal/esp32c2", "esp-sync/esp32c2"]
+esp32c3 = ["dep:esp-hal", "esp-hal/esp32c3", "esp-sync/esp32c3"]
+esp32c6 = ["dep:esp-hal", "esp-hal/esp32c6", "esp-sync/esp32c6"]
+esp32h2 = ["dep:esp-hal", "esp-hal/esp32h2", "esp-sync/esp32h2"]
+esp32s2 = ["dep:esp-hal", "esp-hal/esp32s2", "esp-sync/esp32s2"]
+esp32s3 = ["dep:esp-hal", "esp-hal/esp32s3", "esp-sync/esp32s3"]
+
+stm32 = ["dep:rtt-target"]
+rp2040 = ["dep:rtt-target", "dep:embassy-rp", "embassy-rp/rp2040"]
+rp235xa = ["dep:rtt-target", "dep:embassy-rp", "embassy-rp/rp235xa"]
+rp235xb = ["dep:rtt-target", "dep:embassy-rp", "embassy-rp/rp235xb"]
+esp-sync = ["dep:esp-sync"]
