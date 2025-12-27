@@ -28,3 +28,5 @@ indicatif = "0.18.3"
 defmt-decoder = "1.0.0"
 defmt-parser = "1.0.0"
 arbitrary-int = "2.0.0"
+espflash = { version = "4.3.0", default-features = false, features = ["serialport"] }
+serialport = { version = "4.7.0", features = ["usbportinfo-interface"] }
