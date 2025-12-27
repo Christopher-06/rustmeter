@@ -3,6 +3,8 @@ use espflash::connection::Connection;
 
 use std::io::{ErrorKind, Read};
 
+use crate::ChipMonitoringTool;
+
 pub struct SerialListener {
     defmt_bytes_recver: Receiver<Box<[u8]>>,
     tracing_bytes_recver: Receiver<Box<[u8]>>,
@@ -30,16 +32,18 @@ impl SerialListener {
             error_recver,
         })
     }
+}
 
-    pub fn get_defmt_bytes_recver(&self) -> Receiver<Box<[u8]>> {
+impl ChipMonitoringTool for SerialListener {
+    fn get_defmt_bytes_recver(&self) -> Receiver<Box<[u8]>> {
         self.defmt_bytes_recver.clone()
     }
 
-    pub fn get_tracing_bytes_recver(&self) -> Receiver<Box<[u8]>> {
+    fn get_tracing_bytes_recver(&self) -> Receiver<Box<[u8]>> {
         self.tracing_bytes_recver.clone()
     }
 
-    pub fn get_error_recver(&self) -> Receiver<anyhow::Error> {
+    fn get_error_recver(&self) -> Receiver<anyhow::Error> {
         self.error_recver.clone()
     }
 }
