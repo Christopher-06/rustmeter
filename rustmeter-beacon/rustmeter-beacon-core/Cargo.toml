@@ -11,6 +11,7 @@ repository = "https://github.com/Christopher-06/rustmeter"
 [dependencies]
 portable-atomic = "1"
 arbitrary-int = "2"
+critical-section = "1"
 
 [features]
-std = ["portable-atomic/std"]
+std = ["portable-atomic/std", "critical-section/std"]

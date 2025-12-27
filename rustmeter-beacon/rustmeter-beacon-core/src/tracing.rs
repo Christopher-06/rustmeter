@@ -1,3 +1,5 @@
+use critical_section::Mutex;
+
 #[cfg(feature = "std")]
 use crate::buffer::BufferReader;
 use crate::{buffer::BufferWriter, protocol::EventPayload, time_delta::TimeDelta};
@@ -7,17 +9,24 @@ unsafe extern "Rust" {
     fn write_tracing_data(data: &[u8]);
 }
 
+static TRACE_WRITING: Mutex<()> = Mutex::new(());
+
 /// Serializes and writes a tracing event with timestamp to the tracing channel
 pub fn write_tracing_event(event: EventPayload) {
-    let timestamp = TimeDelta::from_now();
+    // Ensure only one tracing event is written at a time
+    critical_section::with(|cs| {
+        let _lock = TRACE_WRITING.borrow(cs);
 
-    // Write event data
-    let mut buffer = BufferWriter::new();
-    timestamp.write_bytes(&mut buffer);
-    event.write_bytes(&mut buffer);
+        let timestamp = TimeDelta::from_now();
 
-    // Send the data over RTT
-    unsafe { write_tracing_data(buffer.as_slice()) };
+        // Write event data
+        let mut buffer = BufferWriter::new();
+        timestamp.write_bytes(&mut buffer);
+        event.write_bytes(&mut buffer);
+
+        // Send the data over RTT
+        unsafe { write_tracing_data(buffer.as_slice()) };
+    });
 }
 
 #[cfg(feature = "std")]
@@ -59,7 +68,10 @@ mod tests {
     #[test]
     fn test_tracing_event_write_and_read() {
         let events = vec![
-            EventPayload::EmbassyTaskReady { task_id: 1234, executor_id: u3::new(2) },
+            EventPayload::EmbassyTaskReady {
+                task_id: 1234,
+                executor_id: u3::new(2),
+            },
             EventPayload::EmbassyExecutorPollStart {
                 executor_id: u3::new(5),
             },
