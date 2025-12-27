@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use anyhow::Context;
 use crossbeam::select;
 
 use crate::{
@@ -11,11 +12,19 @@ use crate::{
     perfetto_backend::file_writer::spawn_perfetto_file_writer,
     tracing::tracing_instance::TracingInstance,
 };
+use crate::{
+    flash_and_monitor::flash_and_monitor_chip, logs::defmt_decoding::DefmtDecoding,
+    tracing::trace_data_decoder::TraceDataDecoder,
+};
 
 mod cargo;
 mod cli;
 mod elf_file;
+mod espflash;
+mod flash_and_monitor;
+mod logs;
 mod perfetto_backend;
+mod probe_rs;
 mod time;
 mod tracing;
 
@@ -24,98 +33,37 @@ fn main() -> anyhow::Result<()> {
     let exit_flag = Arc::new(AtomicBool::new(false));
     let r_exit_flag = exit_flag.clone();
     ctrlc::set_handler(move || {
+        println!("CTRL-C received, exiting...");
         r_exit_flag.store(true, std::sync::atomic::Ordering::SeqCst);
     })?;
 
     // Parse command line arguments
     let args = CommandLineArgs::parse();
 
-    // Start Cargo child process and wait for build to finish
-    let mut cargo_child_process = CargoChildProcess::new_start_run(args.release, &args.project)?;
-    let build_status = cargo_child_process.wait_build_finish()?;
+    // Start Cargo child process and gather elf path
+    let mut cargo_child_process = CargoChildProcess::new_start_build(args.release, &args.project)?;
+    let elf_path = cargo_child_process.wait_till_finished()?;
+    let fw_addr_map = FirmwareAddressMap::new_from_elf_path(&elf_path)?;
+    println!("Build Status: Success");
+    println!("ELF Path: {:?}", elf_path);
 
-    // Check build status
-    if build_status.has_failed() {
-        // cargo build failed ==> it printed error messages already
-        return Err(anyhow::anyhow!(
-            "Cargo build failed. Cannot start tracing session."
-        ));
-    }
+    // flash and start monitoring
+    let monitor = flash_and_monitor_chip(&args.chip, args.tool.clone(), &elf_path)?;
+    let defmt_bytes_recver = monitor.get_defmt_bytes_recver();
+    let tracing_bytes_recver = monitor.get_tracing_bytes_recver();
+    let monitor_error_recver = monitor.get_error_recver();
 
-    // Get executable path
-    let elf_path = build_status
-        .try_get_executable()
-        .clone()
-        .ok_or(anyhow::anyhow!(
-            "Cannot get executable path from build status"
-        ))?;
-    let elf_path = Path::new(&elf_path);
-    let firmware_addr_map = FirmwareAddressMap::new_from_elf_path(elf_path)?;
+    // Create defmt/tracing decoding instance
+    let mut tracing_decoding = TraceDataDecoder::new();
+    let defmt_decoding = DefmtDecoding::new(&elf_path, defmt_bytes_recver, true)
+        .context("Failed to create defmt decoder!")?;
+    let defmt_logs_recver = defmt_decoding.get_defmt_logs_recver();
 
-    // filter log events and print everything else to stdout
-    let raw_logs_recver = cargo_child_process.get_logs_receiver();
-    let (log_line_sender, log_line_recver) = crossbeam::channel::unbounded();
-    let (log_event_sender, log_event_recver) = crossbeam::channel::unbounded();
-    std::thread::spawn(move || {
-        while let Ok(log) = raw_logs_recver.recv() {
-            // try to parse log line as LogEvent or just print it
-            if let Ok(log_line) = tracing::log_line::LogLine::from_str(&log) {
-                // Check if it is a LogEvent
-                if let Ok(log_event) = tracing::log_event::LogEvent::from_log_line(&log_line) {
-                    // successfully parsed LogEvent ==> send it as log event
-                    if log_event_sender.send(log_event).is_err() {
-                        break; // channel closed
-                    }
-
-                    continue;
-                } else {
-                    // send log line as well for raw logging
-                    println!("{log_line}");
-
-                    // is log line ==> send log line
-                    if log_line_sender.send(log_line).is_err() {
-                        break; // channel closed
-                    }
-                }
-            } else {
-                // cannot parse it correctly ==> just print the raw log
-                print!("{log}");
-            }
-        }
-
-        // error returned because channel closed
-    });
-
-    // Create tracing instance and start processing log events
-    let mut tracing_instance = TracingInstance::new(firmware_addr_map);
+    // Create tracing instance
+    let mut tracing_instance = TracingInstance::new(fw_addr_map);
     let trace_event_recver = tracing_instance.get_trace_event_receiver();
-    std::thread::spawn(move || {
-        loop {
-            // receive next log-event or log-line
-            select! {
-                recv(log_line_recver) -> log_line_res => {
-                    // got log line
-                    match log_line_res {
-                        Ok(log_line) => {
-                            tracing_instance.add_log_line(&log_line);
-                        }
-                        Err(_) => break, // channel closed
-                    }
-                },
-                recv(log_event_recver) -> log_event_res => {
-                    // got log event
-                    match log_event_res {
-                        Ok(log_event) => {
-                            tracing_instance.update(&log_event);
-                        }
-                        Err(_) => break, // channel closed
-                    }
-                },
-            }
-        }
-    });
 
-    // Create Perfetto trace writer and start writing trace events from trace_event_recver
+    // Create perfetto trace writer thread
     let perfetto_filename = Path::new(&args.project).join(format!(
         "rustmeter-perfetto-{}.json",
         if args.release { "release" } else { "debug" }
@@ -123,42 +71,79 @@ fn main() -> anyhow::Result<()> {
     let perfetto_file_writer_handle =
         spawn_perfetto_file_writer(perfetto_filename, trace_event_recver, exit_flag.clone());
 
-    // Main loop
-    while !exit_flag.load(std::sync::atomic::Ordering::SeqCst) {
-        std::thread::sleep(Duration::from_millis(100));
-
-        // Check if cargo child process has exited
-        if let Some(status_code) = cargo_child_process.get_status_code()? {
-            return Err(anyhow::anyhow!(
-                "Cargo process exited with status: {status_code}"
-            ));
+    loop {
+        // Check for exit flag
+        if exit_flag.load(std::sync::atomic::Ordering::SeqCst) {
+            break;
         }
 
-        // Check if perfetto file writer thread has exited with error
+        // check for perfetto file writer thread exit
         if perfetto_file_writer_handle.is_finished() {
             // normally this should not happen
             match perfetto_file_writer_handle.join() {
                 Ok(result) => {
                     if let Err(e) = result {
-                        return Err(anyhow::anyhow!(
-                            "Perfetto file writer thread exited with error: {e}"
-                        ));
+                        println!("[Error] Perfetto file writer thread exited with error: {e}");
                     } else {
-                        return Ok(()); // normal exit
+                        println!("[Info] Perfetto file writer thread exited normally.");
                     }
+                    break;
                 }
                 Err(e) => {
-                    return Err(anyhow::anyhow!(
-                        "Perfetto file writer thread panicked: {e:?}"
-                    ));
+                    println!("[Error] Perfetto file writer thread panicked: {e:?}");
+                    break;
                 }
+            }
+        }
+
+        select! {
+            // Receive next tracing bytes
+            recv(tracing_bytes_recver) -> tracing_bytes_res => {
+                match tracing_bytes_res {
+                    Ok(tracing_bytes) => {
+                        tracing_decoding.feed(&tracing_bytes);
+                        let decoded_items = tracing_decoding.decode()?;
+                        for item in decoded_items {
+                            // println!("[Tracing] {:.6}s - {:?}", item.timestamp().as_secs_f64(), item.payload());
+                            tracing_instance.feed(item, false);
+                        }
+                    }
+                    Err(e) => {
+                        println!("[Tracing RTT Error] {}", e);
+                        break; // channel closed
+                    }
+                }
+            },
+            // Receive next defmt logs
+            recv(defmt_logs_recver) -> defmt_log_res => {
+                match defmt_log_res {
+                    Ok(defmt_log) => {
+                        tracing_instance.add_defmt_log(&defmt_log);
+                    }
+                    Err(e) => {
+                        println!("[Defmt RTT Error] {}", e);
+                        break; // channel closed
+                    }
+                }
+            },
+            // Receive next monitor error
+            recv(monitor_error_recver) -> monitor_error_res => {
+                match monitor_error_res {
+                    Ok(monitor_error) => {
+                        println!("[Monitor Error] {}", monitor_error);
+                    }
+                    Err(e) => {
+                        println!("[Monitor Error Receiver Closed] {}", e);
+                        break; // channel closed
+                    }
+                }                
+            }
+            default(Duration::from_millis(100)) => {
+                // timeout ==> just continue to check exit_flag
+                continue;
             }
         }
     }
 
-    // Clean up
-    cargo_child_process.kill()?;
-    perfetto_file_writer_handle.join().unwrap()?;
-
-    Ok(())
+    return Ok(());
 }
