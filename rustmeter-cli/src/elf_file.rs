@@ -42,6 +42,17 @@ impl FirmwareAddressMap {
             .get(&addr)
             .map(|arg0: &String| try_extract_short_name(arg0.as_str()))
     }
+
+    /// Try to get the address of the _SEGGER_RTT symbol from the firmware
+    pub fn get_rtt_symbol_address(&self) -> Option<u64> {
+        for (addr, name) in self.0.iter() {
+            if name == "_SEGGER_RTT" {
+                return Some(*addr);
+            }
+        }
+
+        None
+    }
 }
 
 /// Helper function to extract short name from full symbol name

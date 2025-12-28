@@ -48,7 +48,7 @@ fn main() -> anyhow::Result<()> {
     println!("ELF Path: {:?}", elf_path);
 
     // flash and start monitoring
-    let monitor = flash_and_monitor_chip(&args.chip, args.tool.clone(), &elf_path)?;
+    let monitor = flash_and_monitor_chip(&args.chip, args.tool.clone(), &elf_path, &fw_addr_map)?;
     let defmt_bytes_recver = monitor.get_defmt_bytes_recver();
     let tracing_bytes_recver = monitor.get_tracing_bytes_recver();
     let monitor_error_recver = monitor.get_error_recver();
