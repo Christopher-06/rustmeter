@@ -1,7 +1,10 @@
 use std::sync::{Arc, Mutex};
 
 use anyhow::Context;
-use probe_rs::{Session, rtt::Rtt};
+use probe_rs::{
+    Session,
+    rtt::{Rtt, ScanRegion},
+};
 
 #[derive(Clone)]
 pub struct AtomicSession {
@@ -23,7 +26,17 @@ impl AtomicSession {
     pub fn attach_rtt(&self) -> anyhow::Result<Rtt> {
         let mut session = self.lock();
         let mut core = session.core(0)?;
+
         probe_rs::rtt::Rtt::attach(&mut core).context("Failed to attach RTT to Core")
+    }
+
+    /// Attach RTT to the session's core 0 at a specific address
+    pub fn attach_rtt_region(&self, addr: u64) -> anyhow::Result<Rtt> {
+        let mut session = self.lock();
+        let mut core = session.core(0)?;
+
+        let region = ScanRegion::Exact(addr);
+        Rtt::attach_region(&mut core, &region).context("No RTT Region in Scan Region")
     }
 }
 

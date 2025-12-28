@@ -15,8 +15,24 @@ pub struct RttListener {
 }
 
 impl RttListener {
-    pub fn new(session: AtomicSession) -> anyhow::Result<Self> {
-        let rtt = session.attach_rtt()?;
+    pub fn new(session: AtomicSession, rtt_address: Option<u64>) -> anyhow::Result<Self> {
+        // Attach to RTT
+        let rtt = match rtt_address {
+            Some(addr) => {
+                match session.attach_rtt_region(addr) {
+                    Ok(rtt) => rtt,
+                    Err(_) => {
+                        // fallback to normal attach
+                        println!(
+                            "Warning: Could not attach to RTT at address 0x{:X}, falling back to normal RTT attach",
+                            addr
+                        );
+                        session.attach_rtt()?
+                    }
+                }
+            }
+            None => session.attach_rtt()?, // scan whole memory for RTT (slow)
+        };
 
         let (defmt_bytes_sender, defmt_bytes_recver) = crossbeam::channel::unbounded();
         let (tracing_bytes_sender, tracing_bytes_recver) = crossbeam::channel::unbounded();
