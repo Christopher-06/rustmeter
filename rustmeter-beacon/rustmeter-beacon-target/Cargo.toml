@@ -16,7 +16,7 @@ embassy-time = { version = "0.5" }
 
 rtt-target = { version = "0.6.2", optional = true}
 esp-hal = { version = "1", optional = true}
-embassy-rp = { version = "0.9", optional = true}
+embassy-rp = { version = "0.9", optional = true, default-features = false}
 defmt = { version = "1" , optional = true }
 embassy-sync = "0.7.2"
 critical-section = "1.2.0"
@@ -37,7 +37,7 @@ esp32s2 = ["dep:esp-hal", "esp-hal/esp32s2", "esp-sync/esp32s2"]
 esp32s3 = ["dep:esp-hal", "esp-hal/esp32s3", "esp-sync/esp32s3"]
 
 stm32 = ["dep:rtt-target"]
-rp2040 = ["dep:rtt-target", "dep:embassy-rp", "embassy-rp/rp2040"]
+rp2040 = ["dep:rtt-target" , "dep:embassy-rp", "embassy-rp/rp2040"]
 rp235xa = ["dep:rtt-target", "dep:embassy-rp", "embassy-rp/rp235xa"]
 rp235xb = ["dep:rtt-target", "dep:embassy-rp", "embassy-rp/rp235xb"]
 esp-sync = ["dep:esp-sync"]

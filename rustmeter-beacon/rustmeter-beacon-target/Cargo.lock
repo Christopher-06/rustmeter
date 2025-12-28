@@ -385,6 +385,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "embassy-executor"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06070468370195e0e86f241c8e5004356d696590a678d47d6676795b2e439c6b"
+dependencies = [
+ "critical-section",
+ "document-features",
+ "embassy-executor-macros",
+ "embassy-executor-timer-queue",
+]
+
+[[package]]
+name = "embassy-executor-macros"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dfdddc3a04226828316bf31393b6903ee162238576b1584ee2669af215d55472"
+dependencies = [
+ "darling 0.20.11",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "embassy-executor-timer-queue"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fc328bf943af66b80b98755db9106bf7e7471b0cf47dc8559cd9a6be504cc9c"
+
+[[package]]
 name = "embassy-futures"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1460,6 +1490,7 @@ name = "rustmeter-beacon-core"
 version = "0.1.0"
 dependencies = [
  "arbitrary-int",
+ "critical-section",
  "portable-atomic",
 ]
 
@@ -1468,10 +1499,16 @@ name = "rustmeter-beacon-target"
 version = "0.1.0"
 dependencies = [
  "arbitrary-int",
+ "cfg-if",
+ "critical-section",
  "defmt 1.0.1",
+ "embassy-executor",
+ "embassy-futures",
  "embassy-rp",
+ "embassy-sync 0.7.2",
  "embassy-time",
  "esp-hal",
+ "esp-sync",
  "portable-atomic",
  "rtt-target",
  "rustmeter-beacon-core",
