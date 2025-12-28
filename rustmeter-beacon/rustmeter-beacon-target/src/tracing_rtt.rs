@@ -67,63 +67,51 @@ fn write_tracing_data(data: &[u8]) {
 }
 
 #[cfg(feature = "defmt")]
-mod with_defmt {
+/// Initializes RustMeter with default RTT configuration:
+/// - Channel 0 for defmt (1kB, NoBlockSkip)
+/// - Channel 1 for tracing (4kB, NoBlockSkip)
+pub fn rustmeter_init_default() {
+    // Initialize RTT with default configuration
+    let channels = rtt_target::rtt_init! {
+        up: {
+            0: {
+                size: 1024,
+                mode: rtt_target::ChannelMode::NoBlockSkip,
+                name: "defmt"
+            }
+            1: {
+                size: 4096,
+                mode: rtt_target::ChannelMode::NoBlockSkip,
+                name: "RustMeter"
+            }
+        }
+    };
 
-    #[macro_export]
-    /// Initializes RustMeter with default RTT configuration:
-    /// - Channel 0 for defmt (1kB, NoBlockSkip)
-    /// - Channel 1 for tracing (4kB, NoBlockSkip)
-    macro_rules! rustmeter_init_default {
-        () => {{
-            // Initialize RTT with default configuration
-            let channels = rtt_target::rtt_init! {
-                up: {
-                    0: {
-                        size: 1024,
-                        mode: rtt_target::ChannelMode::NoBlockSkip,
-                        name: "defmt"
-                    }
-                    1: {
-                        size: 4096,
-                        mode: rtt_target::ChannelMode::NoBlockSkip,
-                        name: "RustMeter"
-                    }
-                }
-            };
+    // Set defmt channel
+    let defmt_channel = channels.up.0;
+    rtt_target::set_defmt_channel(defmt_channel);
 
-            // Set defmt channel
-            let defmt_channel = channels.up.0;
-            rtt_target::set_defmt_channel(defmt_channel);
-
-            // Set tracing channel
-            let tracing_channel = channels.up.1;
-            set_tracing_channel(tracing_channel);
-        }};
-    }
+    // Set tracing channel
+    let tracing_channel = channels.up.1;
+    set_tracing_channel(tracing_channel);
 }
 
 #[cfg(not(feature = "defmt"))]
-mod without_defmt {
-    #[macro_export]
-    /// Initializes RustMeter with default RTT configuration:
-    /// - Channel 1 for tracing (4kB, NoBlockSkip)
-    macro_rules! rustmeter_init_default {
-        () => {{
-            // Initialize RTT with default configuration
-            let channels = rtt_target::rtt_init! {
-                up: {
-                    1: {
-                        size: 4096,
-                        mode: rtt_target::ChannelMode::NoBlockSkip,
-                        name: "RustMeter"
-                    }
-                }
-            };
+/// Initializes RustMeter with default RTT configuration:
+/// - Channel 1 for tracing (4kB, NoBlockSkip)
+pub fn rustmeter_init_default() {
+    // Initialize RTT with default configuration
+    let channels = rtt_target::rtt_init! {
+        up: {
+            1: {
+                size: 4096,
+                mode: rtt_target::ChannelMode::NoBlockSkip,
+                name: "RustMeter"
+            }
+        }
+    };
 
-            // Set tracing channel
-            let tracing_channel = channels.up.1;
-            set_tracing_channel(tracing_channel);
-        }};
-    }
+    // Set tracing channel
+    let tracing_channel = channels.up.1;
+    set_tracing_channel(tracing_channel);
 }
-
