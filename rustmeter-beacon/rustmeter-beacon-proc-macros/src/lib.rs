@@ -142,22 +142,23 @@ pub fn monitor_fn(attr: TokenStream, item: TokenStream) -> TokenStream {
                         rustmeter_beacon::tracing::write_tracing_event(payload);
                     });
 
-                // Send MonitorStart event (after guard-created to lower tracing impact on measured scope)
-                let payload = match core_id {
-                    0 => rustmeter_beacon::protocol::EventPayload::MonitorStartCore0 {
-                        monitor_id: local_id as u8
-                    },
-                    1 => rustmeter_beacon::protocol::EventPayload::MonitorStartCore1 {
-                        monitor_id: local_id as u8
-                    },
-                    _ => rustmeter_beacon::core_id::unreachable_core_id(core_id),
-                };
-                rustmeter_beacon::tracing::write_tracing_event(payload);
-            }
+                    // Send MonitorStart event (after guard-created to lower tracing impact on measured scope)
+                    let payload = match core_id {
+                        0 => rustmeter_beacon::protocol::EventPayload::MonitorStartCore0 {
+                            monitor_id: local_id as u8
+                        },
+                        1 => rustmeter_beacon::protocol::EventPayload::MonitorStartCore1 {
+                            monitor_id: local_id as u8
+                        },
+                        _ => rustmeter_beacon::core_id::unreachable_core_id(core_id),
+                    };
+                    rustmeter_beacon::tracing::write_tracing_event(payload);
+                
 
-                // Execute original function body
-                {#block }
-            }
+                    // Execute original function body
+                    { #block }
+                }
+            }           
         }.into()
     }
 }
