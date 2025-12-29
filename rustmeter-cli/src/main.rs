@@ -25,7 +25,6 @@ mod flash_and_monitor;
 mod logs;
 mod perfetto_backend;
 mod probe_rs;
-mod time;
 mod tracing;
 
 fn main() -> anyhow::Result<()> {
