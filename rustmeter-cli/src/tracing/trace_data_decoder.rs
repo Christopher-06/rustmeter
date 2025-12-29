@@ -1,14 +1,14 @@
 use std::{
     collections::{HashMap, VecDeque},
     rc::Rc,
-    sync::{LazyLock, Mutex},
+    sync::Mutex,
     time::Duration,
     vec,
 };
 
 use rustmeter_beacon::{
     buffer::BufferReader,
-    protocol::{EventPayload, MonitorValuePayload, MonitorValueType, TypeDefinitionPayload},
+    protocol::{EventPayload, TypeDefinitionPayload},
     tracing::read_tracing_event,
 };
 
@@ -54,8 +54,8 @@ impl TraceDataDecoder {
     }
 
     pub fn decode(&mut self) -> anyhow::Result<Vec<TracingItem>> {
-        // Check if we have enough data for a header
-        if self.internal_buffer.len() < 3 {
+        // Check if we have enough data for a header (TODO: improve this check by peeking)
+        if self.internal_buffer.len() < 100 {
             return Ok(vec![]);
         }
 
@@ -96,6 +96,11 @@ impl TraceDataDecoder {
                 }
                 None => break,
             }
+
+            // Check if we have enough data for a header (TODO: improve this check by peeking)
+            if self.internal_buffer.len() - buffer.get_position() < 100 {
+                break;
+            }
         }
 
         // Remove the already read bytes from the internal buffer
@@ -105,6 +110,7 @@ impl TraceDataDecoder {
     }
 }
 
+#[cfg(test)]
 mod tests {
 
     use arbitrary_int::u3;
@@ -133,7 +139,10 @@ mod tests {
 
     pub fn test_trace_data_decoder_sequence() {
         let items = vec![
-            EventPayload::EmbassyTaskReady { task_id: 42 },
+            EventPayload::EmbassyTaskReady {
+                task_id: 42,
+                executor_id: u3::new(1),
+            },
             EventPayload::EmbassyExecutorPollStart {
                 executor_id: u3::new(3),
             },
@@ -149,8 +158,11 @@ mod tests {
             EventPayload::EmbassyTaskExecEndCore0 {
                 executor_id: u3::new(5),
             },
-            EventPayload::EmbassyTaskExecBeginCore0 { task_id: 7 },
-            EventPayload::DataLossEvent { dropped_events: 17 }
+            EventPayload::EmbassyTaskExecBeginCore0 {
+                task_id: 7,
+                executor_id: u3::new(2),
+            },
+            EventPayload::DataLossEvent { dropped_events: 17 },
         ];
 
         let mut decoder = TraceDataDecoder::new();
@@ -179,7 +191,10 @@ mod tests {
 
     pub fn test_trace_data_decoder_continuius() {
         let items = vec![
-            EventPayload::EmbassyTaskReady { task_id: 42 },
+            EventPayload::EmbassyTaskReady {
+                task_id: 42,
+                executor_id: u3::new(1),
+            },
             EventPayload::EmbassyExecutorPollStart {
                 executor_id: u3::new(3),
             },
@@ -195,8 +210,11 @@ mod tests {
             EventPayload::EmbassyTaskExecEndCore0 {
                 executor_id: u3::new(5),
             },
-            EventPayload::EmbassyTaskExecBeginCore0 { task_id: 7 },
-            EventPayload::DataLossEvent { dropped_events: 17 }
+            EventPayload::EmbassyTaskExecBeginCore0 {
+                task_id: 7,
+                executor_id: u3::new(2),
+            },
+            EventPayload::DataLossEvent { dropped_events: 17 },
         ];
 
         // Write tracing events
