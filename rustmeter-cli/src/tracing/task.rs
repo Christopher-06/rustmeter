@@ -31,227 +31,372 @@
 //! 7. A task is awoken, `_embassy_trace_task_ready_begin` is called
 //!
 //! (taken from embassy-executor/src/raw/trace.rs)
-//!
-//! We added the Preempted state to indicate that a task was preempted by another executor task with higher priority (Interrupt context).
 
-use std::{collections::HashMap, fmt::Display};
-
-use crossbeam::channel::Sender;
-
-use crate::{
-    elf_file::FirmwareAddressMap,
-    perfetto_backend::trace_event::TracingEvent,
-    time::EmbassyTime,
-    tracing::log_event::{LogEvent, LogEventType},
+use std::{
+    collections::{HashMap, VecDeque},
+    time::Duration,
 };
 
+use anyhow::bail;
+use arbitrary_int::u3;
+use crossbeam::channel::Sender;
+
+use crate::perfetto_backend::trace_event::{TracingArgsMap, TracingEvent};
+
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
-pub enum TaskTraceState {
+pub enum TaskState {
     Spawned,
-    Waiting,
+    Ready,
     Running,
-    /// Task was preempted by another executor (task with different executor ID on the same core)
-    Preempted {
-        by_executor_id: u32,
-    },
+    Preempted { by_executor_id: u3 },
     Idle,
     Ended,
+    StreamDesynchronized,
 }
 
-impl Display for TaskTraceState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl TaskState {
+    pub fn to_string(&self) -> String {
         match self {
-            TaskTraceState::Spawned => write!(f, "Spawned"),
-            TaskTraceState::Waiting => write!(f, "Waiting"),
-            TaskTraceState::Running => write!(f, "Running"),
-            TaskTraceState::Preempted { by_executor_id } => {
-                write!(f, "Preempted (by {by_executor_id})")
-            }
-            TaskTraceState::Idle => write!(f, "Idle"),
-            TaskTraceState::Ended => write!(f, "Ended"),
+            TaskState::Spawned => "Spawned".to_string(),
+            TaskState::Ready => "Ready".to_string(),
+            TaskState::Running => "Running".to_string(),
+            TaskState::Preempted { by_executor_id } => format!("Preempted (by {})", by_executor_id),
+            TaskState::Idle => "Idle".to_string(),
+            TaskState::Ended => "Ended".to_string(),
+            TaskState::StreamDesynchronized => "StreamDesynchronized".to_string(),
         }
     }
 }
 
 pub struct TaskTracing {
-    task_id: u32,
-    executor_id: u32,
-    core_id: u8,
+    executor_id: u3,
+    task_id: u16,
+    state: TaskState,
+    state_start: Duration,
+    reawoken_while_running: bool,
+    trace_event_tx: Sender<TracingEvent>,
 
-    trace_event_sender: Sender<TracingEvent>,
-
-    /// Current state of the task
-    state: TaskTraceState,
-    /// Timestamp when the current state started
-    state_start_time: EmbassyTime,
+    current_monitors: VecDeque<(String, Duration)>,
+    preempted_monitors: VecDeque<String>,
 }
 
 impl TaskTracing {
-    pub fn new(
-        task_id: u32,
-        executor_id: u32,
-        core_id: u8,
-        trace_event_sender: Sender<TracingEvent>,
-        firmware_addr_map: &FirmwareAddressMap,
-        created_at: EmbassyTime,
+    /// Create a new TaskTracing in Spawned state
+    pub fn new_spawned(
+        executor_id: u3,
+        task_id: u16,
+        state_start: Duration,
+        trace_event_tx: Sender<TracingEvent>,
     ) -> Self {
-        // try to find task name from global firmware address map
-        let task_name = firmware_addr_map.get_symbol_name(task_id as u64);
-        let display_name = match task_name.as_ref() {
-            Some(name) => name.clone(),
-            None => format!("Task 0x{task_id:X}"),
-        };
-
-        // Send task metadata
-        let _ = trace_event_sender.send(TracingEvent::Metadata {
-            name: "thread_name".to_string(),
+        // send end event for previous state (when created and data loss happened)
+        let _ = trace_event_tx.send(TracingEvent::End {
+            name: None,
             cat: None,
-            args: HashMap::from([("name".to_string(), display_name)]),
-            pid: executor_id,
-            tid: Some(task_id),
+            pid: executor_id.into(),
+            tid: Some(task_id as u32),
+            ts: state_start.as_micros(),
+            args: TracingArgsMap::new(),
         });
 
-        // Send Begin trace event for new state SPAWNED
-        let _ = trace_event_sender.send(TracingEvent::Begin {
-            name: TaskTraceState::Spawned.to_string(),
-            cat: None,
-            ts: created_at.as_micros(),
-            pid: executor_id,
-            tid: Some(task_id),
-            args: HashMap::new(),
-        });
-
-        TaskTracing {
-            task_id,
+        Self {
             executor_id,
-            core_id,
-            trace_event_sender,
-            state: TaskTraceState::Spawned,
-            state_start_time: created_at,
+            task_id,
+            state: TaskState::Spawned,
+            state_start,
+            reawoken_while_running: false,
+            trace_event_tx,
+            current_monitors: VecDeque::new(),
+            preempted_monitors: VecDeque::new(),
         }
     }
 
-    pub fn get_pid(&self) -> u32 {
-        self.executor_id
+    /// Create a new TaskTracing in Ready state
+    pub fn new_ready(
+        executor_id: u3,
+        task_id: u16,
+        state_start: Duration,
+        trace_event_tx: Sender<TracingEvent>,
+    ) -> Self {
+        // send end event for previous state (when created and data loss happened)
+        let _ = trace_event_tx.send(TracingEvent::End {
+            name: None,
+            cat: None,
+            pid: executor_id.into(),
+            tid: Some(task_id as u32),
+            ts: state_start.as_micros(),
+            args: TracingArgsMap::new(),
+        });
+
+        Self {
+            executor_id,
+            task_id,
+            state: TaskState::Ready,
+            state_start,
+            reawoken_while_running: false,
+            trace_event_tx,
+            current_monitors: VecDeque::new(),
+            preempted_monitors: VecDeque::new(),
+        }
     }
 
-    /// Set a new state for the task, sending statistics as needed
-    fn set_new_state(&mut self, new_state: TaskTraceState, timestamp: EmbassyTime) {
+    /// Create a new TaskTracing in Running state
+    pub fn new_exec_begin(
+        executor_id: u3,
+        task_id: u16,
+        state_start: Duration,
+        trace_event_tx: Sender<TracingEvent>,
+    ) -> Self {
+        // send end event for previous state (when created and data loss happened)
+        let _ = trace_event_tx.send(TracingEvent::End {
+            name: None,
+            cat: None,
+            pid: executor_id.into(),
+            tid: Some(task_id as u32),
+            ts: state_start.as_micros(),
+            args: TracingArgsMap::new(),
+        });
+
+        Self {
+            executor_id,
+            task_id,
+            state: TaskState::Running,
+            state_start,
+            reawoken_while_running: false,
+            trace_event_tx,
+            current_monitors: VecDeque::new(),
+            preempted_monitors: VecDeque::new(),
+        }
+    }
+
+    pub fn state(&self) -> &TaskState {
+        &self.state
+    }
+
+    fn transition_to(&mut self, new_state: TaskState, timestamp: Duration) {
         if self.state != new_state {
-            // Send End trace event for state change
-            let _ = self.trace_event_sender.send(TracingEvent::End {
+            // send trace event (end and begin)
+            let _ = self.trace_event_tx.send(TracingEvent::End {
                 name: None,
                 cat: None,
-                pid: self.get_pid(),
-                tid: Some(self.task_id),
+                pid: self.executor_id.into(),
+                tid: Some(self.task_id as u32),
                 ts: timestamp.as_micros(),
-                args: HashMap::new(),
+                args: TracingArgsMap::new(),
             });
-
-            // Send Begin trace event for new state
-            let _ = self.trace_event_sender.send(TracingEvent::Begin {
+            let _ = self.trace_event_tx.send(TracingEvent::Begin {
                 name: new_state.to_string(),
                 cat: None,
+                pid: self.executor_id.into(),
+                tid: Some(self.task_id as u32),
                 ts: timestamp.as_micros(),
-                pid: self.get_pid(),
-                tid: Some(self.task_id),
-                args: HashMap::new(),
+                args: TracingArgsMap::new(),
             });
 
-            // update state
+            // switch state
             self.state = new_state;
-            self.state_start_time = timestamp;
+            self.state_start = timestamp;
         }
     }
 
-    /// Update the task state based on a new trace item
-    pub fn update(&mut self, log_event: &LogEvent) {
-        // Check if we get preempted
-        if self.state == TaskTraceState::Running {
-            // check if another executor on the same core_id is beginning to poll (that would preempt us because only one executor can run on a core at a time)
-            if let LogEventType::EventEmbassyPollStart { executor_id, .. } = log_event.event_type {
-                if log_event.core_id == self.core_id && executor_id != self.executor_id {
-                    // preempted by another executor
-                    self.set_new_state(
-                        TaskTraceState::Preempted {
-                            by_executor_id: executor_id,
-                        },
-                        log_event.timestamp,
-                    );
-                    return;
-                }
+    pub fn on_desynchronize(&mut self, timestamp: Duration) {
+        self.transition_to(TaskState::StreamDesynchronized, timestamp);
+
+        // Send all code monitors as completed to now
+        for (name, start_timestamp) in self.current_monitors.drain(..) {
+            let _ = self.trace_event_tx.send(TracingEvent::Complete {
+                name,
+                cat: Some("code_monitor".into()),
+                pid: self.executor_id.into(),
+                tid: self.task_id as u32,
+                ts: start_timestamp.as_micros(),
+                dur: (timestamp - start_timestamp).as_micros() as u64,
+                args: HashMap::new(),
+            });
+        }
+    }
+
+    /// Called when task is ready to run
+    pub fn on_ready(&mut self, timestamp: Duration) -> anyhow::Result<()> {
+        match self.state {
+            TaskState::Spawned | TaskState::Idle => {
+                self.transition_to(TaskState::Ready, timestamp);
+                self.reawoken_while_running = false;
+                Ok(())
+            }
+            TaskState::Running | TaskState::Preempted { by_executor_id: _ } => {
+                // Mark that the task was reawoken while running
+                self.reawoken_while_running = true;
+                Ok(())
+            }
+            _ => {
+                // Cannot transition to Ready from other states
+                bail!(
+                    "Task {} cannot transition to Ready from state {:?}",
+                    self.task_id,
+                    self.state
+                );
             }
         }
+    }
 
-        // // Check if we are resuming from preemption (other executor is now idle)
-        if let TaskTraceState::Preempted { by_executor_id } = self.state {
-            // check if the other executor goes to idle
-            if let LogEventType::EventEmbassyExecutorIdle { executor_id, .. } = log_event.event_type
-            {
-                if executor_id == by_executor_id {
-                    // resume our task to running
-                    self.set_new_state(TaskTraceState::Running, log_event.timestamp);
-                    return;
-                }
+    /// Called when task starts execution
+    pub fn on_exec_begin(&mut self, timestamp: Duration) -> anyhow::Result<()> {
+        match self.state {
+            TaskState::Ready => {
+                self.transition_to(TaskState::Running, timestamp);
+                Ok(())
+            }
+            _ => {
+                // Only Ready tasks can start execution
+                bail!(
+                    "Task {} is not in Ready state, cannot begin execution (current state: {:?})",
+                    self.task_id,
+                    self.state
+                );
             }
         }
+    }
 
-        // Check that this trace item is for this executor
-        if log_event
-            .event_type
-            .get_executor_id()
-            .is_some_and(|exe_id| exe_id == self.executor_id)
-        {
-            // Check that this trace item is for this task
-            if log_event
-                .event_type
-                .get_task_id()
-                .is_some_and(|tid| tid == self.task_id)
-            {
-                // State machine transitions
-                match self.state {
-                    TaskTraceState::Spawned => {
-                        if let LogEventType::EventEmbassyTaskReadyBegin { .. } =
-                            log_event.event_type
-                        {
-                            self.set_new_state(TaskTraceState::Waiting, log_event.timestamp);
-                        }
-                    }
-                    TaskTraceState::Waiting => {
-                        if let LogEventType::EventEmbassyTaskExecBegin { .. } = log_event.event_type
-                        {
-                            self.set_new_state(TaskTraceState::Running, log_event.timestamp);
-                        }
-                    }
-                    TaskTraceState::Running => {
-                        match log_event.event_type {
-                            LogEventType::EventEmbassyTaskExecEnd { .. } => {
-                                self.set_new_state(TaskTraceState::Idle, log_event.timestamp);
-                            }
-                            LogEventType::EventEmbassyTaskReadyBegin { .. } => {
-                                // Normally this would transition after TaskExecEnd, but we can handle it here in this way too (maybe?)
-                                // This means the task was re-awoken while running
-                                self.set_new_state(TaskTraceState::Waiting, log_event.timestamp);
-                            }
-                            LogEventType::EventEmbassyTaskEnd { .. } => {
-                                self.set_new_state(TaskTraceState::Ended, log_event.timestamp);
-                            }
-                            _ => {}
-                        }
-                    }
-                    TaskTraceState::Idle => {
-                        if let LogEventType::EventEmbassyTaskReadyBegin { .. } =
-                            log_event.event_type
-                        {
-                            self.set_new_state(TaskTraceState::Waiting, log_event.timestamp);
-                        }
-                    }
-                    TaskTraceState::Ended => {
-                        // No transitions out of ended for tasks
-                    }
-                    TaskTraceState::Preempted { .. } => {} // nothing here because of other task-id
+    /// Called when task execution ends
+    pub fn on_exec_end(&mut self, timestamp: Duration) -> anyhow::Result<()> {
+        match self.state {
+            TaskState::Running => {
+                if self.reawoken_while_running {
+                    self.transition_to(TaskState::Ready, timestamp);
+                } else {
+                    self.transition_to(TaskState::Idle, timestamp);
                 }
+
+                self.reawoken_while_running = false;
+                Ok(())
             }
+            _ => {
+                // Only Running tasks can end
+                bail!(
+                    "Task {} is not in Running state, cannot end execution (current state: {:?})",
+                    self.task_id,
+                    self.state
+                );
+            }
+        }
+    }
+
+    /// Called when task ends
+    pub fn on_end(&mut self, timestamp: Duration) -> anyhow::Result<()> {
+        match self.state {
+            TaskState::Running => {
+                self.transition_to(TaskState::Ended, timestamp);
+                Ok(())
+            }
+            _ => {
+                // Only Running tasks can end
+                bail!(
+                    "Task {} is not in Running state, cannot end (current state: {:?})",
+                    self.task_id,
+                    self.state
+                );
+            }
+        }
+    }
+
+    /// Called when task is preempted
+    pub fn on_preempted(&mut self, timestamp: Duration, by_executor_id: u3) -> anyhow::Result<()> {
+        match self.state {
+            TaskState::Running => {
+                self.transition_to(TaskState::Preempted { by_executor_id }, timestamp);
+
+                // Send all code monitors as completed till now and store them as preempted
+                for (name, start_timestamp) in self.current_monitors.drain(..) {
+                    self.preempted_monitors.push_front(name.clone());
+                    let _ = self.trace_event_tx.send(TracingEvent::Complete {
+                        name,
+                        cat: Some("code_monitor".into()),
+                        pid: self.executor_id.into(),
+                        tid: self.task_id as u32,
+                        ts: start_timestamp.as_micros(),
+                        dur: (timestamp - start_timestamp).as_micros() as u64,
+                        args: HashMap::new(),
+                    });
+                }
+
+                Ok(())
+            }
+            _ => {
+                // Only running tasks can be preempted
+                bail!(
+                    "Task {} is not in Running state, cannot be preempted (current state: {:?})",
+                    self.task_id,
+                    self.state
+                );
+            }
+        }
+    }
+
+    /// Called when task is resumed from preemption
+    pub fn on_resumed(&mut self, timestamp: Duration) -> anyhow::Result<()> {
+        match self.state {
+            TaskState::Preempted { by_executor_id: _ } => {
+                self.transition_to(TaskState::Running, timestamp);
+
+                // Restore preempted code monitors
+                for name in self.preempted_monitors.drain(..) {
+                    self.current_monitors.push_back((name, timestamp));
+                }
+
+                Ok(())
+            }
+            _ => {
+                bail!(
+                    "Task {} is not in Preempted state, cannot resume (current state: {:?})",
+                    self.task_id,
+                    self.state
+                );
+            }
+        }
+    }
+
+    /// Push a new monitor onto the monitor stack
+    pub fn on_monitor_start(&mut self, name: String, timestamp: std::time::Duration) {
+        self.current_monitors.push_back((name.clone(), timestamp));
+    }
+
+    /// Top of the monitor stack is ended
+    pub fn on_monitor_end(&mut self, timestamp: std::time::Duration) {
+        if let Some((name, start_timestamp)) = self.current_monitors.pop_back() {
+            let _ = self.trace_event_tx.send(TracingEvent::Complete {
+                name,
+                cat: Some("code_monitor".into()),
+                pid: self.executor_id.into(),
+                tid: self.task_id as u32,
+                ts: start_timestamp.as_micros(),
+                dur: (timestamp - start_timestamp).as_micros() as u64,
+                args: HashMap::new(),
+            });
+        }
+    }
+
+    pub fn on_drop(&mut self, timestamp: Duration) {
+        // send end event for current state
+        let _ = self.trace_event_tx.send(TracingEvent::End {
+            name: None,
+            cat: None,
+            pid: self.executor_id.into(),
+            tid: Some(self.task_id as u32),
+            ts: timestamp.as_micros(),
+            args: TracingArgsMap::new(),
+        });
+
+        // Send all code monitors as completed
+        for (name, start_timestamp) in self.current_monitors.drain(..) {
+            let _ = self.trace_event_tx.send(TracingEvent::Complete {
+                name,
+                cat: Some("code_monitor".into()),
+                pid: self.executor_id.into(),
+                tid: self.task_id as u32,
+                ts: start_timestamp.as_micros(),
+                dur: (timestamp - start_timestamp).as_micros() as u64,
+                args: HashMap::new(),
+            });
         }
     }
 }

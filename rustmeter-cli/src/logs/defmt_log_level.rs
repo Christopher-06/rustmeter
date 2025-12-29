@@ -1,5 +1,7 @@
 use std::fmt::{Debug, Display};
 
+use crate::perfetto_backend::trace_event::CName;
+
 #[derive(Clone, PartialEq, Eq, Copy)]
 pub enum DefmtLogLevel {
     Trace,
@@ -41,6 +43,16 @@ impl DefmtLogLevel {
             DefmtLogLevel::Info => "INFO ".blue().to_string(),
             DefmtLogLevel::Warn => "WARN ".yellow().to_string(),
             DefmtLogLevel::Error => "ERROR".red().to_string(),
+        }
+    }
+
+    pub fn get_cname(&self) -> CName {
+        match self {
+            DefmtLogLevel::Trace => CName::Good,
+            DefmtLogLevel::Debug => CName::Good,
+            DefmtLogLevel::Info => CName::Good,
+            DefmtLogLevel::Warn => CName::Terrible,
+            DefmtLogLevel::Error => CName::Terrible,
         }
     }
 }

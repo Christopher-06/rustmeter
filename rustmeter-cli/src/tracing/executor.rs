@@ -24,24 +24,21 @@
 //! (taken from embassy-executor/src/raw/trace.rs)
 //!
 
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, time::Duration};
 
+use anyhow::bail;
+use arbitrary_int::u3;
 use crossbeam::channel::Sender;
 
 use crate::{
-    elf_file::FirmwareAddressMap,
-    perfetto_backend::trace_event::TracingEvent,
-    time::EmbassyTime,
-    tracing::{
-        log_event::{LogEvent, LogEventType},
-        task::TaskTracing,
-    },
+    perfetto_backend::trace_event::{TracingArgsMap, TracingEvent},
+    tracing::task::{TaskState, TaskTracing},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum PreemptedPrevState {
     Scheduling,
-    Polling { task_id: u32 },
+    Polling { task_id: u16 },
 }
 
 impl From<PreemptedPrevState> for ExecutorState {
@@ -59,260 +56,371 @@ pub enum ExecutorState {
     Scheduling,
     /// Executor was preempted by another higher priority executor on the same core
     Preempted {
-        by_executor_id: u32,
+        by_executor_id: u3,
         prev_state: PreemptedPrevState,
     },
     Polling {
-        task_id: u32,
+        task_id: u16,
     },
+    StreamDesynchronized,
 }
 
-impl Display for ExecutorState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl ExecutorState {
+    pub fn to_string(&self) -> String {
         match self {
-            ExecutorState::Idle => write!(f, "Idle"),
-            ExecutorState::Scheduling => write!(f, "Scheduling"),
+            ExecutorState::Idle => "Idle".to_string(),
+            ExecutorState::Scheduling => "Scheduling".to_string(),
             ExecutorState::Preempted { by_executor_id, .. } => {
-                write!(f, "Preempted (by {by_executor_id})")
+                format!("Preempted (by Executor {})", by_executor_id)
             }
-            ExecutorState::Polling { .. } => write!(f, "Polling"),
+            ExecutorState::Polling { task_id } => format!("Polling Task {}", task_id),
+            ExecutorState::StreamDesynchronized => "Stream Desynchronized".to_string(),
         }
     }
 }
 
 pub struct ExecutorTracing {
-    executor_id: u32,
-    core_id: u8,
-    display_name: String,
+    /// Short unique executor ID
+    executor_id: u3,
 
-    firmware_addr_map: FirmwareAddressMap,
-    trace_event_sender: Sender<TracingEvent>,
+    /// Current
+    current_state: ExecutorState,
+    state_start: Duration,
 
-    /// Current state of the executor
-    state: ExecutorState,
-    /// Timestamp when the current state started
-    state_start_time: EmbassyTime,
+    /// Tracked tasks by their short unique task ID
+    tasks: HashMap<u16, TaskTracing>,
 
-    tasks: HashMap<u32, TaskTracing>,
+    trace_event_tx: Sender<TracingEvent>,
 }
 
 impl ExecutorTracing {
-    pub fn new(
-        executor_id: u32,
-        core_id: u8,
-        created_at: EmbassyTime,
-        firmware_addr_map: FirmwareAddressMap,
-        trace_event_sender: Sender<TracingEvent>,
+    /// Create a new ExecutorTracing in Polling state with given task
+    pub fn new_polling(
+        executor_id: u3,
+        state_start: Duration,
+        task_id: u16,
+        trace_event_tx: Sender<TracingEvent>,
     ) -> Self {
-        // try to find task name from global firmware address map
-        let executor_name = firmware_addr_map.get_symbol_name(executor_id as u64);
-        let display_name = match &executor_name {
-            Some(name) => name.clone(),
-            None => format!("Executor 0x{executor_id:X}"),
-        };
-
-        // Send executor metadata
-        let _ = trace_event_sender.send(TracingEvent::Metadata {
-            name: "process_name".to_string(),
+        // send end event for previous state (when created and data loss happened)
+        let _ = trace_event_tx.send(TracingEvent::End {
+            name: None,
             cat: None,
-            args: HashMap::from([
-                (
-                    "name".to_string(),
-                    format!("[CORE {core_id}] {display_name}"),
-                ),
-                ("core".to_string(), core_id.to_string()),
-            ]),
-            pid: executor_id,
-            tid: None,
-        });
-        // Send thread name metadata (to visualize executors as threads in perfetto)
-        let _ = trace_event_sender.send(TracingEvent::Metadata {
-            name: "thread_name".to_string(),
-            cat: None,
-            args: HashMap::from([
-                ("name".to_string(), "Executor".to_string()),
-                ("core".to_string(), core_id.to_string()),
-            ]),
-            pid: executor_id,
-            tid: None,
-        });
-
-        // Send Begin trace event for executor creation
-        let _ = trace_event_sender.send(TracingEvent::Begin {
-            name: "Created".to_string(),
-            cat: None,
-            ts: created_at.as_micros(),
-            pid: executor_id,
-            tid: None,
-            args: HashMap::new(),
+            pid: executor_id.into(),
+            tid: Some(0),
+            ts: state_start.as_micros(),
+            args: TracingArgsMap::new(),
         });
 
         Self {
             executor_id,
-            core_id,
-            display_name,
-            state: ExecutorState::Idle,
-            state_start_time: created_at,
-            firmware_addr_map,
-            trace_event_sender,
-            tasks: HashMap::new(),
+            current_state: ExecutorState::Polling { task_id },
+            state_start,
+            tasks: HashMap::from([(
+                task_id,
+                TaskTracing::new_exec_begin(
+                    executor_id,
+                    task_id,
+                    state_start,
+                    trace_event_tx.clone(),
+                ),
+            )]),
+            trace_event_tx,
         }
     }
 
-    /// Get the display name of the executor
-    pub fn get_name(&self) -> &str {
-        &self.display_name
+    /// Check if executor is currently running (Polling or Scheduling) on the core
+    pub fn is_running(&self) -> bool {
+        matches!(self.current_state, ExecutorState::Polling { .. })
+            || matches!(self.current_state, ExecutorState::Scheduling)
     }
 
-    /// Get the executor ID
-    pub fn get_executor_id(&self) -> u32 {
+    /// Check if executor is preempted by given executor ID
+    pub fn is_preempted_by(&self, executor_id: u3) -> bool {
+        match self.current_state {
+            ExecutorState::Preempted { by_executor_id, .. } if by_executor_id == executor_id => {
+                true
+            }
+            _ => false,
+        }
+    }
+
+    pub fn executor_id(&self) -> u3 {
         self.executor_id
     }
 
-    /// Set a new state for the executor, sending statistics as needed
-    fn set_new_state(&mut self, new_state: ExecutorState, timestamp: EmbassyTime) {
-        if self.state != new_state {
-            // Send End trace event for previous state
-            let _ = self.trace_event_sender.send(TracingEvent::End {
+    fn transition_to(&mut self, new_state: ExecutorState, timestamp: Duration) {
+        if self.current_state != new_state {
+            // send trace event (end and begin)
+            let _ = self.trace_event_tx.send(TracingEvent::End {
                 name: None,
                 cat: None,
+                pid: self.executor_id.into(),
+                tid: Some(0),
                 ts: timestamp.as_micros(),
-                pid: self.executor_id,
-                tid: None,
-                args: HashMap::new(),
+                args: TracingArgsMap::new(),
             });
-            // Send Begin trace event for new state
-            let _ = self.trace_event_sender.send(TracingEvent::Begin {
+            let _ = self.trace_event_tx.send(TracingEvent::Begin {
                 name: new_state.to_string(),
                 cat: None,
+                pid: self.executor_id.into(),
+                tid: Some(0),
                 ts: timestamp.as_micros(),
-                pid: self.executor_id,
-                tid: None,
-                args: HashMap::new(),
+                args: TracingArgsMap::new(),
             });
 
-            // update state
-            self.state = new_state;
-            self.state_start_time = timestamp;
+            // switch state
+            self.current_state = new_state;
+            self.state_start = timestamp;
         }
     }
 
-    /// Run State Machine transition based on trace item
-    pub fn update(&mut self, log_event: &LogEvent) {
-        // Check if the log event contains a task for this executor that we do not yet track
-        if let Some(executor_id) = log_event.event_type.get_executor_id() {
-            // Check executor ID
-            if executor_id == self.executor_id {
-                if let Some(task_id) = log_event.event_type.get_task_id() {
-                    if !self.tasks.contains_key(&task_id) {
-                        // If the task does not exist, create it (probably a TaskNew event)
-                        let new_task = TaskTracing::new(
-                            task_id,
-                            self.executor_id,
-                            self.core_id,
-                            self.trace_event_sender.clone(),
-                            &self.firmware_addr_map,
-                            log_event.timestamp,
-                        );
-                        self.tasks.insert(task_id, new_task);
-                    }
-                }
-            }
-        }
+    pub fn on_desynchronize(&mut self, timestamp: Duration) {
+        self.transition_to(ExecutorState::StreamDesynchronized, timestamp);
 
-        // Update tasks
         for task in self.tasks.values_mut() {
-            task.update(log_event);
+            task.on_desynchronize(timestamp);
+        }
+    }
+
+    /// Called when a new task is created in Spawned state (ignores if already exists)
+    pub fn on_task_new_spawned(&mut self, task_id: u16, timestamp: Duration) -> anyhow::Result<()> {
+        if !self.tasks.contains_key(&task_id) {
+            let task_tracing = TaskTracing::new_spawned(
+                self.executor_id,
+                task_id,
+                timestamp,
+                self.trace_event_tx.clone(),
+            );
+            self.tasks.insert(task_id, task_tracing);
+        }
+        Ok(())
+    }
+
+    /// Called when a task is ready to run (creates if not exists)
+    pub fn on_task_ready(&mut self, task_id: u16, timestamp: Duration) -> anyhow::Result<()> {
+        if let Some(task_tracing) = self.tasks.get_mut(&task_id) {
+            // Update existing task
+            task_tracing.on_ready(timestamp)
+        } else {
+            // Create new task in Ready state
+            let task_tracing = TaskTracing::new_ready(
+                self.executor_id,
+                task_id,
+                timestamp,
+                self.trace_event_tx.clone(),
+            );
+            self.tasks.insert(task_id, task_tracing);
+            Ok(())
+        }
+    }
+
+    /// Called when a task begins execution (creates if not exists)
+    pub fn on_task_exec_begin(&mut self, task_id: u16, timestamp: Duration) -> anyhow::Result<()> {
+        // Check that no else task is running
+        let running_tasks = self
+            .tasks
+            .values()
+            .any(|t| matches!(t.state(), TaskState::Running));
+        if running_tasks {
+            bail!(
+                "Executor {} cannot start executing task {} while another task is running",
+                self.executor_id,
+                task_id
+            );
         }
 
-        // Check preemption state
-        match self.state {
-            ExecutorState::Polling { .. } | ExecutorState::Scheduling => {
-                // Check if we are beeing preempted
-                if let LogEventType::EventEmbassyPollStart { executor_id } = log_event.event_type {
-                    if executor_id != self.executor_id && log_event.core_id == self.core_id {
-                        // preempt
-                        let prev_state = match self.state {
-                            ExecutorState::Scheduling => PreemptedPrevState::Scheduling,
-                            ExecutorState::Polling { task_id } => {
-                                PreemptedPrevState::Polling { task_id }
-                            }
-                            _ => unreachable!(),
-                        };
+        // Update or create task
+        if let Some(task_tracing) = self.tasks.get_mut(&task_id) {
+            // Update existing task
+            task_tracing.on_exec_begin(timestamp)?;
+        } else {
+            // Create new task in Running state
+            let task_tracing = TaskTracing::new_exec_begin(
+                self.executor_id,
+                task_id,
+                timestamp,
+                self.trace_event_tx.clone(),
+            );
+            self.tasks.insert(task_id, task_tracing);
+        }
 
-                        self.set_new_state(
-                            ExecutorState::Preempted {
-                                by_executor_id: executor_id,
-                                prev_state,
-                            },
-                            log_event.timestamp,
-                        );
-                    }
-                }
+        // Transition to Polling state
+        self.transition_to(ExecutorState::Polling { task_id }, timestamp);
+
+        Ok(())
+    }
+
+    /// Called when a task ends execution
+    pub fn on_task_exec_end(&mut self, timestamp: Duration) -> anyhow::Result<()> {
+        // Get running task of Polling state
+        if let ExecutorState::Polling { task_id } = self.current_state {
+            if let Some(task_tracing) = self.tasks.get_mut(&task_id) {
+                // Update existing task
+                task_tracing.on_exec_end(timestamp)?;
+            } else {
+                // In Polling but no such task tracked? ==> this will normally not happen
+                bail!(
+                    "Executor {} has no tracked task {} to end execution for",
+                    self.executor_id,
+                    task_id
+                );
             }
+        } else {
+            // Not in Polling state
+            bail!(
+                "Executor {} cannot end task execution while not in Polling state (current state: {:?})",
+                self.executor_id,
+                self.current_state
+            );
+        }
+
+        self.transition_to(ExecutorState::Scheduling, timestamp);
+
+        Ok(())
+    }
+
+    /// Called when executor is preempted
+    pub fn on_preempted(&mut self, timestamp: Duration, by_executor_id: u3) -> anyhow::Result<()> {
+        let prev_state = match self.current_state {
+            ExecutorState::Scheduling => PreemptedPrevState::Scheduling,
+            ExecutorState::Polling { task_id } => PreemptedPrevState::Polling { task_id },
+            _ => {
+                bail!(
+                    "Cannot preempt executor {} from state {:?}",
+                    self.executor_id,
+                    self.current_state
+                )
+            }
+        };
+
+        // Preempt running task (if any)
+        if let Some(task) = self
+            .tasks
+            .values_mut()
+            .find(|t| matches!(t.state(), TaskState::Running))
+        {
+            // When executor is preempted, the running task is also preempted. But
+            // there could be no running task (e.g., if preempted while scheduling). This
+            // is not an error.
+            task.on_preempted(timestamp, by_executor_id)?;
+        }
+
+        self.transition_to(
             ExecutorState::Preempted {
                 by_executor_id,
                 prev_state,
+            },
+            timestamp,
+        );
+        Ok(())
+    }
+
+    /// Called when executor resumes from preemption
+    pub fn on_resume(&mut self, timestamp: Duration) -> anyhow::Result<()> {
+        match self.current_state {
+            ExecutorState::Preempted {
+                by_executor_id: _,
+                prev_state,
             } => {
-                // Check if we can resume (the higher prio executor goes back to idle)
-                if let LogEventType::EventEmbassyExecutorIdle { executor_id } = log_event.event_type
+                // Resume preempted task
+                if let Some(task) = self
+                    .tasks
+                    .values_mut()
+                    .find(|t| matches!(t.state(), TaskState::Preempted { .. }))
                 {
-                    if executor_id == by_executor_id {
-                        // resume
-                        self.set_new_state(prev_state.into(), log_event.timestamp);
-                    }
+                    task.on_resumed(timestamp)?;
                 }
+
+                self.transition_to(prev_state.into(), timestamp);
+                Ok(())
             }
-            _ => {}
-        }
-
-        // Check that the trace item is for this executor
-        if log_event
-            .event_type
-            .get_executor_id()
-            .is_some_and(|exe_id| exe_id == self.executor_id)
-        {
-            // Executor State machine transitions
-
-            match self.state {
-                ExecutorState::Idle => {
-                    if let LogEventType::EventEmbassyPollStart { .. } = log_event.event_type {
-                        self.set_new_state(ExecutorState::Scheduling, log_event.timestamp);
-                    }
-                }
-                ExecutorState::Scheduling => {
-                    if let LogEventType::EventEmbassyTaskExecBegin { task_id, .. } =
-                        log_event.event_type
-                    {
-                        self.set_new_state(ExecutorState::Polling { task_id }, log_event.timestamp);
-                    }
-
-                    if let LogEventType::EventEmbassyExecutorIdle { .. } = log_event.event_type {
-                        self.set_new_state(ExecutorState::Idle, log_event.timestamp);
-                    }
-                }
-                ExecutorState::Polling { .. } => {
-                    if let LogEventType::EventEmbassyTaskExecEnd { .. } = log_event.event_type {
-                        self.set_new_state(ExecutorState::Scheduling, log_event.timestamp);
-                    }
-                }
-                _ => {}
+            _ => {
+                bail!(
+                    "Cannot resume executor {} from state {:?}",
+                    self.executor_id,
+                    self.current_state
+                )
             }
         }
     }
 
-    /// Check if this executor is currently spending cpu time (scheduling or polling)
-    pub fn is_currently_running(&self) -> bool {
-        matches!(self.state, ExecutorState::Polling { .. })
-            || matches!(self.state, ExecutorState::Scheduling)
-    }
-
-    /// Check if there is a currently running task and return it
-    pub fn get_currently_running_task(&self) -> Option<&TaskTracing> {
-        if let ExecutorState::Polling { task_id } = self.state {
-            return self.tasks.get(&task_id);
+    /// Called when a task ends
+    pub fn on_task_end(&mut self, timestamp: Duration, task_id: u16) -> anyhow::Result<()> {
+        // Check if we have such a task
+        if !self.tasks.contains_key(&task_id) {
+            // Task ended, but we have no record of it ==> ignore and not an error
+            return Ok(());
         }
 
-        None
+        // Get running task of Polling state
+        if let ExecutorState::Polling { task_id } = self.current_state {
+            if let Some(task_tracing) = self.tasks.get_mut(&task_id) {
+                // Update existing task
+                task_tracing.on_end(timestamp)?;
+            } else {
+                // In Polling but no such task tracked? ==> this will normally not happen
+                bail!(
+                    "Executor {} has no tracked task {} to end for",
+                    self.executor_id,
+                    task_id
+                );
+            }
+        } else {
+            // Not in Polling state
+            bail!(
+                "Executor {} cannot end task while not in Polling state (current state: {:?})",
+                self.executor_id,
+                self.current_state
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Called when polling starts
+    pub fn on_poll_start(&mut self, timestamp: Duration) -> anyhow::Result<()> {
+        self.transition_to(ExecutorState::Scheduling, timestamp);
+        Ok(())
+    }
+
+    /// Called when executor becomes idle
+    pub fn on_idle(&mut self, timestamp: Duration) -> anyhow::Result<()> {
+        self.transition_to(ExecutorState::Idle, timestamp);
+        Ok(())
+    }
+
+    /// Broadcast monitor start to current polling task
+    pub fn on_monitor_start(&mut self, name: String, timestamp: std::time::Duration) {
+        if let ExecutorState::Polling { task_id } = self.current_state {
+            if let Some(task_tracing) = self.tasks.get_mut(&task_id) {
+                task_tracing.on_monitor_start(name, timestamp);
+            }
+        }
+    }
+
+    /// Broadcast monitor end to current polling task
+    pub fn on_monitor_end(&mut self, timestamp: std::time::Duration) {
+        if let ExecutorState::Polling { task_id } = self.current_state {
+            if let Some(task_tracing) = self.tasks.get_mut(&task_id) {
+                task_tracing.on_monitor_end(timestamp);
+            }
+        }
+    }
+
+    pub fn on_drop(&mut self, timestamp: Duration) {
+        // feed drop to all tasks
+        for task in self.tasks.values_mut() {
+            task.on_drop(timestamp);
+        }
+
+        // close current executor state
+        let _ = self.trace_event_tx.send(TracingEvent::End {
+            name: None,
+            cat: None,
+            pid: self.executor_id.into(),
+            tid: Some(0),
+            ts: timestamp.as_micros(),
+            args: TracingArgsMap::new(),
+        });
     }
 }
