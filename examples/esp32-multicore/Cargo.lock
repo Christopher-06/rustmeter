@@ -3,6 +3,12 @@
 version = 4
 
 [[package]]
+name = "arbitrary-int"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c858caffa49edfc4ecc45a4bec37abd3e88041a2903816f10f990b7b41abc281"
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -642,12 +648,10 @@ version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a30e6c9fbcc01c348d46706fef8131c7775ab84c254a3cd65d0cd3f6414d592"
 dependencies = [
- "defmt 1.0.1",
  "document-features",
  "esp-metadata-generated",
  "esp-sync",
  "log",
- "portable-atomic",
 ]
 
 [[package]]
@@ -732,7 +736,6 @@ dependencies = [
  "esp-backtrace",
  "esp-bootloader-esp-idf",
  "esp-hal",
- "esp-println",
  "esp-rtos",
  "rustmeter-beacon",
  "static_cell",
@@ -818,16 +821,6 @@ checksum = "4e639847d312d9a82d2e75b0edcc1e934efcc64e6cb7aa94f0b1fbec0bc231d6"
 dependencies = [
  "defmt 0.3.100",
  "gcd",
-]
-
-[[package]]
-name = "function-monitor"
-version = "0.1.0"
-dependencies = [
- "darling 0.23.0",
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -1188,13 +1181,64 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1376b15f3ff160e9b1e8ea564ce427f2f6fcf77528cc0a8bf405cb476f9cea7"
 
 [[package]]
+name = "rtt-target"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7afed1f4302eeba88c601636cf2c554c45e1cbb464bab44c6012bab0e71473c"
+dependencies = [
+ "critical-section",
+ "defmt 0.3.100",
+ "portable-atomic",
+ "ufmt-write",
+]
+
+[[package]]
 name = "rustmeter-beacon"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "defmt 1.0.1",
+ "portable-atomic",
+ "rustmeter-beacon-core",
+ "rustmeter-beacon-proc-macros",
+ "rustmeter-beacon-target",
+]
+
+[[package]]
+name = "rustmeter-beacon-core"
+version = "0.1.0"
+dependencies = [
+ "arbitrary-int",
+ "critical-section",
+ "portable-atomic",
+]
+
+[[package]]
+name = "rustmeter-beacon-proc-macros"
+version = "0.1.0"
+dependencies = [
+ "darling 0.23.0",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "rustmeter-beacon-target"
+version = "0.1.0"
+dependencies = [
+ "arbitrary-int",
+ "cfg-if",
+ "critical-section",
+ "defmt 1.0.1",
  "embassy-executor",
- "function-monitor",
- "tracing-core",
+ "embassy-futures",
+ "embassy-sync 0.7.2",
+ "embassy-time",
+ "esp-hal",
+ "esp-sync",
+ "portable-atomic",
+ "rtt-target",
+ "rustmeter-beacon-core",
 ]
 
 [[package]]
@@ -1405,14 +1449,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0cbe268d35bdb4bb5a56a2de88d0ad0eb70af5384a99d648cd4b3d04039800e"
 dependencies = [
  "winnow",
-]
-
-[[package]]
-name = "tracing-core"
-version = "0.1.0"
-dependencies = [
- "defmt 1.0.1",
- "esp-hal",
 ]
 
 [[package]]
