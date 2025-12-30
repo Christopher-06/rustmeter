@@ -53,59 +53,69 @@ impl TraceDataDecoder {
         self.internal_buffer.extend(data);
     }
 
-    pub fn decode(&mut self) -> anyhow::Result<Vec<TracingItem>> {
-        // Check if we have enough data for a header (TODO: improve this check by peeking)
-        if self.internal_buffer.len() < 100 {
-            return Ok(vec![]);
-        }
-
+    /// Decode a single tracing item from the internal buffer, advance
+    /// the timestamp and drain the read bytes from the buffer.
+    fn decode_single(&mut self) -> Option<TracingItem> {
         // Prepare monitor type lookup function
         let monitors = self.monitors.clone();
         let monitor_type_fn = move |monitor_id: u8| -> Option<u8> {
             monitors.lock().unwrap().get(&monitor_id).cloned()
         };
 
-        // TODO: Optimize decoding loop to avoid reallocations
-        // TODO: Check when decoding failed to go to next byte instead of stopping (message is corrupted)
-
-        // Try to decode some bytes
+        // Create buffer reader
         self.internal_buffer.make_contiguous();
         let mut buffer = BufferReader::new(self.internal_buffer.as_slices().0);
-        let mut items = vec![];
-        loop {
-            match read_tracing_event(&mut buffer, &monitor_type_fn) {
-                Some((timedelta, payload)) => {
-                    // Advance the timestamp
-                    let timestamp = self.last_timestamp
-                        + Duration::from_micros(timedelta.get_delta_us() as u64);
-                    self.last_timestamp = timestamp;
 
-                    // Check for monitor registration events
-                    if let EventPayload::TypeDefinition(definition) = &payload {
-                        if let TypeDefinitionPayload::ValueMonitor {
-                            type_id, value_id, ..
-                        } = definition
-                        {
-                            let mut monitors = self.monitors.lock().unwrap();
-                            monitors.insert(*value_id, *type_id);
-                        }
-                    }
+        if let Some((timedelta, payload)) = read_tracing_event(&mut buffer, &monitor_type_fn) {
+            // Advance the timestamp
+            let timestamp =
+                self.last_timestamp + Duration::from_micros(timedelta.get_delta_us() as u64);
+            self.last_timestamp = timestamp;
 
-                    // Store the item
-                    items.push(TracingItem::new(timestamp, payload));
+            // Check for monitor registration events
+            if let EventPayload::TypeDefinition(definition) = &payload {
+                if let TypeDefinitionPayload::ValueMonitor {
+                    type_id, value_id, ..
+                } = definition
+                {
+                    let mut monitors = self.monitors.lock().unwrap();
+                    monitors.insert(*value_id, *type_id);
                 }
-                None => break,
             }
 
-            // Check if we have enough data for a header (TODO: improve this check by peeking)
-            if self.internal_buffer.len() - buffer.get_position() < 100 {
-                break;
+            // Remove the already read bytes from the internal buffer
+            let read_bytes = buffer.get_position();
+            self.internal_buffer.drain(0..read_bytes);
+
+            return Some(TracingItem::new(timestamp, payload));
+        }
+
+        None
+    }
+
+    /// Decode all available tracing items from the internal buffer. If no
+    /// items could be decoded, but the buffer has significant data, it will
+    /// try to recover by removing bytes from the start of the buffer until
+    /// valid data is found.
+    pub fn decode(&mut self) -> anyhow::Result<Vec<TracingItem>> {
+        // Decode all available items
+        let mut items = vec![];
+        while let Some(item) = self.decode_single() {
+            items.push(item);
+        }
+
+        // Check for corrupted data (buffer cannot read any item, but it has significant data)
+        // 32 bytes is buffer size on target side
+        while items.is_empty() && self.internal_buffer.len() > 32 {
+            // Clear first byte till recovering
+            self.internal_buffer.pop_front();
+
+            // Try decoding again
+            while let Some(item) = self.decode_single() {
+                items.push(item);
             }
         }
 
-        // Remove the already read bytes from the internal buffer
-        let read_bytes = buffer.get_position();
-        self.internal_buffer.drain(0..read_bytes);
         Ok(items)
     }
 }
@@ -240,6 +250,26 @@ mod tests {
         for (decoded_item, original_item) in decoded_items.iter().zip(items.iter()) {
             assert_eq!(decoded_item.payload(), original_item);
         }
+    }
+
+    #[test]
+    pub fn test_trace_data_decoder_empty() {
+        let mut decoder = TraceDataDecoder::new();
+        let decoded_items = decoder.decode().unwrap();
+        assert_eq!(decoded_items.len(), 0);
+    }
+
+    #[test]
+    fn test_trace_data_decoder() {
+        test_trace_data_decoder_sequence();
+
+        // Reset RTT channel
+        {
+            let (_sender, receiver) = &*RTT_CHANNEL;
+            while receiver.try_recv().is_ok() {}
+        }
+
+        test_trace_data_decoder_continuius();
     }
 
     #[test]
