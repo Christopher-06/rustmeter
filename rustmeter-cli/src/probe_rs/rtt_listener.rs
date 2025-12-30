@@ -78,21 +78,35 @@ fn rtt_reader_thread(
     tracing_bytes_recver: Sender<Box<[u8]>>,
     error_recver: Sender<anyhow::Error>,
 ) {
+    let mut buffer = vec![0u8; 4096];
     loop {
         // Read defmt channel
-        let defmt_result = read_rtt_channel(&mut rtt, &session, 0);
-        if route_reading_result(defmt_result, &defmt_bytes_recver, &error_recver) {
+        let defmt_result = read_rtt_channel(&mut rtt, &mut buffer, &session, 0);
+        let (defmt_bytes, defmt_size) = to_bytes(defmt_result, &buffer);
+        if route_reading_result(defmt_bytes, &defmt_bytes_recver, &error_recver) {
             break;
         }
 
         // Read tracing channel
-        let tracing_result = read_rtt_channel(&mut rtt, &session, 1);
-        if route_reading_result(tracing_result, &tracing_bytes_recver, &error_recver) {
+        let tracing_result = read_rtt_channel(&mut rtt, &mut buffer, &session, 1);
+        let (tracing_bytes, tracing_size) = to_bytes(tracing_result, &buffer);
+        if route_reading_result(tracing_bytes, &tracing_bytes_recver, &error_recver) {
             break;
         }
 
-        // Avoid busy-waiting
-        std::thread::sleep(Duration::from_millis(10));
+        // Wait a bit if no data was read to avoid busy-waiting,
+        // else do not sleep to ensure low latency and reread as soon as possible
+        if tracing_size + defmt_size == 0 {
+            // No data read, avoid busy-waiting
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+}
+
+fn to_bytes(result: anyhow::Result<usize>, buffer: &[u8]) -> (anyhow::Result<Box<[u8]>>, usize) {
+    match result {
+        Ok(size) => (Ok(buffer[..size].to_vec().into_boxed_slice()), size),
+        Err(e) => (Err(e), 0),
     }
 }
 
@@ -111,9 +125,10 @@ fn route_reading_result(
 /// Read data from a specific RTT up channel
 fn read_rtt_channel(
     rtt: &mut Rtt,
+    buffer: &mut [u8],
     session: &AtomicSession,
     channel_index: usize,
-) -> anyhow::Result<Box<[u8]>> {
+) -> anyhow::Result<usize> {
     // Get the channel
     let channel = rtt
         .up_channel(channel_index)
@@ -124,12 +139,8 @@ fn read_rtt_channel(
     let mut core = session_lock.core(0)?;
 
     // Read data from the channel
-    let mut buffer = vec![0u8; 1024];
-    let bytes_read = channel.read(&mut core, &mut buffer).context(format!(
+    channel.read(&mut core, buffer).context(format!(
         "Failed to read from RTT up channel {}",
         channel_index
-    ))?;
-
-    buffer.truncate(bytes_read);
-    Ok(buffer.into_boxed_slice())
+    ))
 }
