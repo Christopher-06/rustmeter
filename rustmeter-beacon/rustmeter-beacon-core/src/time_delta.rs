@@ -2,6 +2,7 @@ use crate::buffer::{BufferReader, BufferWriter};
 
 static mut LAST_TIMESTAMP: u32 = 0;
 
+#[cfg(not(feature = "std"))]
 unsafe extern "Rust" {
     /// Low-level function to get the current tracing time in microseconds. Implemented in the target crate.
     fn get_tracing_time_us() -> u32;
@@ -14,6 +15,7 @@ pub struct TimeDelta {
 
 impl TimeDelta {
     /// This has to be called inside a critical section
+    #[cfg(not(feature = "std"))]
     pub fn from_now() -> Self {
         // estimate time between last timestamp and now
         let now = unsafe { get_tracing_time_us() };
@@ -25,6 +27,21 @@ impl TimeDelta {
         }
 
         TimeDelta { delta }
+    }
+    #[cfg(feature = "std")]
+    pub fn from_now() -> Self {
+        use std::{sync::OnceLock, time::Instant};
+        static START_TIME: OnceLock<Instant> = OnceLock::new();
+
+        let start_time = START_TIME.get_or_init(Instant::now);
+        let now = Instant::now().duration_since(*start_time).as_micros() as u32;
+        let delta_us = now.wrapping_sub(unsafe { LAST_TIMESTAMP });
+
+        unsafe {
+            LAST_TIMESTAMP = now;
+        }
+
+        TimeDelta { delta: delta_us }
     }
 
     /// Returns true if the TimeDelta requires extended format (4 bytes), false if it can be represented in single format (2 bytes).
