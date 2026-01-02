@@ -112,6 +112,6 @@ pub fn rustmeter_init_default() {
     };
 
     // Set tracing channel
-    let tracing_channel = channels.up.1;
+    let tracing_channel = channels.up.0;
     set_tracing_channel(tracing_channel);
 }
