@@ -3,11 +3,11 @@ use espflash::connection::Connection;
 
 use std::io::{ErrorKind, Read};
 
-use crate::flash_and_monitor::ChipMonitoringTool;
+use crate::{flash_and_monitor::ChipMonitoringTool, tracing::trace_data_decoder::CoreTracingData};
 
 pub struct SerialListener {
     defmt_bytes_recver: Receiver<Box<[u8]>>,
-    tracing_bytes_recver: Receiver<Box<[u8]>>,
+    tracing_bytes_recver: Receiver<CoreTracingData>,
     error_recver: Receiver<anyhow::Error>,
 }
 
@@ -39,7 +39,7 @@ impl ChipMonitoringTool for SerialListener {
         self.defmt_bytes_recver.clone()
     }
 
-    fn get_tracing_bytes_recver(&self) -> Receiver<Box<[u8]>> {
+    fn get_tracing_bytes_recver(&self) -> Receiver<CoreTracingData> {
         self.tracing_bytes_recver.clone()
     }
 
@@ -51,7 +51,7 @@ impl ChipMonitoringTool for SerialListener {
 fn serial_reader_thread(
     espflash_conn: Connection,
     defmt_bytes_sender: Sender<Box<[u8]>>,
-    tracing_bytes_sender: Sender<Box<[u8]>>,
+    tracing_bytes_sender: Sender<CoreTracingData>,
     error_sender: Sender<anyhow::Error>,
 ) {
     let mut serial_port = espflash_conn.into_serial();
@@ -105,9 +105,13 @@ fn serial_reader_thread(
             let paylaod = &decoding[(frame_starts + 3)..(frame_starts + 3 + length)];
 
             match type_id {
-                1 => {
-                    // tracing frame
-                    let _ = tracing_bytes_sender.send(paylaod.to_vec().into_boxed_slice());
+                0xF0 => {
+                    // tracing frame from core 0
+                    let _ = tracing_bytes_sender.send(CoreTracingData::Core0(paylaod.to_vec().into_boxed_slice()));
+                }
+                0xF1 => { 
+                    // tracing frame from core 1
+                    let _ = tracing_bytes_sender.send(CoreTracingData::Core1(paylaod.to_vec().into_boxed_slice()));
                 }
                 2 => {
                     // defmt frame

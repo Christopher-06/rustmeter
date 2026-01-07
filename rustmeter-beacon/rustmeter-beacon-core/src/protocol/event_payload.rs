@@ -65,21 +65,22 @@ pub enum EventPayload {
 
 impl EventPayload {
     pub const fn event_id(&self) -> u5 {
+        use crate::protocol::raw_writers::event_ids::*;
         let id = match self {
-            EventPayload::EmbassyTaskReady { .. } => 0,
-            EventPayload::EmbassyTaskExecBeginCore0 { .. } => 1,
-            EventPayload::EmbassyTaskExecBeginCore1 { .. } => 2,
-            EventPayload::EmbassyTaskExecEndCore0 { .. } => 3,
-            EventPayload::EmbassyTaskExecEndCore1 { .. } => 4,
-            EventPayload::EmbassyExecutorPollStart { .. } => 5,
-            EventPayload::EmbassyExecutorIdle { .. } => 6,
-            EventPayload::MonitorStartCore0 { .. } => 7,
-            EventPayload::MonitorStartCore1 { .. } => 8,
-            EventPayload::MonitorEndCore0 => 9,
-            EventPayload::MonitorEndCore1 => 10,
-            EventPayload::MonitorValue { .. } => 11,
-            EventPayload::TypeDefinition(_) => 12,
-            EventPayload::DataLossEvent { .. } => 13,
+            EventPayload::EmbassyTaskReady { .. } => EMBASSY_TASK_READY,
+            EventPayload::EmbassyTaskExecBeginCore0 { .. } => EMBASSY_TASK_EXEC_BEGIN_CORE0,
+            EventPayload::EmbassyTaskExecBeginCore1 { .. } => EMBASSY_TASK_EXEC_BEGIN_CORE1,
+            EventPayload::EmbassyTaskExecEndCore0 { .. } => EMBASSY_TASK_EXEC_END_CORE0,
+            EventPayload::EmbassyTaskExecEndCore1 { .. } => EMBASSY_TASK_EXEC_END_CORE1,
+            EventPayload::EmbassyExecutorPollStart { .. } => EMBASSY_EXECUTOR_POLL_START,
+            EventPayload::EmbassyExecutorIdle { .. } => EMBASSY_EXECUTOR_IDLE,
+            EventPayload::MonitorStartCore0 { .. } => MONITOR_START_CORE0,
+            EventPayload::MonitorStartCore1 { .. } => MONITOR_START_CORE1,
+            EventPayload::MonitorEndCore0 => MONITOR_END_CORE0,
+            EventPayload::MonitorEndCore1 => MONITOR_END_CORE1,
+            EventPayload::MonitorValue { .. } => MONITOR_VALUE,
+            EventPayload::TypeDefinition(_) => TYPE_DEFINITION,
+            EventPayload::DataLossEvent { .. } => DATA_LOSS_EVENT,
         };
 
         u5::new(id)
@@ -140,7 +141,6 @@ impl EventPayload {
         }
     }
 
-    #[cfg(feature = "std")]
     /// Reads an EventPayload from the provided buffer based on the given type ID. Params:
     /// - event_type: The combined event type byte containing event ID and executor short ID.
     /// - buffer: The buffer reader to read additional event data from.
@@ -158,7 +158,7 @@ impl EventPayload {
 
         match event_id.as_u8() {
             // EmbassyTaskReady
-            0 => {
+            1 => {
                 let mut data = [0u8; 2];
                 for byte in data.iter_mut() {
                     *byte = buffer.read_byte()?;
@@ -169,7 +169,7 @@ impl EventPayload {
                 })
             }
             // EmbassyTaskExecBeginCore0
-            1 => {
+            2 => {
                 let mut data = [0u8; 2];
                 for byte in data.iter_mut() {
                     *byte = buffer.read_byte()?;
@@ -180,7 +180,7 @@ impl EventPayload {
                 })
             }
             // EmbassyTaskExecBeginCore
-            2 => {
+            3 => {
                 let mut data = [0u8; 2];
                 for byte in data.iter_mut() {
                     *byte = buffer.read_byte()?;
@@ -191,37 +191,37 @@ impl EventPayload {
                 })
             }
             // EmbassyTaskExecEndCore0
-            3 => Some(EventPayload::EmbassyTaskExecEndCore0 {
+            4 => Some(EventPayload::EmbassyTaskExecEndCore0 {
                 executor_id: _executor_short_id,
             }),
             // EmbassyTaskExecEndCore1
-            4 => Some(EventPayload::EmbassyTaskExecEndCore1 {
+            5 => Some(EventPayload::EmbassyTaskExecEndCore1 {
                 executor_id: _executor_short_id,
             }),
             // EmbassyExecutorPollStart
-            5 => Some(EventPayload::EmbassyExecutorPollStart {
+            6 => Some(EventPayload::EmbassyExecutorPollStart {
                 executor_id: _executor_short_id,
             }),
             // EmbassyExecutorIdle
-            6 => Some(EventPayload::EmbassyExecutorIdle {
+            7 => Some(EventPayload::EmbassyExecutorIdle {
                 executor_id: _executor_short_id,
             }),
             // MonitorStartCore0
-            7 => {
+            8 => {
                 let monitor_id = buffer.read_byte()?;
                 Some(EventPayload::MonitorStartCore0 { monitor_id })
             }
             // MonitorStartCore1
-            8 => {
+            9 => {
                 let monitor_id = buffer.read_byte()?;
                 Some(EventPayload::MonitorStartCore1 { monitor_id })
             }
             // MonitorEndCore0
-            9 => Some(EventPayload::MonitorEndCore0),
+            10 => Some(EventPayload::MonitorEndCore0),
             // MonitorEndCore1
-            10 => Some(EventPayload::MonitorEndCore1),
+            11 => Some(EventPayload::MonitorEndCore1),
             // MonitorValue
-            11 => {
+            12 => {
                 let value_id = buffer.read_byte()?;
                 let type_id = monitor_type_fn(value_id)?;
                 let value = MonitorValuePayload::from_bytes(type_id, buffer)?;
@@ -229,13 +229,13 @@ impl EventPayload {
                 Some(EventPayload::MonitorValue { value_id, value })
             }
             // TypeDefinition
-            12 => {
+            13 => {
                 let typedef_it = buffer.read_byte()?;
                 let def = TypeDefinitionPayload::from_bytes(typedef_it, buffer)?;
                 Some(EventPayload::TypeDefinition(def))
             }
             // DataLossEvent
-            13 => {
+            14 => {
                 let mut data = [0u8; 4];
                 for byte in data.iter_mut() {
                     *byte = buffer.read_byte()?;

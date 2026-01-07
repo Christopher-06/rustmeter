@@ -12,6 +12,13 @@ use rustmeter_beacon::{
     tracing::read_tracing_event,
 };
 
+pub enum CoreTyped<T> {
+    Core0(T),
+    Core1(T),
+}
+
+pub type CoreTracingData = CoreTyped<Box<[u8]>>;
+
 #[derive(Debug, Clone)]
 pub struct TracingItem {
     timestamp: Duration,
@@ -33,29 +40,64 @@ impl TracingItem {
 }
 
 pub struct TraceDataDecoder {
-    internal_buffer: VecDeque<u8>,
+    byte_buffer_core0: VecDeque<u8>,
+    event_buffer_core0: VecDeque<TracingItem>,
+    byte_buffer_core1: VecDeque<u8>,
+    event_buffer_core1: VecDeque<TracingItem>,
     /// Registered monitors for decoding monitor values (monitor ID -> type ID)
     monitors: Rc<Mutex<HashMap<u8, u8>>>,
-    last_timestamp: Duration,
+
+    last_timestamp_core0: Duration,
+    cpu_tick_offset_us_core0 : f64,
+    last_timestamp_core1: Duration,
+    cpu_tick_offset_us_core1 : f64,
 }
 
 impl TraceDataDecoder {
     pub fn new() -> Self {
         Self {
-            internal_buffer: VecDeque::with_capacity(128),
+            byte_buffer_core0: VecDeque::with_capacity(128),
+            event_buffer_core0: VecDeque::with_capacity(128),
+            byte_buffer_core1: VecDeque::with_capacity(128),
+            event_buffer_core1: VecDeque::with_capacity(128),
             monitors: Rc::new(Mutex::new(HashMap::new())),
-            last_timestamp: Duration::from_micros(0),
+            last_timestamp_core0: Duration::from_micros(0),
+            last_timestamp_core1: Duration::from_micros(0),
+            cpu_tick_offset_us_core0 : 0.0,
+            cpu_tick_offset_us_core1 : 0.0,
         }
     }
 
     /// Feeds new data into the decoder's internal buffer
-    pub fn feed(&mut self, data: &[u8]) {
-        self.internal_buffer.extend(data);
+    pub fn feed(&mut self, data: &CoreTracingData) {
+        match data {
+            CoreTracingData::Core0(bytes) => self.byte_buffer_core0.extend(bytes.iter()),
+            CoreTracingData::Core1(bytes) => self.byte_buffer_core1.extend(bytes.iter()),
+        }
     }
 
-    /// Decode a single tracing item from the internal buffer, advance
-    /// the timestamp and drain the read bytes from the buffer.
-    fn decode_single(&mut self) -> Option<TracingItem> {
+    /// Decode a single tracing item from the internal byte buffer from the core, advance
+    /// the timestamp and drain the read bytes from the buffer. Appends it to the event buffer.
+    /// Returns false if no complete item could be decoded.
+    fn decode_single(&mut self, core: CoreTyped<()>) -> bool {
+        // Select core buffers
+        let (byte_buffer, last_timestamp, event_buffer, cur_core_id, cpu_tick_offset_us) = match core {
+            CoreTyped::Core0(_) => (
+                &mut self.byte_buffer_core0,
+                &mut self.last_timestamp_core0,
+                &mut self.event_buffer_core0,
+                0, 
+                &mut self.cpu_tick_offset_us_core0,
+            ),
+            CoreTyped::Core1(_) => (
+                &mut self.byte_buffer_core1,
+                &mut self.last_timestamp_core1,
+                &mut self.event_buffer_core1,
+                1,
+                &mut self.cpu_tick_offset_us_core1,
+            ),
+        };
+
         // Prepare monitor type lookup function
         let monitors = self.monitors.clone();
         let monitor_type_fn = move |monitor_id: u8| -> Option<u8> {
@@ -63,15 +105,10 @@ impl TraceDataDecoder {
         };
 
         // Create buffer reader
-        self.internal_buffer.make_contiguous();
-        let mut buffer = BufferReader::new(self.internal_buffer.as_slices().0);
+        byte_buffer.make_contiguous();
+        let mut buffer = BufferReader::new(byte_buffer.as_slices().0);
 
         if let Some((timedelta, payload)) = read_tracing_event(&mut buffer, &monitor_type_fn) {
-            // Advance the timestamp
-            let timestamp =
-                self.last_timestamp + Duration::from_micros(timedelta.get_delta_us() as u64);
-            self.last_timestamp = timestamp;
-
             // Check for monitor registration events
             if let EventPayload::TypeDefinition(definition) = &payload {
                 if let TypeDefinitionPayload::ValueMonitor {
@@ -81,16 +118,52 @@ impl TraceDataDecoder {
                     let mut monitors = self.monitors.lock().unwrap();
                     monitors.insert(*value_id, *type_id);
                 }
+
+                // ADVANCE TIME CURRENTLY ONLY HERE  on ClockReference
+                if let TypeDefinitionPayload::CoreClockReference { core_id, systimer_us, cpu_ticks } = definition {
+                    if *core_id == cur_core_id {
+                        println!("[Info] Received Clock Reference for core {}: {:?} us, {} cpu ticks", core_id, systimer_us, cpu_ticks);
+                        // Calculate CPU Start Point
+                        let cpu_time_us = (*cpu_ticks as f64) * 64.0 / 240.0; // Adjust for 240 MHz clock with TICK_DIVIDER = 64
+                        *cpu_tick_offset_us = (*systimer_us as f64) - cpu_time_us;
+                        println!("[Info] Core {} Clock Reference received. Adjusting timestamps by offset of {:.6}s", core_id, *cpu_tick_offset_us * 1e-6);
+
+                        // let systimer_duration = Duration::from_micros(*systimer_us);
+                        // let cpu_duration = Duration::from_secs_f64(cpu_time_us * 1e-6);
+                        // let offset = systimer_duration - cpu_duration;
+                        // println!("[Info] Core {} Clock Reference received. Adjusting timestamps by offset of {:.6}s", core_id, offset.as_secs_f64());
+                        // *last_timestamp += offset;
+                    }
+                }
             }
+
+            // Advance the timestamp
+            let timedelta = 64.0 * timedelta.get_delta_us() as f64 / 240.0 - *cpu_tick_offset_us; // Adjust for 240 MHz clock with TICK_DIVIDER = 64
+            let timestamp = *last_timestamp + Duration::from_secs_f64(timedelta.max(0.0) * 1e-6);
+            assert!(timestamp >= *last_timestamp, "Timestamps must be non-decreasing for core {}", cur_core_id);
+            *last_timestamp = timestamp;
+            // let timestamp = Duration::from_secs_f64(timedelta * 1e-6);
+
 
             // Remove the already read bytes from the internal buffer
             let read_bytes = buffer.get_position();
-            self.internal_buffer.drain(0..read_bytes);
+            byte_buffer.drain(0..read_bytes);
 
-            return Some(TracingItem::new(timestamp, payload));
+            // Append to event buffer
+            event_buffer.push_back(TracingItem::new(timestamp, payload));
+
+            return true;
         }
 
-        None
+        // Nothing decoded
+
+        // Check if we have more data in byte buffer and this could be a corrupted item
+        if byte_buffer.len() > 32 {
+            // Clear first byte to try recovering
+            byte_buffer.pop_front();
+        }
+
+        false
     }
 
     /// Decode all available tracing items from the internal buffer. If no
@@ -98,20 +171,40 @@ impl TraceDataDecoder {
     /// try to recover by removing bytes from the start of the buffer until
     /// valid data is found.
     pub fn decode(&mut self) -> anyhow::Result<Vec<TracingItem>> {
-        // Decode all available items
-        let mut items = vec![];
-        while let Some(item) = self.decode_single() {
-            items.push(item);
+        // Ping pong decode all cores
+        loop {
+            let mut decoded_any = false;
+            if self.decode_single(CoreTyped::Core0(())) {
+                decoded_any = true;
+            }
+            if self.decode_single(CoreTyped::Core1(())) {
+                decoded_any = true;
+            }
+
+            if !decoded_any {
+                break;
+            }
         }
 
-        // Check for corrupted data (buffer cannot read any item, but it has significant data)
-        // 32 bytes is buffer size on target side
-        while items.is_empty() && self.internal_buffer.len() > 32 {
-            // Clear first byte till recovering
-            self.internal_buffer.pop_front();
+        // Extract all items from core0 that have a timestamp earlier than the earliest core1 item
+        // Do this same for core1 items
+        // TODO: What if one core do not have any items? Threshold for messages?
+        // currently both cores sending data, so we can assume both have items ping ponged
 
-            // Try decoding again
-            while let Some(item) = self.decode_single() {
+        let mut items = Vec::new();
+        loop {
+            if self.event_buffer_core0.len() < 2 || self.event_buffer_core1.len() < 2 {
+                break;
+            }
+
+            let ts_core0 = self.event_buffer_core0.front().unwrap().timestamp();
+            let ts_core1 = self.event_buffer_core1.front().unwrap().timestamp();
+
+            if ts_core0 <= ts_core1 {
+                let item = self.event_buffer_core0.pop_front().unwrap();
+                items.push(item);
+            } else {
+                let item = self.event_buffer_core1.pop_front().unwrap();
                 items.push(item);
             }
         }

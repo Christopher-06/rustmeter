@@ -4,13 +4,16 @@ use anyhow::Context;
 use crossbeam::channel::{Receiver, Sender};
 use probe_rs::rtt::Rtt;
 
-use crate::{flash_and_monitor::ChipMonitoringTool, probe_rs::atomic_session::AtomicSession};
+use crate::{
+    flash_and_monitor::ChipMonitoringTool, probe_rs::atomic_session::AtomicSession,
+    tracing::trace_data_decoder::CoreTracingData,
+};
 
 /// This struct aggressively reads RTT data from the target to ensure that the RTT Channels do not overflow.
 /// It spawns a thread that continuously reads from all up channels and sends the data to defmt_bytes or tracing_bytes
 pub struct RttListener {
     defmt_bytes_recver: Receiver<Box<[u8]>>,
-    tracing_bytes_recver: Receiver<Box<[u8]>>,
+    tracing_bytes_recver: Receiver<CoreTracingData>,
     error_recver: Receiver<anyhow::Error>,
 }
 
@@ -61,7 +64,7 @@ impl ChipMonitoringTool for RttListener {
         self.defmt_bytes_recver.clone()
     }
 
-    fn get_tracing_bytes_recver(&self) -> Receiver<Box<[u8]>> {
+    fn get_tracing_bytes_recver(&self) -> Receiver<CoreTracingData> {
         self.tracing_bytes_recver.clone()
     }
 
@@ -75,7 +78,7 @@ fn rtt_reader_thread(
     mut rtt: Rtt,
     session: AtomicSession,
     defmt_bytes_recver: Sender<Box<[u8]>>,
-    tracing_bytes_recver: Sender<Box<[u8]>>,
+    tracing_bytes_recver: Sender<CoreTracingData>,
     error_recver: Sender<anyhow::Error>,
 ) {
     let mut buffer = vec![0u8; 4096];
@@ -90,7 +93,14 @@ fn rtt_reader_thread(
         // Read tracing channel
         let tracing_result = read_rtt_channel(&mut rtt, &mut buffer, &session, 1);
         let (tracing_bytes, tracing_size) = to_bytes(tracing_result, &buffer);
-        if route_reading_result(tracing_bytes, &tracing_bytes_recver, &error_recver) {
+        let is_err = match tracing_bytes {
+            Ok(bytes) => tracing_bytes_recver
+                .send(CoreTracingData::Core0(bytes))
+                .is_err(),
+            Err(e) => error_recver.send(e).is_err(),
+        };
+
+        if is_err {
             break;
         }
 

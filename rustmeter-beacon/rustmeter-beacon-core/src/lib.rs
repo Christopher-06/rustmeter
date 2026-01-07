@@ -1,10 +1,11 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+pub mod buffer;
 pub mod protocol;
 pub mod time_delta;
 pub mod tracing;
-pub mod buffer;
 
+#[inline(always)]
 pub fn compressed_task_id(task_id: u32) -> u16 {
     // Step 1: Ignore alignment.
     // We discard the lowest 2 bits (4-byte alignment).
@@ -15,4 +16,14 @@ pub fn compressed_task_id(task_id: u32) -> u16 {
     let folded = (shifted ^ (shifted >> 16)) as u16;
 
     folded
+}
+
+#[cfg(not(feature = "std"))]
+unsafe extern "Rust" {
+    pub fn get_current_core_id() -> u8;
+}
+
+#[cfg(feature = "std")]
+unsafe fn get_current_core_id() -> u8 {
+    0
 }

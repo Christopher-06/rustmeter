@@ -1,12 +1,14 @@
 use critical_section::Mutex;
 
-#[cfg(feature = "std")]
-use crate::buffer::BufferReader;
-use crate::{buffer::BufferWriter, protocol::EventPayload, time_delta::TimeDelta};
+use crate::{
+    buffer::{BufferReader, BufferWriter},
+    protocol::EventPayload,
+    time_delta::TimeDelta,
+};
 
 unsafe extern "Rust" {
     /// Low-level function to write tracing data. Implemented in the target crate.
-    fn write_tracing_data(data: &[u8]);
+    pub fn write_tracing_data(data: &[u8]);
 }
 
 static TRACE_WRITING: Mutex<()> = Mutex::new(());
@@ -21,15 +23,14 @@ pub fn write_tracing_event(event: EventPayload) {
 
         // Write event data
         let mut buffer = BufferWriter::new();
-        timestamp.write_bytes(&mut buffer);
         event.write_bytes(&mut buffer);
+        timestamp.write_bytes(&mut buffer);
 
         // Send the data over RTT
         unsafe { write_tracing_data(buffer.as_slice()) };
     });
 }
 
-#[cfg(feature = "std")]
 pub fn read_tracing_event<F>(
     buffer: &mut BufferReader,
     monitor_type_fn: &F,
@@ -37,15 +38,14 @@ pub fn read_tracing_event<F>(
 where
     F: Fn(u8) -> Option<u8>,
 {
-    let timestamp = TimeDelta::read_bytes(buffer)?;
     let event_type = buffer.read_byte()?;
     let event = EventPayload::from_bytes(event_type, buffer, monitor_type_fn)?;
+    let timestamp = TimeDelta::read_bytes(buffer)?;
 
     Some((timestamp, event))
 }
 
 #[cfg(test)]
-#[cfg(feature = "std")]
 mod tests {
     use arbitrary_int::u3;
 
@@ -59,11 +59,11 @@ mod tests {
     use std::sync::atomic::AtomicU32;
 
     // Mock implementation of get_tracing_time_us for testing
-    #[unsafe(no_mangle)]
-    fn get_tracing_time_us() -> u32 {
-        static COUNTER: AtomicU32 = AtomicU32::new(0);
-        COUNTER.fetch_add(1000, std::sync::atomic::Ordering::SeqCst)
-    }
+    // #[unsafe(no_mangle)]
+    // fn get_tracing_time_us() -> u32 {
+    //     static COUNTER: AtomicU32 = AtomicU32::new(0);
+    //     COUNTER.fetch_add(1000, std::sync::atomic::Ordering::SeqCst)
+    // }
 
     #[test]
     fn test_tracing_event_write_and_read() {

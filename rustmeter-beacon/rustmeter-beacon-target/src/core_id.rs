@@ -2,6 +2,7 @@
 #[inline(always)]
 /// Returns the core ID of the currently executing core based on the target architecture.
 /// Supports various architectures including ESP32 (Xtensa and RISC-V), RP2040, and STM32 (single or H7 dual-core).
+#[unsafe(no_mangle)]
 pub fn get_current_core_id() -> u8 {
     //
     // ESP32 via esp-hal (xtensa or riscv32) [can be dual-core]
@@ -16,7 +17,11 @@ pub fn get_current_core_id() -> u8 {
         feature = "esp32s3"
     ))]
     {
+        if crate::espressif::NUM_CORES == 1 {
+            return 0;
+        } else {
         return esp_hal::system::Cpu::current() as u8;
+        }
     }
 
     // STM32 (most likely single-core)
