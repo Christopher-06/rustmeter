@@ -51,6 +51,10 @@ impl<'a> BufferReader<'a> {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.buffer.len()
+    }
+
     /// Reads a single byte from the buffer. Returns None if end of buffer is reached.
     pub fn read_byte(&mut self) -> Option<u8> {
         if self.position >= self.buffer.len() {
