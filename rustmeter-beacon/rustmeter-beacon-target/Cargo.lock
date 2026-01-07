@@ -1515,6 +1515,7 @@ version = "0.1.0"
 dependencies = [
  "arbitrary-int",
  "cfg-if",
+ "cortex-m",
  "critical-section",
  "defmt 1.0.1",
  "embassy-executor",

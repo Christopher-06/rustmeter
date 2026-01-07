@@ -10,11 +10,10 @@ repository = "https://github.com/Christopher-06/rustmeter"
 
 [dependencies]
 rustmeter-beacon-core = { path = "../rustmeter-beacon-core" }
-portable-atomic = "1"
+portable-atomic = {version = "1"}
 arbitrary-int = "2"
 embassy-time = { version = "0.5" }
 
-rtt-target = { version = "0.6.2", optional = true}
 esp-hal = { version = "1", optional = true}
 embassy-rp = { version = "0.9", optional = true, default-features = false}
 defmt = { version = "1" , optional = true }
@@ -25,6 +24,7 @@ embassy-executor = "0.9"
 embassy-futures = "0.1.2"
 cfg-if = "1.0.4"
 embedded-io-async = "0.7.0"
+cortex-m = "0.7.7"
 
 [features]
 defmt = ["dep:defmt", "rtt-target?/defmt"]
@@ -37,8 +37,8 @@ esp32h2 = ["dep:esp-hal", "esp-hal/esp32h2", "esp-sync/esp32h2"]
 esp32s2 = ["dep:esp-hal", "esp-hal/esp32s2", "esp-sync/esp32s2"]
 esp32s3 = ["dep:esp-hal", "esp-hal/esp32s3", "esp-sync/esp32s3", "rustmeter-beacon-core/multicore"]
 
-stm32 = ["dep:rtt-target"]
-rp2040 = ["dep:rtt-target" , "dep:embassy-rp", "embassy-rp/rp2040"]
-rp235xa = ["dep:rtt-target", "dep:embassy-rp", "embassy-rp/rp235xa"]
-rp235xb = ["dep:rtt-target", "dep:embassy-rp", "embassy-rp/rp235xb"]
+stm32 = []
+rp2040 = [ "dep:embassy-rp", "embassy-rp/rp2040", "portable-atomic/critical-section", "rustmeter-beacon-core/multicore"]
+rp235xa = ["dep:embassy-rp", "embassy-rp/rp235xa", "portable-atomic/critical-section", "rustmeter-beacon-core/multicore"]
+rp235xb = ["dep:embassy-rp", "embassy-rp/rp235xb", "portable-atomic/critical-section", "rustmeter-beacon-core/multicore"]
 esp-sync = ["dep:esp-sync"]

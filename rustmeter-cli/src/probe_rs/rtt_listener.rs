@@ -84,21 +84,33 @@ fn rtt_reader_thread(
     let mut buffer = vec![0u8; 4096];
     loop {
         // Read defmt channel
-        let defmt_result = read_rtt_channel(&mut rtt, &mut buffer, &session, 0);
+        let defmt_result = read_rtt_channel(&mut rtt, &mut buffer, &session, 2);
         let (defmt_bytes, defmt_size) = to_bytes(defmt_result, &buffer);
         if route_reading_result(defmt_bytes, &defmt_bytes_recver, &error_recver) {
             break;
         }
 
-        // Read tracing channel
-        let tracing_result = read_rtt_channel(&mut rtt, &mut buffer, &session, 1);
-        let (tracing_bytes, tracing_size) = to_bytes(tracing_result, &buffer);
-        let is_err = match tracing_bytes {
+        // Read tracing channel core0
+        let tracing_result = read_rtt_channel(&mut rtt, &mut buffer, &session, 0);
+        let (tracing_bytes, tracing_size_core0) = to_bytes(tracing_result, &buffer);
+        let mut is_err = match tracing_bytes {
             Ok(bytes) => tracing_bytes_recver
                 .send(CoreTracingData::Core0(bytes))
                 .is_err(),
             Err(e) => error_recver.send(e).is_err(),
         };
+
+        // Read tracing channel core1 (can be erroneous on single-core targets)
+        let tracing_result = read_rtt_channel(&mut rtt, &mut buffer, &session, 1);
+        let (tracing_bytes, tracing_size_core1) = to_bytes(tracing_result, &buffer);
+        if let Ok(bytes) = tracing_bytes {
+            if tracing_bytes_recver
+                .send(CoreTracingData::Core1(bytes))
+                .is_err()
+            {
+                is_err = true;
+            }
+        }
 
         if is_err {
             break;
@@ -106,7 +118,7 @@ fn rtt_reader_thread(
 
         // Wait a bit if no data was read to avoid busy-waiting,
         // else do not sleep to ensure low latency and reread as soon as possible
-        if tracing_size + defmt_size == 0 {
+        if tracing_size_core0 + tracing_size_core1 + defmt_size == 0 {
             // No data read, avoid busy-waiting
             std::thread::sleep(Duration::from_millis(10));
         }
