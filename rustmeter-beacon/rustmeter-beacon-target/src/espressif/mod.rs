@@ -1,9 +1,42 @@
 #[cfg(feature = "defmt")]
-pub mod esp_defmt_pipe;
-pub mod espressif_config;
-pub mod tracing_esp;
+mod esp_defmt_pipe;
+mod espressif_config;
+pub use espressif_config::{Config as RustmeterConfig, *};
+mod tracing_esp;
 
 mod printing;
-pub use printing::*;
 
-// TODO: Add Serial-JTAG support for better performance on supported chips
+#[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32p4"))]
+pub const NUM_CORES: usize = 2;
+#[cfg(any(
+    feature = "esp32s2",
+    feature = "esp32c3",
+    feature = "esp32c6",
+    feature = "esp32h2"
+))]
+pub const NUM_CORES: usize = 1;
+
+#[derive(Debug)]
+pub enum InitializationError {
+    UartConfigError(esp_hal::uart::ConfigError),
+    TaskSpawnError(embassy_executor::SpawnError),
+}
+
+/// Initialize Rustmeter Beacon tracing and logging system
+/// This spawns the printing task that handles all output
+pub fn init_rustmeter_beacon<P: ConfigPrinterBuild>(
+    config: RustmeterConfig<P>,
+    spawner: &embassy_executor::Spawner,
+) -> Result<(), InitializationError> {
+    // Build Printer
+    let printer_route = config
+        .build_printer_route()
+        .map_err(InitializationError::UartConfigError)?;
+
+    // Spawn printing task
+    spawner
+        .spawn(printing::connector(printer_route, config.cpu_freq))
+        .map_err(InitializationError::TaskSpawnError)?;
+
+    Ok(())
+}
