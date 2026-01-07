@@ -113,7 +113,6 @@ impl MonitorValuePayload {
         }
     }
 
-    #[cfg(feature = "std")]
     pub fn as_f64(&self) -> f64 {
         match self {
             MonitorValuePayload::U8(v) => *v as f64,
