@@ -1,7 +1,7 @@
 //! An example demonstrating the use of Rustmeter Beacon with Embassy on a Raspberry Pi Pico (RP2040).
 //! This example sets up multiple asynchronous tasks with different priorities across both cores of the RP2040,
 //! including tasks that perform long computations and control an LED (everything monitored)
-//! 
+//!
 #![no_std]
 #![no_main]
 
@@ -14,10 +14,10 @@ use embassy_rp::{
     interrupt::{InterruptExt, Priority},
     multicore::{Stack, spawn_core1},
 };
-use static_cell::StaticCell;
 use embassy_time::Timer;
 use panic_probe as _;
-use rustmeter_beacon::{monitor_fn, monitor_scoped, rustmeter_init_default};
+use rustmeter_beacon::{init_rustmeter_beacon, monitor_fn, monitor_scoped};
+use static_cell::StaticCell;
 
 static mut CORE1_STACK: Stack<4096> = Stack::new();
 static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
@@ -32,10 +32,10 @@ unsafe fn SWI_IRQ_0() {
 
 #[cortex_m_rt::entry]
 fn main() -> ! {
-    rustmeter_init_default();
-
     let p = embassy_rp::init(Default::default());
     let led = Output::new(p.PIN_25, Level::Low);
+
+    info!("Starting Rustmeter Beacon Embassy RP2040 example");
 
     // Spawn core 1
     spawn_core1(
@@ -44,6 +44,7 @@ fn main() -> ! {
         move || {
             let executor1 = EXECUTOR1.init(Executor::new());
             executor1.run(|spawner| {
+                init_rustmeter_beacon(&spawner).unwrap();
                 spawner.spawn(hello_world_task_core1().unwrap());
             });
         },
@@ -69,7 +70,7 @@ async fn spamming_task() {
         let start = embassy_time::Instant::now();
         while embassy_time::Instant::now() - start < embassy_time::Duration::from_micros(1500) {}
 
-        Timer::after(embassy_time::Duration::from_micros(1500)).await;
+        Timer::after(embassy_time::Duration::from_micros(15000)).await;
     }
 }
 
@@ -85,7 +86,7 @@ async fn long_computation_task() {
 #[monitor_fn]
 #[inline(never)]
 fn do_long_computation() {
-    for _ in 0..1_000_000 {
+    for _ in 0..1_000 {
         asm::nop();
     }
 }

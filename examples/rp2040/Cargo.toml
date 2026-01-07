@@ -25,11 +25,13 @@ embassy-executor = { path = "../../../embassy/embassy-executor" }
 embassy-rp = { path = "../../../embassy/embassy-rp" }
 
 [profile.release]
-codegen-units = 1
-debug = true            
+codegen-units = 1        # LLVM can perform better optimizations using a single thread
+debug = 2
 debug-assertions = false
-opt-level = 3          
-lto = "fat"
+incremental = false
+lto = 'fat'
+opt-level = 's'
+overflow-checks = false
 
 [package.metadata.embassy]
 build = [
