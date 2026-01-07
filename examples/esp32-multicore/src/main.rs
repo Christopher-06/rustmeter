@@ -10,7 +10,7 @@ use defmt::*;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
-use esp_hal::clock::CpuClock;
+use esp_hal::clock::{Clock, CpuClock};
 use esp_hal::gpio;
 use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::timer::timg::TimerGroup;
@@ -55,11 +55,14 @@ async fn main(spawner: Spawner) {
         move || {
             let executor = EXECUTOR_CORE_1.init(esp_rtos::embassy::Executor::new());
             executor.run(|spawner| {
-                spawner
-                    .spawn(rustmeter_beacon::espressif::trace_data_printing(
-                        Default::default(),
-                    ))
-                    .unwrap();
+                // Initialize Rustmeter Beacon on second core
+                init_rustmeter_beacon(
+                    RustmeterConfig::new(config.cpu_clock().frequency()),
+                    &spawner,
+                )
+                .unwrap();
+                info!("Rustmeter Beacon initialized!");
+
                 spawner.spawn(busy_loop_task_second()).unwrap();
             });
         },
