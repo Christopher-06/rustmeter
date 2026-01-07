@@ -218,6 +218,8 @@ impl TracingInstance {
                     .insert(*monitor_id as u32, name.clone());
                 Ok(())
             }
+            TypeDefinitionPayload::GlobalClockConfiguration { .. } => Ok(()), // TODO: handle clock changes
+            TypeDefinitionPayload::CoreClockReference { .. } => Ok(()),
         }
     }
 
