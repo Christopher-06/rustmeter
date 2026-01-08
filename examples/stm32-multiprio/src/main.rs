@@ -1,13 +1,15 @@
 #![no_std]
 #![no_main]
 
-use {defmt_rtt as _, panic_probe as _};
+use panic_probe as _;
 
 use cortex_m_rt::entry;
 use defmt::info;
 use embassy_executor::{Executor, InterruptExecutor};
-use embassy_stm32::interrupt;
-use embassy_stm32::interrupt::{InterruptExt, Priority};
+use embassy_stm32::{
+    Config, Peripherals, interrupt,
+    interrupt::{InterruptExt, Priority},
+};
 use embassy_time::{Duration, Instant, Timer};
 use static_cell::StaticCell;
 
@@ -38,19 +40,21 @@ fn complex_computation() {
 
     // Metric reporting of computation duration
     let duration = Instant::now() - start;
-    event_metric!("complex_computation_completed", duration.as_millis() as u32);
+    monitor_value!("complex_calc_done", duration.as_millis() as u32);
 }
 
 #[entry]
 fn main() -> ! {
-    let _p = embassy_stm32::init(Default::default());
+    let config = Config::default();
+    // let rcc = config.rcc.;
+    let _p = embassy_stm32::init(config);
 
     // STM32s don’t have any interrupts exclusively for software use, but they can all be triggered by software as well as
     // by the peripheral, so we can just use any free interrupt vectors which aren’t used by the rest of your application.
     // In this case we’re using UART4 and UART5, but there’s nothing special about them. Any otherwise unused interrupt
     // vector would work exactly the same.
 
-    event_metric!("system_startup", 3300);
+    monitor_value!("system_startup", 3300);
 
     // High-priority executor: UART4, priority level 6
     interrupt::UART4.set_priority(Priority::P6);
@@ -67,6 +71,10 @@ fn main() -> ! {
     // Low priority executor: runs in thread mode, using WFE/SEV
     let executor = EXECUTOR_LOW.init(Executor::new());
     executor.run(|spawner| {
+        rustmeter_beacon::init_rustmeter_beacon(RustmeterConfig::new(get_system_freq!()), &spawner)
+            .unwrap();
+        info!("Rustmeter Beacon initialized");
+
         spawner.spawn(hello_world_task_low()).unwrap();
         spawner.spawn(busy_loop_task_low_prio()).unwrap();
     });
