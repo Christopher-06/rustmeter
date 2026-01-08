@@ -123,12 +123,10 @@ macro_rules! monitor_scoped {
         };
 
         use rustmeter_beacon::monitors::{CODE_MONITOR_REGISTRY, VALUE_MONITOR_REGISTRY};
-        use rustmeter_beacon::core_id::get_current_core_id;
         use rustmeter_beacon::get_static_id_by_registry;
         use rustmeter_beacon::tracing::write_tracing_event;
 
         let (local_id, registered_newly) = get_static_id_by_registry!(CODE_MONITOR_REGISTRY);
-        let core_id = get_current_core_id();
 
         // Send TypeDefinition event if newly registered
         if registered_newly {
@@ -143,21 +141,12 @@ macro_rules! monitor_scoped {
 
         // Create guard to signal end of scope
         let _guard = rustmeter_beacon::monitors::DropGuard::new(|| {
-            let payload = match core_id {
-                0 => rustmeter_beacon::protocol::EventPayload::MonitorEndCore0 {},
-                1 => rustmeter_beacon::protocol::EventPayload::MonitorEndCore1 {},
-                _ => rustmeter_beacon::core_id::unreachable_core_id(core_id),
-            };
-
+            let payload = rustmeter_beacon::protocol::EventPayload::MonitorEnd;
             write_tracing_event(payload);
         });
 
         // Send MonitorStart event (after guard-created to lower tracing impact on measured scope)
-        let payload = match core_id {
-            0 => rustmeter_beacon::protocol::EventPayload::MonitorStartCore0 {monitor_id: local_id as u8},
-            1 => rustmeter_beacon::protocol::EventPayload::MonitorStartCore1 {monitor_id: local_id as u8},
-            _ => rustmeter_beacon::core_id::unreachable_core_id(core_id),
-        };
+        let payload = rustmeter_beacon::protocol::EventPayload::MonitorStart {monitor_id: local_id as u8};
         write_tracing_event(payload);
 
         { $body }
@@ -172,5 +161,7 @@ pub fn defmt_trace_new_function_monitor(name: &str, local_id: usize) {
         "Registered new function monitor: {} with id {}",
         name,
         local_id
+    );
+}
     );
 }

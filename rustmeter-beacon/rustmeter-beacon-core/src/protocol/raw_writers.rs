@@ -3,20 +3,16 @@ use arbitrary_int::{traits::Integer, u3};
 
 pub mod event_ids {
     pub const EMBASSY_TASK_READY: u8 = 1;
-    pub const EMBASSY_TASK_EXEC_BEGIN_CORE0: u8 = 2;
-    pub const EMBASSY_TASK_EXEC_BEGIN_CORE1: u8 = 3;
-    pub const EMBASSY_TASK_EXEC_END_CORE0: u8 = 4;
-    pub const EMBASSY_TASK_EXEC_END_CORE1: u8 = 5;
-    pub const EMBASSY_EXECUTOR_POLL_START: u8 = 6;
-    pub const EMBASSY_EXECUTOR_IDLE: u8 = 7;
-    pub const MONITOR_START_CORE0: u8 = 8;
-    pub const MONITOR_START_CORE1: u8 = 9;
-    pub const MONITOR_END_CORE0: u8 = 10;
-    pub const MONITOR_END_CORE1: u8 = 11;
-    pub const MONITOR_VALUE: u8 = 12;
-    pub const TYPE_DEFINITION: u8 = 13;
-    pub const DATA_LOSS_EVENT: u8 = 14;
-    pub const DEFMT_DATA_EVENT: u8 = 15;
+    pub const EMBASSY_TASK_EXEC_BEGIN: u8 = 2;
+    pub const EMBASSY_TASK_EXEC_END: u8 = 3;
+    pub const EMBASSY_EXECUTOR_POLL_START: u8 = 4;
+    pub const EMBASSY_EXECUTOR_IDLE: u8 = 5;
+    pub const MONITOR_START: u8 = 6;
+    pub const MONITOR_END: u8 = 7;
+    pub const MONITOR_VALUE: u8 = 8;
+    pub const TYPE_DEFINITION: u8 = 9;
+    pub const DATA_LOSS_EVENT: u8 = 10;
+    pub const DEFMT_DATA_EVENT: u8 = 11;
 }
 
 #[inline(always)]
@@ -33,16 +29,10 @@ pub fn write_embassy_task_ready(task_id: u16, executor_id: u3) {
 }
 
 #[inline(always)]
-pub fn write_embassy_task_exec_begin(core_id: u8, task_id: u16, executor_id: u3) {
-    let event_id = match core_id {
-        0 => event_ids::EMBASSY_TASK_EXEC_BEGIN_CORE0 << 3,
-        1 => event_ids::EMBASSY_TASK_EXEC_BEGIN_CORE1 << 3,
-        _ => return, // Invalid core ID
-    };
-
+pub fn write_embassy_task_exec_begin(task_id: u16, executor_id: u3) {
     // Add payload
     let mut buffer = [0u8; 8];
-    buffer[0] = event_id | executor_id.as_u8();
+    buffer[0] = (event_ids::EMBASSY_TASK_EXEC_BEGIN << 3) | executor_id.as_u8();
     buffer[1..3].copy_from_slice(&task_id.to_le_bytes());
 
     // Write to global buffer
@@ -52,16 +42,10 @@ pub fn write_embassy_task_exec_begin(core_id: u8, task_id: u16, executor_id: u3)
 }
 
 #[inline(always)]
-pub fn write_embassy_task_exec_end(core_id: u8, executor_id: u3) {
-    let event_id = match core_id {
-        0 => event_ids::EMBASSY_TASK_EXEC_END_CORE0 << 3,
-        1 => event_ids::EMBASSY_TASK_EXEC_END_CORE1 << 3,
-        _ => return, // Invalid core ID
-    };
-
+pub fn write_embassy_task_exec_end(executor_id: u3) {
     // Add payload
     let mut buffer = [0u8; 8];
-    buffer[0] = event_id | executor_id.as_u8();
+    buffer[0] = (event_ids::EMBASSY_TASK_EXEC_END << 3) | executor_id.as_u8();
 
     // Write to global buffer
     let timestamp = TimeDelta::from_now();
@@ -94,16 +78,10 @@ pub fn write_embassy_executor_idle(executor_id: u3) {
 }
 
 #[inline(always)]
-pub fn write_monitor_start(core_id: u8, monitor_id: u8) {
-    let event_id = match core_id {
-        0 => event_ids::MONITOR_START_CORE0 << 3,
-        1 => event_ids::MONITOR_START_CORE1 << 3,
-        _ => return, // Invalid core ID
-    };
-
+pub fn write_monitor_start(monitor_id: u8) {
     // Add payload
     let mut buffer = [0u8; 8];
-    buffer[0] = event_id;
+    buffer[0] = event_ids::MONITOR_START << 3;
     buffer[1] = monitor_id;
 
     // Write to global buffer
@@ -113,16 +91,10 @@ pub fn write_monitor_start(core_id: u8, monitor_id: u8) {
 }
 
 #[inline(always)]
-pub fn write_monitor_end(core_id: u8) {
-    let event_id = match core_id {
-        0 => event_ids::MONITOR_END_CORE0 << 3,
-        1 => event_ids::MONITOR_END_CORE1 << 3,
-        _ => return, // Invalid core ID
-    };
-
+pub fn write_monitor_end() {
     // Add payload
     let mut buffer = [0u8; 8];
-    buffer[0] = event_id;
+    buffer[0] = event_ids::MONITOR_END << 3;
 
     // Write to global buffer
     let timestamp = TimeDelta::from_now();
@@ -131,7 +103,7 @@ pub fn write_monitor_end(core_id: u8) {
 }
 
 #[inline(always)]
-pub fn write_defmt_data(data : &[u8]) {
+pub fn write_defmt_data(data: &[u8]) {
     // TODO: Create chunked writes if data is too large
     // Create header
     let mut buffer = [0u8; 20]; // 2 header + 2 timestamp + 16 data
@@ -211,24 +183,13 @@ pub mod tests {
     #[test]
     fn test_write_embassy_task_exec_begin() {
         with_mocks(
-            mock_trace_writer(EventPayload::EmbassyTaskExecBeginCore0 {
+            mock_trace_writer(EventPayload::EmbassyTaskExecBegin {
                 task_id: 54321,
                 executor_id: u3::new(2),
             }),
             mock_time_provider,
             || {
-                write_embassy_task_exec_begin(0, 54321, u3::new(2));
-            },
-        );
-
-        with_mocks(
-            mock_trace_writer(EventPayload::EmbassyTaskExecBeginCore1 {
-                task_id: 54321,
-                executor_id: u3::new(2),
-            }),
-            mock_time_provider,
-            || {
-                write_embassy_task_exec_begin(1, 54321, u3::new(2));
+                write_embassy_task_exec_begin(54321, u3::new(2));
             },
         );
     }
@@ -236,22 +197,12 @@ pub mod tests {
     #[test]
     fn test_write_embassy_task_exec_end() {
         with_mocks(
-            mock_trace_writer(EventPayload::EmbassyTaskExecEndCore0 {
+            mock_trace_writer(EventPayload::EmbassyTaskExecEnd {
                 executor_id: u3::new(3),
             }),
             mock_time_provider,
             || {
-                write_embassy_task_exec_end(0, u3::new(3));
-            },
-        );
-
-        with_mocks(
-            mock_trace_writer(EventPayload::EmbassyTaskExecEndCore1 {
-                executor_id: u3::new(3),
-            }),
-            mock_time_provider,
-            || {
-                write_embassy_task_exec_end(1, u3::new(3));
+                write_embassy_task_exec_end(u3::new(3));
             },
         );
     }
@@ -285,18 +236,10 @@ pub mod tests {
     #[test]
     pub fn test_write_monitor_start() {
         with_mocks(
-            mock_trace_writer(EventPayload::MonitorStartCore0 { monitor_id: 10 }),
+            mock_trace_writer(EventPayload::MonitorStart { monitor_id: 10 }),
             mock_time_provider,
             || {
-                write_monitor_start(0, 10);
-            },
-        );
-
-        with_mocks(
-            mock_trace_writer(EventPayload::MonitorStartCore1 { monitor_id: 20 }),
-            mock_time_provider,
-            || {
-                write_monitor_start(1, 20);
+                write_monitor_start(10);
             },
         );
     }
@@ -304,18 +247,10 @@ pub mod tests {
     #[test]
     pub fn test_write_monitor_end() {
         with_mocks(
-            mock_trace_writer(EventPayload::MonitorEndCore0),
+            mock_trace_writer(EventPayload::MonitorEnd),
             mock_time_provider,
             || {
-                write_monitor_end(0);
-            },
-        );
-
-        with_mocks(
-            mock_trace_writer(EventPayload::MonitorEndCore1),
-            mock_time_provider,
-            || {
-                write_monitor_end(1);
+                write_monitor_end();
             },
         );
     }

@@ -7,52 +7,29 @@ use arbitrary_int::{traits::Integer, u3, u5};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EventPayload {
     /// Embassy Task is ready to be polled (Waker called).
-    /// CoreID is not included here because ISR can run on any core (mostly core 0).
     /// ExecutorID will also be included
     EmbassyTaskReady { task_id: u16, executor_id: u3 },
     /// Embassy Task execution began (poll called).
-    /// CoreID is included via Variant (Core0/Core1).
     /// ExecutorID will also be included
-    EmbassyTaskExecBeginCore0 { task_id: u16, executor_id: u3 },
-    /// Embassy Task execution began (poll called).
-    /// CoreID is included via Variant (Core0/Core1).
-    /// ExecutorID will also be included
-    EmbassyTaskExecBeginCore1 { task_id: u16, executor_id: u3 },
+    EmbassyTaskExecBegin { task_id: u16, executor_id: u3 },
     /// Embassy Task execution ended (returned Poll::Ready or yielded Poll::Pending).
-    /// CoreID is included via Variant (Core0/Core1).
     /// ExecutorID is included because it is shorter to transmit than TaskID and we know the executor from the TaskExecBegin event.
-    EmbassyTaskExecEndCore0 { executor_id: u3 },
-    /// Embassy Task execution ended (returned Poll::Ready or yielded Poll::Pending).
-    /// CoreID is included via Variant (Core0/Core1).
-    /// ExecutorID is included because it is shorter to transmit than TaskID and we know the executor from the TaskExecBegin event.
-    EmbassyTaskExecEndCore1 { executor_id: u3 },
+    EmbassyTaskExecEnd { executor_id: u3 },
     /// Embassy Executor started polling tasks.
     /// ExecutorID is included because it is the only identifier for the executor.
-    /// CoreID is not included here because executor than calls TaskExecBegin events that include the core ID (so this event can be taken out if not needed)
     EmbassyExecutorPollStart { executor_id: u3 },
     /// Embassy Executor is idle (no tasks to poll).
     /// ExecutorID is included because it is the only identifier for the executor.
     EmbassyExecutorIdle { executor_id: u3 },
     /// Function or Scope Monitor started
-    /// CoreID is included via Variant (Core0/Core1).
     /// MonitorID identifies the monitor instance (was assigned via previous TypeDefinition event).
-    MonitorStartCore0 { monitor_id: u8 },
-    /// Function or Scope Monitor started
-    /// CoreID is included via Variant (Core0/Core1).
-    /// MonitorID identifies the monitor instance (was assigned via previous TypeDefinition event).
-    MonitorStartCore1 { monitor_id: u8 },
+    MonitorStart { monitor_id: u8 },
     /// Function or Scope Monitor ended
-    /// CoreID is included via Variant (Core0/Core1).
-    /// MonitorID are not included here because they can be inferred from the corresponding MonitorStart event on the same core.
-    MonitorEndCore0,
-    /// Function or Scope Monitor ended
-    /// CoreID is included via Variant (Core0/Core1).
     /// MonitorID are not included here because they can be inferred from the corresponding MonitorStart event
-    MonitorEndCore1,
+    MonitorEnd,
     /// Value Monitor reported a value
     /// ValueID identifies the monitor instance (was assigned via previous TypeDefinition event).
     /// Value is the reported value payload.
-    /// CoreID is not relevant for value monitors and thus not included.
     MonitorValue {
         value_id: u8,
         value: MonitorValuePayload,
@@ -75,16 +52,12 @@ impl EventPayload {
         use crate::protocol::raw_writers::event_ids::*;
         let id = match self {
             EventPayload::EmbassyTaskReady { .. } => EMBASSY_TASK_READY,
-            EventPayload::EmbassyTaskExecBeginCore0 { .. } => EMBASSY_TASK_EXEC_BEGIN_CORE0,
-            EventPayload::EmbassyTaskExecBeginCore1 { .. } => EMBASSY_TASK_EXEC_BEGIN_CORE1,
-            EventPayload::EmbassyTaskExecEndCore0 { .. } => EMBASSY_TASK_EXEC_END_CORE0,
-            EventPayload::EmbassyTaskExecEndCore1 { .. } => EMBASSY_TASK_EXEC_END_CORE1,
+            EventPayload::EmbassyTaskExecBegin { .. } => EMBASSY_TASK_EXEC_BEGIN,
+            EventPayload::EmbassyTaskExecEnd { .. } => EMBASSY_TASK_EXEC_END,
             EventPayload::EmbassyExecutorPollStart { .. } => EMBASSY_EXECUTOR_POLL_START,
             EventPayload::EmbassyExecutorIdle { .. } => EMBASSY_EXECUTOR_IDLE,
-            EventPayload::MonitorStartCore0 { .. } => MONITOR_START_CORE0,
-            EventPayload::MonitorStartCore1 { .. } => MONITOR_START_CORE1,
-            EventPayload::MonitorEndCore0 => MONITOR_END_CORE0,
-            EventPayload::MonitorEndCore1 => MONITOR_END_CORE1,
+            EventPayload::MonitorStart { .. } => MONITOR_START,
+            EventPayload::MonitorEnd => MONITOR_END,
             EventPayload::MonitorValue { .. } => MONITOR_VALUE,
             EventPayload::TypeDefinition(_) => TYPE_DEFINITION,
             EventPayload::DataLossEvent { .. } => DATA_LOSS_EVENT,
@@ -97,10 +70,8 @@ impl EventPayload {
     pub const fn get_executor_id(&self) -> Option<u3> {
         match self {
             EventPayload::EmbassyTaskReady { executor_id, .. } => Some(*executor_id),
-            EventPayload::EmbassyTaskExecBeginCore0 { executor_id, .. } => Some(*executor_id),
-            EventPayload::EmbassyTaskExecBeginCore1 { executor_id, .. } => Some(*executor_id),
-            EventPayload::EmbassyTaskExecEndCore0 { executor_id, .. } => Some(*executor_id),
-            EventPayload::EmbassyTaskExecEndCore1 { executor_id, .. } => Some(*executor_id),
+            EventPayload::EmbassyTaskExecBegin { executor_id, .. } => Some(*executor_id),
+            EventPayload::EmbassyTaskExecEnd { executor_id, .. } => Some(*executor_id),
             EventPayload::EmbassyExecutorPollStart { executor_id, .. } => Some(*executor_id),
             EventPayload::EmbassyExecutorIdle { executor_id, .. } => Some(*executor_id),
             _ => None,
@@ -121,30 +92,19 @@ impl EventPayload {
             } => {
                 writer.write_bytes(&task_id.to_le_bytes());
             }
-            EventPayload::EmbassyTaskExecBeginCore0 {
+            EventPayload::EmbassyTaskExecBegin {
                 task_id,
                 executor_id: _,
             } => {
                 writer.write_bytes(&task_id.to_le_bytes());
             }
-            EventPayload::EmbassyTaskExecBeginCore1 {
-                task_id,
-                executor_id: _,
-            } => {
-                writer.write_bytes(&task_id.to_le_bytes());
-            }
-            EventPayload::EmbassyTaskExecEndCore0 { executor_id: _ } => {}
-            EventPayload::EmbassyTaskExecEndCore1 { executor_id: _ } => {}
+            EventPayload::EmbassyTaskExecEnd { executor_id: _ } => {}
             EventPayload::EmbassyExecutorPollStart { executor_id: _ } => {}
             EventPayload::EmbassyExecutorIdle { executor_id: _ } => {}
-            EventPayload::MonitorStartCore0 { monitor_id } => {
+            EventPayload::MonitorStart { monitor_id } => {
                 writer.write_byte(*monitor_id);
             }
-            EventPayload::MonitorStartCore1 { monitor_id } => {
-                writer.write_byte(*monitor_id);
-            }
-            EventPayload::MonitorEndCore0 => {}
-            EventPayload::MonitorEndCore1 => {}
+            EventPayload::MonitorEnd => {}
             EventPayload::MonitorValue { value_id, value } => {
                 writer.write_byte(*value_id);
                 value.write_bytes(writer);
@@ -184,9 +144,10 @@ impl EventPayload {
         let event_id = u5::new(event_type >> 3);
         let _executor_short_id = u3::new(event_type & 0x07);
 
+        use crate::protocol::raw_writers::event_ids::*;
         match event_id.as_u8() {
             // EmbassyTaskReady
-            1 => {
+            EMBASSY_TASK_READY => {
                 let mut data = [0u8; 2];
                 for byte in data.iter_mut() {
                     *byte = buffer.read_byte()?;
@@ -196,60 +157,38 @@ impl EventPayload {
                     executor_id: _executor_short_id,
                 })
             }
-            // EmbassyTaskExecBeginCore0
-            2 => {
+            // EmbassyTaskExecBegin
+            EMBASSY_TASK_EXEC_BEGIN => {
                 let mut data = [0u8; 2];
                 for byte in data.iter_mut() {
                     *byte = buffer.read_byte()?;
                 }
-                Some(EventPayload::EmbassyTaskExecBeginCore0 {
+                Some(EventPayload::EmbassyTaskExecBegin {
                     task_id: u16::from_le_bytes(data),
                     executor_id: _executor_short_id,
                 })
             }
-            // EmbassyTaskExecBeginCore
-            3 => {
-                let mut data = [0u8; 2];
-                for byte in data.iter_mut() {
-                    *byte = buffer.read_byte()?;
-                }
-                Some(EventPayload::EmbassyTaskExecBeginCore1 {
-                    task_id: u16::from_le_bytes(data),
-                    executor_id: _executor_short_id,
-                })
-            }
-            // EmbassyTaskExecEndCore0
-            4 => Some(EventPayload::EmbassyTaskExecEndCore0 {
-                executor_id: _executor_short_id,
-            }),
-            // EmbassyTaskExecEndCore1
-            5 => Some(EventPayload::EmbassyTaskExecEndCore1 {
+            // EmbassyTaskExecEnd
+            EMBASSY_TASK_EXEC_END => Some(EventPayload::EmbassyTaskExecEnd {
                 executor_id: _executor_short_id,
             }),
             // EmbassyExecutorPollStart
-            6 => Some(EventPayload::EmbassyExecutorPollStart {
+            EMBASSY_EXECUTOR_POLL_START => Some(EventPayload::EmbassyExecutorPollStart {
                 executor_id: _executor_short_id,
             }),
             // EmbassyExecutorIdle
-            7 => Some(EventPayload::EmbassyExecutorIdle {
+            EMBASSY_EXECUTOR_IDLE => Some(EventPayload::EmbassyExecutorIdle {
                 executor_id: _executor_short_id,
             }),
-            // MonitorStartCore0
-            8 => {
+            // MonitorStart
+            MONITOR_START => {
                 let monitor_id = buffer.read_byte()?;
-                Some(EventPayload::MonitorStartCore0 { monitor_id })
+                Some(EventPayload::MonitorStart { monitor_id })
             }
-            // MonitorStartCore1
-            9 => {
-                let monitor_id = buffer.read_byte()?;
-                Some(EventPayload::MonitorStartCore1 { monitor_id })
-            }
-            // MonitorEndCore0
-            10 => Some(EventPayload::MonitorEndCore0),
-            // MonitorEndCore1
-            11 => Some(EventPayload::MonitorEndCore1),
+            // MonitorEnd
+            MONITOR_END => Some(EventPayload::MonitorEnd),
             // MonitorValue
-            12 => {
+            MONITOR_VALUE => {
                 let value_id = buffer.read_byte()?;
                 let type_id = monitor_type_fn(value_id)?;
                 let value = MonitorValuePayload::from_bytes(type_id, buffer)?;
@@ -257,13 +196,13 @@ impl EventPayload {
                 Some(EventPayload::MonitorValue { value_id, value })
             }
             // TypeDefinition
-            13 => {
+            TYPE_DEFINITION => {
                 let typedef_it = buffer.read_byte()?;
                 let def = TypeDefinitionPayload::from_bytes(typedef_it, buffer)?;
                 Some(EventPayload::TypeDefinition(def))
             }
             // DataLossEvent
-            14 => {
+            DATA_LOSS_EVENT => {
                 let mut data = [0u8; 4];
                 for byte in data.iter_mut() {
                     *byte = buffer.read_byte()?;
@@ -274,7 +213,7 @@ impl EventPayload {
                 })
             }
             // DefmtDataEvent
-            15 => {
+            DEFMT_DATA_EVENT => {
                 #[cfg(not(feature = "std"))]
                 {
                     panic!("DefmtDataEvent decoding requires the 'std' feature to be enabled.");
