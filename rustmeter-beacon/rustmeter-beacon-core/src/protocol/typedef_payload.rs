@@ -51,7 +51,7 @@ pub enum TypeDefinitionPayload {
         name: String,
     },
     GlobalClockConfiguration {
-        cpu_frequency_hz: u32,
+        system_frequency_hz: u32,
         tick_divider: u16,
     },
     /// Core Clock Reference Event. Syncing CPU ticks to system timer time and core ID.
@@ -124,10 +124,10 @@ impl TypeDefinitionPayload {
                 writer.write_byte(0); // Null-terminated string
             }
             TypeDefinitionPayload::GlobalClockConfiguration {
-                cpu_frequency_hz,
+                system_frequency_hz,
                 tick_divider,
             } => {
-                writer.write_bytes(&cpu_frequency_hz.to_le_bytes());
+                writer.write_bytes(&system_frequency_hz.to_le_bytes());
                 writer.write_bytes(&tick_divider.to_le_bytes());
             }
             TypeDefinitionPayload::CoreClockReference {
@@ -267,12 +267,12 @@ impl TypeDefinitionPayload {
             }
             // GlobalClockConfiguration
             5 => {
-                // Read CPU Frequency
-                let mut cpu_frequency_bytes = [0u8; 4];
-                for byte in cpu_frequency_bytes.iter_mut() {
+                // Read system Frequency
+                let mut system_frequency_bytes = [0u8; 4];
+                for byte in system_frequency_bytes.iter_mut() {
                     *byte = buffer.read_byte()?;
                 }
-                let cpu_frequency_hz = u32::from_le_bytes(cpu_frequency_bytes);
+                let system_frequency_hz = u32::from_le_bytes(system_frequency_bytes);
 
                 // Read Tick Divider
                 let mut tick_divider_bytes = [0u8; 2];
@@ -282,7 +282,7 @@ impl TypeDefinitionPayload {
                 let tick_divider = u16::from_le_bytes(tick_divider_bytes);
 
                 Some(TypeDefinitionPayload::GlobalClockConfiguration {
-                    cpu_frequency_hz,
+                    system_frequency_hz,
                     tick_divider,
                 })
             }

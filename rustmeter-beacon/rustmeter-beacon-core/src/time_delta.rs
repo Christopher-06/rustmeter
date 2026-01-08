@@ -29,6 +29,9 @@ fn do_core_clock_referencing(core_id: usize) {
     critical_section::with(|_| {
         CORE_CLOCK_REFERENCED[core_id].store(true, portable_atomic::Ordering::Relaxed);
 
+        #[cfg(not(feature = "std"))]
+        unsafe { preinit_clock_reference() };
+        
         let cpu_ticks = unsafe { get_tracing_raw_ticks() };
         let systimer_us = unsafe { get_system_time_us() };
 
@@ -47,6 +50,10 @@ unsafe extern "Rust" {
     /// Low-level function to get the current tracing time in microseconds. Implemented in the target crate.
     /// In tests this already should return the timedelta directly.
     // pub fn get_tracing_time_us() -> u32;
+
+    /// Low-level function to preinitialize the clock reference for the target core. Implemented in the target crate.
+    /// Runs in critical section.
+    pub fn preinit_clock_reference();
 
     /// Low-level function to get the current tracing raw ticks. Implemented in the target crate.
     pub fn get_tracing_raw_ticks() -> u32;
@@ -83,7 +90,6 @@ pub struct TimeDelta {
 
 impl TimeDelta {
     /// This has to be called inside a critical section
-// #[cfg(not(feature = "std"))]
     #[inline(always)]
     pub fn from_now() -> Self {
         let core_id = unsafe { crate::get_current_core_id() as usize };
@@ -98,13 +104,12 @@ impl TimeDelta {
         if now < last {
             // Handle wrap-around
             let last_till_end = arbitrary_int::u26::MAX.as_u32() - last;
-            return TimeDelta { delta: last_till_end + now };
+            return TimeDelta {
+                delta: last_till_end + now,
+            };
         } else {
-
-        TimeDelta {
-            delta: now - last,
+            TimeDelta { delta: now - last }
         }
-    }
     }
 
     // #[cfg(test)]

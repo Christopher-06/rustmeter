@@ -1,5 +1,4 @@
 use critical_section::RestoreState;
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 
 use crate::cortex::rtt_minimal::rtt_write_core;
 
@@ -20,7 +19,6 @@ unsafe impl defmt::Logger for Logger {
                 panic!("defmt logger taken reentrantly")
             }
 
-            // cortex_m::interrupt::disable();
             RESTORE_STATE = critical_section::acquire();
 
             // safety: accessing the `static mut` is OK because we have acquired a critical
@@ -46,7 +44,6 @@ unsafe impl defmt::Logger for Logger {
             TAKEN = false;
 
             critical_section::release(RESTORE_STATE);
-            // cortex_m::interrupt::enable();
         }
     }
 
