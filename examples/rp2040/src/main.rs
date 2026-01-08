@@ -16,7 +16,7 @@ use embassy_rp::{
 };
 use embassy_time::Timer;
 use panic_probe as _;
-use rustmeter_beacon::{init_rustmeter_beacon, monitor_fn, monitor_scoped};
+use rustmeter_beacon::*;
 use static_cell::StaticCell;
 
 static mut CORE1_STACK: Stack<4096> = Stack::new();
@@ -44,7 +44,7 @@ fn main() -> ! {
         move || {
             let executor1 = EXECUTOR1.init(Executor::new());
             executor1.run(|spawner| {
-                init_rustmeter_beacon(&spawner).unwrap();
+                init_rustmeter_beacon(RustmeterConfig::new(get_system_freq!()), &spawner).unwrap();
                 spawner.spawn(hello_world_task_core1().unwrap());
             });
         },
