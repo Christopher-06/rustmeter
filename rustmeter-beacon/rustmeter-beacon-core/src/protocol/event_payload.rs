@@ -61,6 +61,13 @@ pub enum EventPayload {
     TypeDefinition(TypeDefinitionPayload),
     /// Data Loss Event because of buffer full situation
     DataLossEvent { dropped_events: u32 },
+    DefmtData {
+        len: u8,
+        #[cfg(not(feature = "std"))]
+        data: *const u8,
+        #[cfg(feature = "std")]
+        data: Vec<u8>,
+    },
 }
 
 impl EventPayload {
@@ -81,6 +88,7 @@ impl EventPayload {
             EventPayload::MonitorValue { .. } => MONITOR_VALUE,
             EventPayload::TypeDefinition(_) => TYPE_DEFINITION,
             EventPayload::DataLossEvent { .. } => DATA_LOSS_EVENT,
+            EventPayload::DefmtData { .. } => DEFMT_DATA_EVENT,
         };
 
         u5::new(id)
@@ -107,13 +115,22 @@ impl EventPayload {
 
         // Write event-specific data
         match self {
-            EventPayload::EmbassyTaskReady { task_id, executor_id : _ } => {
+            EventPayload::EmbassyTaskReady {
+                task_id,
+                executor_id: _,
+            } => {
                 writer.write_bytes(&task_id.to_le_bytes());
             }
-            EventPayload::EmbassyTaskExecBeginCore0 { task_id, executor_id: _ } => {
+            EventPayload::EmbassyTaskExecBeginCore0 {
+                task_id,
+                executor_id: _,
+            } => {
                 writer.write_bytes(&task_id.to_le_bytes());
             }
-            EventPayload::EmbassyTaskExecBeginCore1 { task_id, executor_id: _ } => {
+            EventPayload::EmbassyTaskExecBeginCore1 {
+                task_id,
+                executor_id: _,
+            } => {
                 writer.write_bytes(&task_id.to_le_bytes());
             }
             EventPayload::EmbassyTaskExecEndCore0 { executor_id: _ } => {}
@@ -137,6 +154,17 @@ impl EventPayload {
             }
             EventPayload::DataLossEvent { dropped_events } => {
                 writer.write_bytes(&dropped_events.to_le_bytes());
+            }
+            EventPayload::DefmtData { data, len } => {
+                writer.write_byte(*len);
+                #[cfg(not(feature = "std"))]
+                unsafe {
+                    writer.write_bytes(core::slice::from_raw_parts(*data, *len as usize));
+                }
+                #[cfg(feature = "std")]
+                {
+                    writer.write_bytes(&data[..*len as usize]);
+                }
             }
         }
     }
@@ -245,6 +273,24 @@ impl EventPayload {
                     dropped_events: u32::from_le_bytes(data),
                 })
             }
+            // DefmtDataEvent
+            15 => {
+                #[cfg(not(feature = "std"))]
+                {
+                    panic!("DefmtDataEvent decoding requires the 'std' feature to be enabled.");
+                }
+                #[cfg(feature = "std")]
+                {
+                    let len = buffer.read_byte()?;
+
+                    // Read data
+                    let mut data = vec![0u8; len as usize];
+                    for byte in data.iter_mut() {
+                        *byte = buffer.read_byte()?;
+                    }
+                    Some(EventPayload::DefmtData { len, data })
+                }
+            }
             _ => None,
         }
     }
@@ -262,9 +308,18 @@ mod tests {
     #[test]
     fn test_event_payload_write_and_read() {
         let events = vec![
-            EventPayload::EmbassyTaskReady { task_id: 42, executor_id: u3::new(5) },
-            EventPayload::EmbassyTaskExecBeginCore0 { task_id: 43, executor_id: u3::new(5) },
-            EventPayload::EmbassyTaskExecBeginCore1 { task_id: 44, executor_id: u3::new(6) },
+            EventPayload::EmbassyTaskReady {
+                task_id: 42,
+                executor_id: u3::new(5),
+            },
+            EventPayload::EmbassyTaskExecBeginCore0 {
+                task_id: 43,
+                executor_id: u3::new(5),
+            },
+            EventPayload::EmbassyTaskExecBeginCore1 {
+                task_id: 44,
+                executor_id: u3::new(6),
+            },
             EventPayload::EmbassyTaskExecEndCore0 {
                 executor_id: u3::new(1),
             },

@@ -124,8 +124,8 @@ impl TraceDataDecoder {
                     if *core_id == cur_core_id {
                         println!("[Info] Received Clock Reference for core {}: {:?} us, {} cpu ticks", core_id, systimer_us, cpu_ticks);
                         // Calculate CPU Start Point
-                        // let cpu_time_us = (*cpu_ticks as f64) * 64.0 / 100.0; // Adjust for 240 MHz clock with TICK_DIVIDER = 64
-                        let cpu_time_us = *cpu_ticks as f64; // RP2040 directly 1us counter!!!!
+                        let cpu_time_us = (*cpu_ticks as f64) * 64.0 / 160.0; // Adjust for 240 MHz clock with TICK_DIVIDER = 64
+                        // let cpu_time_us = *cpu_ticks as f64; // RP2040 directly 1us counter!!!!
 
                         *cpu_tick_offset_us = (*systimer_us as f64) - cpu_time_us;
                         println!("[Info] Core {} Clock Reference received. Adjusting timestamps by offset of {:.6}s", core_id, *cpu_tick_offset_us * 1e-6);
@@ -140,8 +140,8 @@ impl TraceDataDecoder {
             }
 
             // Advance the timestamp
-            // let timedelta = 64.0 * timedelta.get_delta_us() as f64 / 100.0 - *cpu_tick_offset_us; // Adjust for 240 MHz clock with TICK_DIVIDER = 64
-            let timedelta = timedelta.get_delta_us() as f64 - *cpu_tick_offset_us; // RP2040!!!!
+            let timedelta = 64.0 * timedelta.get_delta_us() as f64 / 160.0 - *cpu_tick_offset_us; // Adjust for 240 MHz clock with TICK_DIVIDER = 64
+            // let timedelta = timedelta.get_delta_us() as f64 - *cpu_tick_offset_us; // RP2040!!!!
             let timestamp = *last_timestamp + Duration::from_secs_f64(timedelta.max(0.0) * 1e-6);
             assert!(timestamp >= *last_timestamp, "Timestamps must be non-decreasing for core {}", cur_core_id);
             *last_timestamp = timestamp;
@@ -200,6 +200,14 @@ impl TraceDataDecoder {
 
         let mut items = Vec::new();
         loop {
+             // TODO DEV ONLY
+            // Export all core0 items if core1 is empty
+            if self.event_buffer_core1.is_empty() && !self.event_buffer_core0.is_empty() {
+                let item = self.event_buffer_core0.pop_front().unwrap();
+                items.push(item);
+                continue;
+            }
+           
             if self.event_buffer_core0.len() < 2 || self.event_buffer_core1.len() < 2 {
                 break;
             }

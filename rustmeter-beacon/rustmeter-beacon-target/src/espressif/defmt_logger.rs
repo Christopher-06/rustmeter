@@ -1,11 +1,13 @@
 use rustmeter_beacon_core::{get_current_core_id, protocol::raw_writers::write_defmt_data};
 
-use crate::ringbuffer::AtomicRingBuffer;
+use crate::{
+    espressif::local_critical_section::{enter_local_critical_section, exit_local_critical_section}, ringbuffer::AtomicRingBuffer,
+};
 
 static mut PER_CORE_BUFFER: [AtomicRingBuffer<32>; 2] =
     [AtomicRingBuffer::new(), AtomicRingBuffer::new()];
 
-static mut PER_CORE_STATE: [u32; 2] = [0, 0];
+static mut PER_CORE_STATE: [usize; 2] = [0, 0];
 static mut PER_CORE_ENCODER: [defmt::Encoder; 2] = [defmt::Encoder::new(), defmt::Encoder::new()];
 
 #[defmt::global_logger]
@@ -35,22 +37,18 @@ impl Logger {
 #[allow(static_mut_refs)]
 unsafe impl defmt::Logger for Logger {
     fn acquire() {
+        // Enter critical section and start frame
         unsafe {
             let core_id = get_current_core_id() as usize;
 
-            // Enter local critical section
-            core::arch::asm!(
-                "mrs {}, PRIMASK", // Status lesen
-                "cpsid i",         // Interrupts aus
-                out(reg) PER_CORE_STATE[core_id],
-                options(nomem, nostack, preserves_flags)
-            );
+            PER_CORE_STATE[core_id] = enter_local_critical_section();
 
             PER_CORE_ENCODER[core_id].start_frame(do_encoder_write)
         }
     }
 
     unsafe fn release() {
+        // Finish frame, flush data and exit critical section
         unsafe {
             let core_id = get_current_core_id() as usize;
 
@@ -59,10 +57,7 @@ unsafe impl defmt::Logger for Logger {
             Self::flush();
 
             // Exit local critical section
-            core::arch::asm!(
-                "msr PRIMASK, {}",
-                in(reg) PER_CORE_STATE[core_id],
-            );
+            exit_local_critical_section(PER_CORE_STATE[core_id]);
         }
     }
 

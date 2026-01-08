@@ -81,44 +81,46 @@ fn rtt_reader_thread(
     tracing_bytes_recver: Sender<CoreTracingData>,
     error_recver: Sender<anyhow::Error>,
 ) {
+    // Check if core1 exists
+    let core1_exists = rtt.up_channels().len() > 1;
+
     let mut buffer = vec![0u8; 4096];
     loop {
-        // Read defmt channel
-        let defmt_result = read_rtt_channel(&mut rtt, &mut buffer, &session, 2);
-        let (defmt_bytes, defmt_size) = to_bytes(defmt_result, &buffer);
-        if route_reading_result(defmt_bytes, &defmt_bytes_recver, &error_recver) {
-            break;
-        }
-
         // Read tracing channel core0
         let tracing_result = read_rtt_channel(&mut rtt, &mut buffer, &session, 0);
         let (tracing_bytes, tracing_size_core0) = to_bytes(tracing_result, &buffer);
-        let mut is_err = match tracing_bytes {
+        let is_err = match tracing_bytes {
             Ok(bytes) => tracing_bytes_recver
                 .send(CoreTracingData::Core0(bytes))
                 .is_err(),
             Err(e) => error_recver.send(e).is_err(),
         };
-
-        // Read tracing channel core1 (can be erroneous on single-core targets)
-        let tracing_result = read_rtt_channel(&mut rtt, &mut buffer, &session, 1);
-        let (tracing_bytes, tracing_size_core1) = to_bytes(tracing_result, &buffer);
-        if let Ok(bytes) = tracing_bytes {
-            if tracing_bytes_recver
-                .send(CoreTracingData::Core1(bytes))
-                .is_err()
-            {
-                is_err = true;
-            }
-        }
-
         if is_err {
             break;
         }
 
+        // Read tracing channel core1
+        let tracing_size_core1 = if core1_exists {
+            let tracing_result = read_rtt_channel(&mut rtt, &mut buffer, &session, 1);
+            let (tracing_bytes, tracing_size_core1) = to_bytes(tracing_result, &buffer);
+            let is_err = match tracing_bytes {
+                Ok(bytes) => tracing_bytes_recver
+                    .send(CoreTracingData::Core1(bytes))
+                    .is_err(),
+                Err(e) => error_recver.send(e).is_err(),
+            };
+            if is_err {
+                break;
+            }
+
+            tracing_size_core1
+        } else {
+            0
+        };
+
         // Wait a bit if no data was read to avoid busy-waiting,
         // else do not sleep to ensure low latency and reread as soon as possible
-        if tracing_size_core0 + tracing_size_core1 + defmt_size == 0 {
+        if tracing_size_core0 + tracing_size_core1 == 0 {
             // No data read, avoid busy-waiting
             std::thread::sleep(Duration::from_millis(10));
         }
@@ -129,18 +131,6 @@ fn to_bytes(result: anyhow::Result<usize>, buffer: &[u8]) -> (anyhow::Result<Box
     match result {
         Ok(size) => (Ok(buffer[..size].to_vec().into_boxed_slice()), size),
         Err(e) => (Err(e), 0),
-    }
-}
-
-/// Route the reading result to the appropriate channel (data or error) and returning if the receiver is closed
-fn route_reading_result(
-    result: anyhow::Result<Box<[u8]>>,
-    bytes_recver: &Sender<Box<[u8]>>,
-    error_recver: &Sender<anyhow::Error>,
-) -> bool {
-    match result {
-        Ok(bytes) => bytes_recver.send(bytes).is_err(),
-        Err(e) => error_recver.send(e).is_err(),
     }
 }
 

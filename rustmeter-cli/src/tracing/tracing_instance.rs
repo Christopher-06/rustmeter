@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use crossbeam::channel::{Receiver, Sender};
 use rustmeter_beacon::{
@@ -8,7 +8,7 @@ use rustmeter_beacon::{
 
 use crate::{
     elf_file::FirmwareAddressMap,
-    logs::defmt_line::DefmtLine,
+    logs::{defmt_decoding::DefmtDecoding, defmt_line::DefmtLine},
     perfetto_backend::trace_event::{InstantScope, TracingArgsMap, TracingEvent},
     tracing::{core::CoreTracing, trace_data_decoder::TracingItem},
 };
@@ -25,11 +25,18 @@ pub struct TracingInstance {
 
     monitor_value_names: HashMap<u32, String>,
     monitor_code_names: HashMap<u32, String>,
+
+    defmt_decoder : DefmtDecoding,
+    defmt_bytes_sender : Sender<Box<[u8]>>,
 }
 
 impl TracingInstance {
-    pub fn new(fw_addr_map: FirmwareAddressMap) -> Self {
+    pub fn new(fw_addr_map: FirmwareAddressMap, elf_path: &PathBuf) -> Self {
         let (trace_event_tx, trace_event_rx) = crossbeam::channel::unbounded();
+
+        let (defmt_bytes_sender, defmt_bytes_recver) = crossbeam::channel::unbounded();
+        let defmt_decoder = DefmtDecoding::new(elf_path, defmt_bytes_recver, true)
+            .expect("Failed to create defmt decoder!");
 
         // write initial metadata for core overview
         let _ = trace_event_tx.send(TracingEvent::Metadata {
@@ -71,6 +78,8 @@ impl TracingInstance {
             fw_addr_map,
             monitor_value_names: HashMap::new(),
             monitor_code_names: HashMap::new(),
+            defmt_decoder,
+            defmt_bytes_sender,
         }
     }
 
@@ -304,6 +313,11 @@ impl TracingInstance {
                 }
                 Ok(())
             }
+            EventPayload::DefmtData { len, data } => {
+                self.defmt_bytes_sender
+                    .send(data.clone().into_boxed_slice())
+                    .map_err(|e| anyhow::anyhow!("Failed to send defmt data: {}", e))?;
+                Ok(())},
         }
     }
 

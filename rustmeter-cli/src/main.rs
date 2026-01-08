@@ -59,7 +59,7 @@ fn main() -> anyhow::Result<()> {
     let defmt_logs_recver = defmt_decoding.get_defmt_logs_recver();
 
     // Create tracing instance
-    let mut tracing_instance = TracingInstance::new(fw_addr_map);
+    let mut tracing_instance = TracingInstance::new(fw_addr_map, &elf_path);
     let trace_event_recver = tracing_instance.get_trace_event_receiver();
 
     // Create perfetto trace writer thread

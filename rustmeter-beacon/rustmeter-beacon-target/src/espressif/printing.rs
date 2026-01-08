@@ -8,14 +8,18 @@ use esp_hal::uart::Uart;
 use rustmeter_beacon_core::protocol::{EventPayload, Request, TypeDefinitionPayload};
 use rustmeter_beacon_core::tracing::write_tracing_event;
 
-use crate::TICK_DIVIDER;
-use crate::espressif::esp_defmt_pipe;
+use crate::timing::TICK_DIVIDER;
 use crate::espressif::tracing_esp;
 use crate::ringbuffer::SimpleRingBuffer;
 
 pub enum PrinterRoute {
     Uart(Uart<'static, Async>),
-    #[cfg(any(feature = "esp32c3", feature = "esp32c6", feature = "esp32h2", feature = "esp32s3"))]
+    #[cfg(any(
+        feature = "esp32c3",
+        feature = "esp32c6",
+        feature = "esp32h2",
+        feature = "esp32s3"
+    ))]
     SerialJtag(esp_hal::usb_serial_jtag::UsbSerialJtag<'static, Async>),
 }
 
@@ -27,7 +31,12 @@ impl PrinterRoute {
                 Ok(_) => Ok(()),
                 Err(_) => Err(()),
             },
-            #[cfg(any(feature = "esp32c3", feature = "esp32c6", feature = "esp32h2", feature = "esp32s3"))]
+            #[cfg(any(
+                feature = "esp32c3",
+                feature = "esp32c6",
+                feature = "esp32h2",
+                feature = "esp32s3"
+            ))]
             PrinterRoute::SerialJtag(jtag) => match jtag.write_all(&data).await {
                 Ok(_) => Ok(()),
                 Err(_) => Err(()),
@@ -46,7 +55,12 @@ impl PrinterRoute {
                     0
                 }
             }
-            #[cfg(any(feature = "esp32c3", feature = "esp32c6", feature = "esp32h2", feature = "esp32s3"))]
+            #[cfg(any(
+                feature = "esp32c3",
+                feature = "esp32c6",
+                feature = "esp32h2",
+                feature = "esp32s3"
+            ))]
             PrinterRoute::SerialJtag(jtag) => {
                 let mut n = 0;
                 loop {
@@ -71,12 +85,10 @@ impl PrinterRoute {
 #[embassy_executor::task]
 pub async fn connector(mut out_route: PrinterRoute, cpu_freq: Rate) {
     // Get pipes
-    let (trace_buffer, trace_data_signal) = tracing_esp::get_trace_pipe_and_signal();
-    #[cfg(feature = "defmt")]
-    let (defmt_data_pipe, defmt_data_signal) = esp_defmt_pipe::get_defmt_pipe_and_signal();
+    let (trace_buffers, trace_data_signal) = tracing_esp::get_tracing_buffers_and_signaller();
 
     // Working buffer buffer
-    let mut buffer = [0u8; 128]; // 128 byte buffer is ESP UART FIFO size and 64 bytes is USB Serial-JTAG FIFO size
+    let mut buffer = [0u8; 256]; // 128 byte buffer is ESP UART FIFO size and 64 bytes is USB Serial-JTAG FIFO size. Payload-Length is max 252 bytes
     buffer[0] = 0xFF; // Start byte
 
     // Receive buffer
@@ -84,23 +96,18 @@ pub async fn connector(mut out_route: PrinterRoute, cpu_freq: Rate) {
 
     loop {
         // Wait for any new datadata or timeout
-        // let _ = select(
-        //     trace_data_signal.wait(),
-        //     select(
-        //         defmt_data_signal.wait(),
-        //         Timer::after(Duration::from_millis(100)),
-        //     ),
-        // )
-        // .await;
-
-        trace_data_signal.wait().await;
+        let _ = select(
+            trace_data_signal.wait(),
+            Timer::after(Duration::from_millis(100)),
+        )
+        .await;
 
         // Process tracing data per core
-        for (core_id, buf) in trace_buffer.iter().enumerate() {
-            for _ in 0..30 {
+        for (core_id, buf) in trace_buffers.iter().enumerate() {
+            for _ in 0..10 {
                 let len = {
                     let buf0 = unsafe { &mut *buf.get() };
-                    buf0.pop_slice(&mut buffer[3..127])
+                    buf0.pop_slice(&mut buffer[3..255])
                 };
 
                 if len > 0 {
@@ -118,17 +125,6 @@ pub async fn connector(mut out_route: PrinterRoute, cpu_freq: Rate) {
                 }
             }
         }
-
-        // Process defmt data
-        #[cfg(feature = "defmt")]
-        read_and_write_pipe(
-            defmt_data_pipe,
-            defmt_data_signal,
-            &mut buffer,
-            0x02,
-            &mut out_route,
-        )
-        .await;
 
         // try to read requests
         let n = out_route.read_bytes(&mut buffer[1..128]);
@@ -148,7 +144,7 @@ pub async fn connector(mut out_route: PrinterRoute, cpu_freq: Rate) {
                             // Send clock definition response via TypeDefinition
                             write_tracing_event(EventPayload::TypeDefinition(
                                 TypeDefinitionPayload::GlobalClockConfiguration {
-                                    cpu_frequency_hz: cpu_freq.as_hz(),
+                                    system_frequency_hz: cpu_freq.as_hz(),
                                     tick_divider: TICK_DIVIDER as u16,
                                 },
                             ));
@@ -172,27 +168,6 @@ pub async fn connector(mut out_route: PrinterRoute, cpu_freq: Rate) {
                 }
             }
         }
-    }
-}
-
-/// Read all available data from the pipe and write it to UART with header and checksum
-async fn read_and_write_pipe<'a, const N: usize>(
-    pipe: &Pipe<CriticalSectionRawMutex, N>,
-    new_data_signal: &Signal<CriticalSectionRawMutex, ()>,
-    buffer: &mut [u8; 128],
-    type_id: u8,
-    tx: &mut PrinterRoute,
-) {
-    while let Ok(n_bytes) = pipe.try_read(&mut buffer[3..127]) {
-        new_data_signal.reset();
-
-        // Create Header
-        buffer[1] = type_id;
-        buffer[2] = n_bytes as u8; // length byte
-
-        // Calculate xor checksum and send
-        buffer[n_bytes + 3] = calculate_checksum(&buffer[1..(3 + n_bytes)]);
-        let _ = tx.write_all(&buffer[0..3 + n_bytes + 1]).await;
     }
 }
 

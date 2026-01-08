@@ -1,9 +1,9 @@
 #[cfg(feature = "defmt")]
-mod esp_defmt_pipe;
+mod defmt_logger;
 mod espressif_config;
 pub use espressif_config::{Config as RustmeterConfig, *};
 mod tracing_esp;
-
+mod local_critical_section;
 mod printing;
 
 #[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32p4"))]

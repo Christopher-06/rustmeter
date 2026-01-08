@@ -16,6 +16,7 @@ pub mod event_ids {
     pub const MONITOR_VALUE: u8 = 12;
     pub const TYPE_DEFINITION: u8 = 13;
     pub const DATA_LOSS_EVENT: u8 = 14;
+    pub const DEFMT_DATA_EVENT: u8 = 15;
 }
 
 #[inline(always)]
@@ -127,6 +128,43 @@ pub fn write_monitor_end(core_id: u8) {
     let timestamp = TimeDelta::from_now();
     let pos = timestamp.write_bytes_mut(&mut buffer[1..]);
     unsafe { write_tracing_data(&buffer[..1 + pos]) };
+}
+
+#[inline(always)]
+pub fn write_defmt_data(data : &[u8]) {
+    // TODO: Create chunked writes if data is too large
+    // Create header
+    let mut buffer = [0u8; 20]; // 2 header + 2 timestamp + 16 data
+    buffer[0] = event_ids::DEFMT_DATA_EVENT << 3;
+
+    // Send in chunks
+    let mut start = 0;
+    while start < data.len() {
+        let chunk_size = core::cmp::min(16, data.len() - start);
+        buffer[1] = chunk_size as u8;
+
+        // Copy payload data
+        buffer[2..2 + chunk_size].copy_from_slice(&data[start..start + chunk_size]);
+        let next_pos = 2 + chunk_size;
+
+        // Write to global buffer with timestamp
+        let timestamp = TimeDelta::from_now();
+        let pos = timestamp.write_bytes_mut(&mut buffer[next_pos..]);
+        unsafe { write_tracing_data(&buffer[..next_pos + pos]) };
+
+        start += chunk_size;
+    }
+
+    // buffer[1] = data.len() as u8;
+
+    // // Copy payload data
+    // buffer[2..2 + data.len()].copy_from_slice(data);
+    // let next_pos = 2 + data.len();
+
+    // // Write to global buffer with timestamp
+    // let timestamp = TimeDelta::from_now();
+    // let pos = timestamp.write_bytes_mut(&mut buffer[next_pos..]);
+    // unsafe { write_tracing_data(&buffer[..next_pos + pos]) };
 }
 
 // TODO: Implement monitor value!

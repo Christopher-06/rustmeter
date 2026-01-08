@@ -113,10 +113,6 @@ fn serial_reader_thread(
                     // tracing frame from core 1
                     let _ = tracing_bytes_sender.send(CoreTracingData::Core1(paylaod.to_vec().into_boxed_slice()));
                 }
-                2 => {
-                    // defmt frame
-                    let _ = defmt_bytes_sender.send(paylaod.to_vec().into_boxed_slice());
-                }
                 _ => {
                     println!("Unknown frame type id: {}", type_id);
                 }

@@ -14,8 +14,7 @@ use embassy_sync::{
 use rustmeter_beacon_core::{buffer::BufferWriter, protocol::EventPayload, time_delta::TimeDelta};
 
 use crate::{
-    NUM_CORES,
-    ringbuffer::{AtomicRingBuffer, SimpleRingBuffer},
+    NUM_CORES, espressif::local_critical_section::{enter_local_critical_section, exit_local_critical_section}, ringbuffer::{AtomicRingBuffer, SimpleRingBuffer}
 };
 
 const BUFFER_SIZE: usize = 4096;
@@ -31,7 +30,7 @@ static NEW_DATA_SIGNAL: embassy_sync::signal::Signal<CriticalSectionRawMutex, ()
 
 static DROPPED_EVENTS_COUNTER: portable_atomic::AtomicU32 = portable_atomic::AtomicU32::new(0);
 
-pub fn get_trace_pipe_and_signal() -> (
+pub fn get_tracing_buffers_and_signaller() -> (
     &'static [PerCoreSync<AtomicRingBuffer<BUFFER_SIZE>>; NUM_CORES],
     &'static embassy_sync::signal::Signal<CriticalSectionRawMutex, ()>,
 ) {
@@ -45,23 +44,7 @@ fn write_tracing_data(data: &[u8]) {
     let idx = if core_id > 1 { 0 } else { core_id as usize };
 
     // Enter local critical section
-    let prev_interrupt_state;
-
-    #[cfg(target_arch = "xtensa")]
-    unsafe {
-        // Xtensa: RSIL level 15
-        let ps: u32;
-        core::arch::asm!("rsil {0}, 15", out(reg) ps);
-        prev_interrupt_state = ps as usize;
-    }
-
-    #[cfg(target_arch = "riscv32")]
-    unsafe {
-        // RISC-V: Bit 3 (MIE - Machine Interrupt Enable)
-        let mstatus: usize;
-        core::arch::asm!("csrrci {0}, mstatus, 8", out(reg) mstatus);
-        prev_interrupt_state = mstatus;
-    }
+    let prev_interrupt_state = enter_local_critical_section();
 
     // Write to Buffer
     let buf = unsafe { &mut *TRACE_BUFFERS[core_id].get() };
@@ -74,18 +57,7 @@ fn write_tracing_data(data: &[u8]) {
     }
 
     // Exit local critical section
-    #[cfg(target_arch = "xtensa")]
-    unsafe {
-        // Xtensa: Restore previous PS
-        let ps = prev_interrupt_state as u32;
-        core::arch::asm!("wsr.ps {0}", "rsync", in(reg) ps);
-    }
-
-    #[cfg(target_arch = "riscv32")]
-    unsafe {
-        // RISC-V: restore previous MSTATUS
-        core::arch::asm!("csrw mstatus, {0}", in(reg) prev_interrupt_state);
-    }
+    exit_local_critical_section(prev_interrupt_state);
 }
 
 pub struct PerCoreSync<T>(UnsafeCell<T>);
