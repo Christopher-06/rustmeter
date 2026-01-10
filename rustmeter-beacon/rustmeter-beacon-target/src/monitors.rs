@@ -163,5 +163,3 @@ pub fn defmt_trace_new_function_monitor(name: &str, local_id: usize) {
         local_id
     );
 }
-    );
-}
