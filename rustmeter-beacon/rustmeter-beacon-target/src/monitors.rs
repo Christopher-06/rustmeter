@@ -58,7 +58,7 @@ macro_rules! monitor_value {
         };
 
         use crate::monitors::{CODE_MONITOR_REGISTRY, VALUE_MONITOR_REGISTRY};
-        use rustmeter_beacon::protocol::MonitorValueType;
+        use rustmeter_beacon::protocol::MonitorValuePayload;
 
         let (local_id, registered_newly) = get_static_id_by_registry!(VALUE_MONITOR_REGISTRY);
 
@@ -66,7 +66,6 @@ macro_rules! monitor_value {
         if registered_newly {
             let payload = rustmeter_beacon::protocol::TypeDefinitionPayload::ValueMonitor {
                 value_id: local_id as u8,
-                type_id: $val.get_monitor_value_type_id(),
                 name: $name,
             };
             rustmeter_beacon::tracing::write_tracing_event(rustmeter_beacon::protocol::EventPayload::TypeDefinition(payload));
@@ -75,10 +74,9 @@ macro_rules! monitor_value {
         }
 
         // Send MonitorValue event
-        let payload = $val.to_payload();
         rustmeter_beacon::tracing::write_tracing_event(rustmeter_beacon::protocol::EventPayload::MonitorValue {
             value_id: local_id as u8,
-            value: payload,
+            value: $val.into(),
         });
     };
 }

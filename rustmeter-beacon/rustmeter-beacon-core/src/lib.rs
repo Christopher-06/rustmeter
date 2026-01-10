@@ -4,10 +4,10 @@ pub mod buffer;
 pub mod protocol;
 pub mod time_delta;
 pub mod tracing;
+pub mod varint;
 
 #[cfg(test)]
 pub mod mocks;
-
 
 #[inline(always)]
 pub fn compressed_task_id(task_id: u32) -> u16 {

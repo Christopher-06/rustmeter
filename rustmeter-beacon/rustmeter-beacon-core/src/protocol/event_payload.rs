@@ -4,7 +4,7 @@ use crate::{
 };
 use arbitrary_int::{traits::Integer, u3, u5};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum EventPayload {
     /// Embassy Task is ready to be polled (Waker called).
     /// ExecutorID will also be included
@@ -67,6 +67,7 @@ impl EventPayload {
         u5::new(id)
     }
 
+    /// Returns the executor ID if the event is related to an embassy executor
     pub const fn get_executor_id(&self) -> Option<u3> {
         match self {
             EventPayload::EmbassyTaskReady { executor_id, .. } => Some(*executor_id),
@@ -78,10 +79,32 @@ impl EventPayload {
         }
     }
 
+    /// Returns the MonitorValuePayload type ID if the event is a MonitorValue event
+    pub const fn get_monitor_value_type_id(&self) -> Option<u3> {
+        match self {
+            EventPayload::MonitorValue { value, .. } => Some(value.type_id()),
+            _ => None,
+        }
+    }
+
+    /// Returns the sub ID (executor ID or MonitorValue type ID) if applicable
+    pub const fn get_sub_id(&self) -> Option<u3> {
+        // Check for executor ID
+        if let Some(executor_id) = self.get_executor_id() {
+            return Some(executor_id);
+        }
+        // Check for MonitorValue type ID
+        if let Some(type_id) = self.get_monitor_value_type_id() {
+            return Some(type_id);
+        }
+
+        None
+    }
+
     pub fn write_bytes(&self, writer: &mut BufferWriter) {
-        // Write the event ID (5 bits) and executor short ID (3 bits) as a single byte
-        let executor_short_id = self.get_executor_id().map_or(u8::ZERO, |id| id.as_u8());
-        let event_type = u8::from(self.event_id()) << 3 | executor_short_id;
+        // Write the event ID (5 bits) and sub event id (3 bits) as a single byte
+        let sub_id = self.get_sub_id().unwrap_or(u3::new(0));
+        let event_type = u8::from(self.event_id()) << 3 | sub_id.as_u8();
         writer.write_byte(event_type);
 
         // Write event-specific data
@@ -132,17 +155,9 @@ impl EventPayload {
     /// Reads an EventPayload from the provided buffer based on the given type ID. Params:
     /// - event_type: The combined event type byte containing event ID and executor short ID.
     /// - buffer: The buffer reader to read additional event data from.
-    /// - monitor_value_reader: A function to map monitor IDs to their corresponding ValueTypes.
-    pub fn from_bytes<F>(
-        event_type: u8,
-        buffer: &mut BufferReader,
-        monitor_type_fn: &F,
-    ) -> Option<EventPayload>
-    where
-        F: Fn(u8) -> Option<u8>,
-    {
+    pub fn from_bytes(event_type: u8, buffer: &mut BufferReader) -> Option<EventPayload> {
         let event_id = u5::new(event_type >> 3);
-        let _executor_short_id = u3::new(event_type & 0x07);
+        let sub_id = u3::new(event_type & 0x07);
 
         use crate::protocol::raw_writers::event_ids::*;
         match event_id.as_u8() {
@@ -154,7 +169,7 @@ impl EventPayload {
                 }
                 Some(EventPayload::EmbassyTaskReady {
                     task_id: u16::from_le_bytes(data),
-                    executor_id: _executor_short_id,
+                    executor_id: sub_id,
                 })
             }
             // EmbassyTaskExecBegin
@@ -165,20 +180,20 @@ impl EventPayload {
                 }
                 Some(EventPayload::EmbassyTaskExecBegin {
                     task_id: u16::from_le_bytes(data),
-                    executor_id: _executor_short_id,
+                    executor_id: sub_id,
                 })
             }
             // EmbassyTaskExecEnd
             EMBASSY_TASK_EXEC_END => Some(EventPayload::EmbassyTaskExecEnd {
-                executor_id: _executor_short_id,
+                executor_id: sub_id,
             }),
             // EmbassyExecutorPollStart
             EMBASSY_EXECUTOR_POLL_START => Some(EventPayload::EmbassyExecutorPollStart {
-                executor_id: _executor_short_id,
+                executor_id: sub_id,
             }),
             // EmbassyExecutorIdle
             EMBASSY_EXECUTOR_IDLE => Some(EventPayload::EmbassyExecutorIdle {
-                executor_id: _executor_short_id,
+                executor_id: sub_id,
             }),
             // MonitorStart
             MONITOR_START => {
@@ -190,8 +205,7 @@ impl EventPayload {
             // MonitorValue
             MONITOR_VALUE => {
                 let value_id = buffer.read_byte()?;
-                let type_id = monitor_type_fn(value_id)?;
-                let value = MonitorValuePayload::from_bytes(type_id, buffer)?;
+                let value = MonitorValuePayload::from_bytes(sub_id, buffer)?;
 
                 Some(EventPayload::MonitorValue { value_id, value })
             }

@@ -1,5 +1,7 @@
 use core::mem::MaybeUninit;
 
+use crate::varint::VarIntWritable;
+
 /// Internal buffer writer for tracing events using a fixed-size buffer with uninitialized memory for efficiency
 pub struct BufferWriter {
     buffer: [MaybeUninit<u8>; 32],
@@ -25,6 +27,25 @@ impl BufferWriter {
         self.buffer[self.position..self.position + len]
             .copy_from_slice(unsafe { core::mem::transmute::<&[u8], &[MaybeUninit<u8>]>(data) });
         self.position += len;
+    }
+
+    /// Writes a generic integer using LEB128 (VarInt) encoding
+    #[inline]
+    pub fn write_varint<T: VarIntWritable>(&mut self, mut value: T) {
+        loop {
+            let mut byte = value.low_7_bits();
+
+            value.shr_7();
+            if !value.is_zero() {
+                // More bytes to come, set continuation bit
+                byte |= 0x80;
+                self.write_byte(byte);
+            } else {
+                // Last byte, no continuation bit
+                self.write_byte(byte);
+                break;
+            }
+        }
     }
 
     /// Returns the already written data as a slice
@@ -77,6 +98,31 @@ impl<'a> BufferReader<'a> {
         Some(bytes)
     }
 
+    /// Reads a LEB128 (VarInt) encoded u64.
+    pub fn read_varint(&mut self) -> Option<u64> {
+        let mut result = 0u64;
+        let mut shift = 0;
+
+        loop {
+            let byte = self.read_byte()?;
+
+            // Mask out the continuation bit and shift into result
+            result |= ((byte & 0x7F) as u64) << shift;
+
+            // If continuation bit is not set, we are done
+            if (byte & 0x80) == 0 {
+                return Some(result);
+            }
+
+            shift += 7;
+
+            // Protection against overflow / bad data (max 10 bytes for u64)
+            if shift >= 70 {
+                return None;
+            }
+        }
+    }
+
     pub fn get_position(&self) -> usize {
         self.position
     }
@@ -105,5 +151,33 @@ mod tests {
         assert_eq!(reader.read_bytes(2), Some(&[0xBC, 0xDE][..]));
         assert_eq!(reader.read_byte(), Some(0xF0));
         assert_eq!(reader.read_byte(), None);
+    }
+
+    #[test]
+    fn test_buffer_write_and_read() {
+        // Write data
+        let mut writer = BufferWriter::new();
+        writer.write_bytes(&[0x01, 0x02, 0x03, 0x04, 0x05]);
+        writer.write_varint(1u8);
+        writer.write_varint(300u16);
+        writer.write_varint(70000u32);
+        writer.write_varint(123456789u64);
+        writer.write_bytes(&[0x01, 0x02, 0x03, 0x04, 0x05]);
+
+        // Read data
+        let data = writer.as_slice();
+        let mut reader = BufferReader::new(data);
+        assert_eq!(
+            reader.read_bytes(5),
+            Some(&[0x01, 0x02, 0x03, 0x04, 0x05][..])
+        );
+        assert_eq!(reader.read_varint(), Some(1u64));
+        assert_eq!(reader.read_varint(), Some(300u64));
+        assert_eq!(reader.read_varint(), Some(70000u64));
+        assert_eq!(reader.read_varint(), Some(123456789u64));
+        assert_eq!(
+            reader.read_bytes(5),
+            Some(&[0x01, 0x02, 0x03, 0x04, 0x05][..])
+        );
     }
 }

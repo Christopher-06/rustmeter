@@ -40,11 +40,9 @@ pub enum TypeDefinitionPayload {
     },
     /// New Value Monitor defined
     /// ValueID identifies the monitor instance in future events.
-    /// TypeID identifies the type of the value being monitored (see MonitorValueType).
     /// Name is a null-terminated string representing the name of the value (max. 20 Characters).
     ValueMonitor {
         value_id: u8,
-        type_id: u8,
         #[cfg(not(feature = "std"))]
         name: &'static str,
         #[cfg(feature = "std")]
@@ -115,11 +113,9 @@ impl TypeDefinitionPayload {
             }
             TypeDefinitionPayload::ValueMonitor {
                 value_id,
-                type_id,
                 name,
             } => {
                 writer.write_byte(*value_id);
-                writer.write_byte(*type_id);
                 writer.write_bytes(name.as_bytes());
                 writer.write_byte(0); // Null-terminated string
             }
@@ -244,9 +240,6 @@ impl TypeDefinitionPayload {
                     // Read ValueID
                     let value_id = buffer.read_byte()?;
 
-                    // Read TypeID
-                    let type_id = buffer.read_byte()?;
-
                     // Read null-terminated string
                     let mut name_bytes = Vec::new();
                     loop {
@@ -260,7 +253,6 @@ impl TypeDefinitionPayload {
 
                     Some(TypeDefinitionPayload::ValueMonitor {
                         value_id,
-                        type_id,
                         name,
                     })
                 }

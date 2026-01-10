@@ -31,15 +31,9 @@ pub fn write_tracing_event(event: EventPayload) {
     });
 }
 
-pub fn read_tracing_event<F>(
-    buffer: &mut BufferReader,
-    monitor_type_fn: &F,
-) -> Option<(TimeDelta, EventPayload)>
-where
-    F: Fn(u8) -> Option<u8>,
-{
+pub fn read_tracing_event(buffer: &mut BufferReader) -> Option<(TimeDelta, EventPayload)> {
     let event_type = buffer.read_byte()?;
-    let event = EventPayload::from_bytes(event_type, buffer, monitor_type_fn)?;
+    let event = EventPayload::from_bytes(event_type, buffer)?;
     let timestamp = TimeDelta::read_bytes(buffer)?;
 
     Some((timestamp, event))
@@ -89,11 +83,6 @@ mod tests {
             },
         ];
 
-        let monitor_value_reader = |monitor_id: u8| {
-            assert_eq!(monitor_id, 1);
-            Some(u16::ZERO.get_monitor_value_type_id())
-        };
-
         for event in events {
             // Write event
             let mut buffer = BufferWriter::new();
@@ -105,8 +94,7 @@ mod tests {
             // Read event
             let mut buffer = BufferReader::new(data);
             let (read_timestamp, read_event) =
-                read_tracing_event(&mut buffer, &monitor_value_reader)
-                    .expect("Failed to read tracing event");
+                read_tracing_event(&mut buffer).expect("Failed to read tracing event");
 
             assert_eq!(timestamp, read_timestamp);
             assert_eq!(event, read_event);
