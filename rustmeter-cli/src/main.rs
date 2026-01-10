@@ -39,12 +39,20 @@ fn main() -> anyhow::Result<()> {
     // Parse command line arguments
     let args = CommandLineArgs::parse();
 
-    // Start Cargo child process and gather elf path
-    let mut cargo_child_process = CargoChildProcess::new_start_build(args.release, &args.project)?;
-    let elf_path = cargo_child_process.wait_till_finished()?;
+    // Get elf path
+    let elf_path = match &args.executable {
+        Some(path) => path.clone(), // use provided elf path
+        None => {
+            // build project and get elf path
+            let mut cargo_child_process = CargoChildProcess::new_start_build(args.release, &args.project)?;
+            let elf_path = cargo_child_process.wait_till_finished()?;
+            println!("Build Status: Success");
+            elf_path
+        }
+    };
+
+    // Create firmware address map from elf file
     let fw_addr_map = FirmwareAddressMap::new_from_elf_path(&elf_path)?;
-    println!("Build Status: Success");
-    println!("ELF Path: {:?}", elf_path);
 
     // flash and start monitoring
     let monitor = flash_and_monitor_chip(&args.chip, args.tool.clone(), &elf_path, &fw_addr_map)?;

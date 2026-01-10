@@ -1,7 +1,8 @@
 # This file was automatically generated.
 
 [target.thumbv7em-none-eabi]
-runner = 'probe-rs run --chip STM32F446RCTx'
+# runner = 'probe-rs run --chip STM32F446RCTx'
+runner = "../../rustmeter-cli/target/debug/rustmeter --chip STM32F446RCTx"
 
 [build]
 target = "thumbv7em-none-eabi"

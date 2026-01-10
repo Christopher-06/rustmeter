@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -13,12 +15,16 @@ pub enum FlashingTool {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct CommandLineArgs {
+    /// Path to the compiled executable file (ELF)
+    #[arg(value_name = "EXECUTABLE")]
+    pub executable: Option<PathBuf>,
+
     /// Choose release build
-    #[clap(long, action)]
+    #[clap(long, action, conflicts_with = "executable")]
     pub release: bool,
 
     /// Choose Embedded Project Directory
-    #[clap(long, default_value = ".")]
+    #[clap(long, default_value = ".", conflicts_with = "executable")]
     pub project: String,
 
     /// Choose Chip (required)
