@@ -45,19 +45,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        buffer::BufferReader,
-        protocol::{MonitorValuePayload, MonitorValueType, TypeDefinitionPayload},
-        time_delta::TimeDelta,
+        mocks::test_mocks::{mock_time_provider, mock_trace_writer, with_mocks},
+        protocol::TypeDefinitionPayload,
     };
-    use arbitrary_int::traits::Integer;
-    use std::sync::atomic::AtomicU32;
-
-    // Mock implementation of get_tracing_time_us for testing
-    // #[unsafe(no_mangle)]
-    // fn get_tracing_time_us() -> u32 {
-    //     static COUNTER: AtomicU32 = AtomicU32::new(0);
-    //     COUNTER.fetch_add(1000, std::sync::atomic::Ordering::SeqCst)
-    // }
 
     #[test]
     fn test_tracing_event_write_and_read() {
@@ -79,25 +69,19 @@ mod tests {
             }),
             EventPayload::MonitorValue {
                 value_id: 1,
-                value: MonitorValuePayload::U16(65535),
+                value: 456i16.into(),
             },
         ];
 
         for event in events {
-            // Write event
-            let mut buffer = BufferWriter::new();
-            let timestamp = TimeDelta::from_now();
-            timestamp.write_bytes(&mut buffer);
-            event.write_bytes(&mut buffer);
-            let data = buffer.as_slice();
-
-            // Read event
-            let mut buffer = BufferReader::new(data);
-            let (read_timestamp, read_event) =
-                read_tracing_event(&mut buffer).expect("Failed to read tracing event");
-
-            assert_eq!(timestamp, read_timestamp);
-            assert_eq!(event, read_event);
+            with_mocks(
+                mock_trace_writer(event.clone()),
+                mock_time_provider,
+                || 0,
+                || {
+                    write_tracing_event(event);
+                },
+            );
         }
     }
 }

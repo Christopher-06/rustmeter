@@ -1,3 +1,4 @@
+#![allow(unused)] // in test mode, things might be unused
 use arbitrary_int::traits::Integer;
 
 use crate::{
@@ -30,8 +31,10 @@ fn do_core_clock_referencing(core_id: usize) {
         CORE_CLOCK_REFERENCED[core_id].store(true, portable_atomic::Ordering::Relaxed);
 
         #[cfg(not(feature = "std"))]
-        unsafe { preinit_clock_reference() };
-        
+        unsafe {
+            preinit_clock_reference()
+        };
+
         let cpu_ticks = unsafe { get_tracing_raw_ticks() };
         let systimer_us = unsafe { get_system_time_us() };
 
@@ -45,7 +48,6 @@ fn do_core_clock_referencing(core_id: usize) {
     });
 }
 
-#[cfg(not(feature = "std"))]
 unsafe extern "Rust" {
     /// Low-level function to get the current tracing time in microseconds. Implemented in the target crate.
     /// In tests this already should return the timedelta directly.
@@ -56,31 +58,10 @@ unsafe extern "Rust" {
     pub fn preinit_clock_reference();
 
     /// Low-level function to get the current tracing raw ticks. Implemented in the target crate.
+    /// In tests this already should return the timedelta directly.
     pub fn get_tracing_raw_ticks() -> u32;
 
     pub fn get_system_time_us() -> u64;
-}
-
-#[cfg(all(feature = "std"))]
-#[unsafe(no_mangle)]
-unsafe fn get_tracing_raw_ticks() -> u32 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
-    now.as_micros() as u32
-}
-
-#[cfg(all(feature = "std"))]
-#[unsafe(no_mangle)]
-unsafe fn get_system_time_us() -> u64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
-    now.as_micros() as u64
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,6 +72,7 @@ pub struct TimeDelta {
 impl TimeDelta {
     /// This has to be called inside a critical section
     #[inline(always)]
+    #[cfg(not(test))]
     pub fn from_now() -> Self {
         let core_id = unsafe { crate::get_current_core_id() as usize };
         if !CORE_CLOCK_REFERENCED[core_id].load(portable_atomic::Ordering::Relaxed) {
@@ -112,11 +94,11 @@ impl TimeDelta {
         }
     }
 
-    // #[cfg(test)]
-    // pub fn from_now() -> Self {
-    //     let now = unsafe { get_tracing_time_us() };
-    //     TimeDelta { delta: now }
-    // }
+    #[cfg(test)]
+    pub fn from_now() -> Self {
+        let now = unsafe { get_tracing_raw_ticks() };
+        TimeDelta { delta: now }
+    }
 
     /// Returns true if the TimeDelta requires extended format (4 bytes), false if it can be represented in single format (2 bytes).
     #[inline(always)]
@@ -197,6 +179,29 @@ impl TimeDelta {
 
     pub fn get_delta_us(&self) -> u32 {
         self.delta
+    }
+}
+
+#[cfg(all(feature = "std", not(test)))]
+mod std_time {
+    #[unsafe(no_mangle)]
+    unsafe fn get_tracing_raw_ticks() -> u32 {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards");
+        now.as_micros() as u32
+    }
+
+    #[unsafe(no_mangle)]
+    unsafe fn get_system_time_us() -> u64 {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards");
+        now.as_micros() as u64
     }
 }
 

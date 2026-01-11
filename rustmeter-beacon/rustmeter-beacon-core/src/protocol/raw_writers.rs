@@ -145,26 +145,10 @@ pub fn write_defmt_data(data: &[u8]) {
 pub mod tests {
     use super::*;
     use crate::{
-        buffer::BufferReader, mocks::test_mocks::with_mocks, protocol::EventPayload,
-        tracing::read_tracing_event,
+        mocks::test_mocks::{mock_time_provider, mock_trace_writer, with_mocks},
+        protocol::EventPayload,
     };
     use arbitrary_int::u3;
-
-    fn mock_time_provider() -> u32 {
-        123_456_789
-    }
-
-    // Mock trace writer that checks the written data to match the expected event payload
-    fn mock_trace_writer(expected: EventPayload) -> impl Fn(&[u8]) {
-        move |data: &[u8]| {
-            let mut buffer = BufferReader::new(data);
-            let (timestamp, event) =
-                read_tracing_event(&mut buffer, &|_| None).expect("Failed to read tracing event");
-
-            assert_eq!(timestamp.get_delta_us(), 123_456_789);
-            assert_eq!(event, expected);
-        }
-    }
 
     #[test]
     fn test_write_embassy_task_ready() {
@@ -174,6 +158,7 @@ pub mod tests {
                 executor_id: u3::new(5),
             }),
             mock_time_provider,
+            || 0,
             || {
                 write_embassy_task_ready(12345, u3::new(5));
             },
@@ -188,6 +173,7 @@ pub mod tests {
                 executor_id: u3::new(2),
             }),
             mock_time_provider,
+            || 0,
             || {
                 write_embassy_task_exec_begin(54321, u3::new(2));
             },
@@ -201,6 +187,7 @@ pub mod tests {
                 executor_id: u3::new(3),
             }),
             mock_time_provider,
+            || 0,
             || {
                 write_embassy_task_exec_end(u3::new(3));
             },
@@ -214,6 +201,7 @@ pub mod tests {
                 executor_id: u3::new(1),
             }),
             mock_time_provider,
+            || 0,
             || {
                 write_embassy_executor_poll_start(u3::new(1));
             },
@@ -227,6 +215,7 @@ pub mod tests {
                 executor_id: u3::new(4),
             }),
             mock_time_provider,
+            || 0,
             || {
                 write_embassy_executor_idle(u3::new(4));
             },
@@ -238,6 +227,7 @@ pub mod tests {
         with_mocks(
             mock_trace_writer(EventPayload::MonitorStart { monitor_id: 10 }),
             mock_time_provider,
+            || 0,
             || {
                 write_monitor_start(10);
             },
@@ -249,6 +239,7 @@ pub mod tests {
         with_mocks(
             mock_trace_writer(EventPayload::MonitorEnd),
             mock_time_provider,
+            || 0,
             || {
                 write_monitor_end();
             },

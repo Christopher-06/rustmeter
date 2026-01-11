@@ -111,10 +111,7 @@ impl TypeDefinitionPayload {
                 writer.write_bytes(name.as_bytes());
                 writer.write_byte(0); // Null-terminated string
             }
-            TypeDefinitionPayload::ValueMonitor {
-                value_id,
-                name,
-            } => {
+            TypeDefinitionPayload::ValueMonitor { value_id, name } => {
                 writer.write_byte(*value_id);
                 writer.write_bytes(name.as_bytes());
                 writer.write_byte(0); // Null-terminated string
@@ -251,10 +248,7 @@ impl TypeDefinitionPayload {
                     }
                     let name = core::str::from_utf8(&name_bytes).ok()?.to_string();
 
-                    Some(TypeDefinitionPayload::ValueMonitor {
-                        value_id,
-                        name,
-                    })
+                    Some(TypeDefinitionPayload::ValueMonitor { value_id, name })
                 }
             }
             // GlobalClockConfiguration
@@ -313,7 +307,7 @@ mod tests {
     use super::*;
     use crate::buffer::{BufferReader, BufferWriter};
 
-    // #[test]
+    #[test]
     fn test_type_definition_read_and_write() {
         let typedefs = vec![
             TypeDefinitionPayload::EmbassyTaskCreated {
@@ -336,24 +330,23 @@ mod tests {
             },
             TypeDefinitionPayload::ValueMonitor {
                 value_id: 13,
-                type_id: 2,
                 name: "TestValue".to_string(),
             },
         ];
 
         for typedef in typedefs {
-            // Write typedef to bytes
+            // Write the event to bytes
             let mut writer = BufferWriter::new();
             typedef.write_bytes(&mut writer);
             let bytes = writer.as_slice();
 
-            // Read typedef from bytes
+            // Read the event back from bytes
             let mut reader = BufferReader::new(bytes);
-            let typedef_id = reader.read_byte().unwrap();
-            let parsed_typedef =
-                TypeDefinitionPayload::from_bytes(typedef_id, &mut reader).unwrap();
+            let read_typedef =
+                TypeDefinitionPayload::from_bytes(reader.read_byte().unwrap(), &mut reader)
+                    .unwrap();
 
-            assert_eq!(typedef, parsed_typedef);
+            assert_eq!(typedef, read_typedef);
         }
     }
 }

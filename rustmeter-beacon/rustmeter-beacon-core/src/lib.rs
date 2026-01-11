@@ -22,12 +22,14 @@ pub fn compressed_task_id(task_id: u32) -> u16 {
     folded
 }
 
-#[cfg(not(feature = "std"))]
 unsafe extern "Rust" {
     pub fn get_current_core_id() -> u8;
 }
 
 #[cfg(feature = "std")]
-unsafe fn get_current_core_id() -> u8 {
-    0
+mod std_core_id {
+    #[unsafe(no_mangle)]
+    unsafe fn get_current_core_id() -> u8 {
+        0
+    }
 }

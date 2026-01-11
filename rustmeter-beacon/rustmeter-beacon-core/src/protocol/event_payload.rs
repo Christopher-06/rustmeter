@@ -253,10 +253,7 @@ impl EventPayload {
 #[cfg(feature = "std")]
 mod tests {
     use super::*;
-    use crate::{
-        buffer::{BufferReader, BufferWriter},
-        protocol::{MonitorValuePayload, monitor_value_payload::MonitorValueType},
-    };
+    use crate::buffer::{BufferReader, BufferWriter};
 
     #[test]
     fn test_event_payload_write_and_read() {
@@ -265,19 +262,12 @@ mod tests {
                 task_id: 42,
                 executor_id: u3::new(5),
             },
-            EventPayload::EmbassyTaskExecBeginCore0 {
-                task_id: 43,
-                executor_id: u3::new(5),
-            },
-            EventPayload::EmbassyTaskExecBeginCore1 {
+            EventPayload::EmbassyTaskExecBegin {
                 task_id: 44,
                 executor_id: u3::new(6),
             },
-            EventPayload::EmbassyTaskExecEndCore0 {
+            EventPayload::EmbassyTaskExecEnd {
                 executor_id: u3::new(1),
-            },
-            EventPayload::EmbassyTaskExecEndCore1 {
-                executor_id: u3::new(2),
             },
             EventPayload::EmbassyExecutorPollStart {
                 executor_id: u3::new(3),
@@ -285,13 +275,11 @@ mod tests {
             EventPayload::EmbassyExecutorIdle {
                 executor_id: u3::new(4),
             },
-            EventPayload::MonitorStartCore0 { monitor_id: 5 },
-            EventPayload::MonitorStartCore1 { monitor_id: 6 },
-            EventPayload::MonitorEndCore0,
-            EventPayload::MonitorEndCore1,
+            EventPayload::MonitorStart { monitor_id: 5 },
+            EventPayload::MonitorEnd,
             EventPayload::MonitorValue {
                 value_id: 7,
-                value: MonitorValuePayload::U32(123456),
+                value: 456u16.into(),
             },
             EventPayload::TypeDefinition(TypeDefinitionPayload::ScopeMonitor {
                 monitor_id: 8,
@@ -299,12 +287,6 @@ mod tests {
             }),
             EventPayload::DataLossEvent { dropped_events: 10 },
         ];
-
-        // create a closure to read MonitorValuePayloads for testing
-        let monitor_value_reader = |monitor_id: u8| {
-            assert_eq!(monitor_id, 7); // we only test with monitor_id 7 here
-            Some(u32::ZERO.get_monitor_value_type_id())
-        };
 
         for event in events {
             // Write the event to bytes
@@ -314,12 +296,8 @@ mod tests {
 
             // Read the event back from bytes
             let mut reader = BufferReader::new(bytes);
-            let read_event = EventPayload::from_bytes(
-                reader.read_byte().unwrap(),
-                &mut reader,
-                &monitor_value_reader,
-            )
-            .unwrap();
+            let read_event =
+                EventPayload::from_bytes(reader.read_byte().unwrap(), &mut reader).unwrap();
 
             assert_eq!(event, read_event);
         }

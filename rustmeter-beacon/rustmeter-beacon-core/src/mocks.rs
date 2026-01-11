@@ -1,59 +1,92 @@
-
 #[cfg(test)]
 pub mod test_mocks {
+    use crate::{buffer::BufferReader, protocol::EventPayload, tracing::read_tracing_event};
     use core::cell::RefCell;
 
-    // 1. Thread-Local Storage für die Hooks
-    // Hier speichern wir Closures, die das eigentliche Verhalten pro Test definieren.
     thread_local! {
         static WRITE_HOOK: RefCell<Option<Box<dyn FnMut(&[u8])>>> = RefCell::new(None);
-        static TIME_HOOK: RefCell<Option<Box<dyn FnMut() -> u32>>> = RefCell::new(None);
+        static RAW_TIME_HOOK: RefCell<Option<Box<dyn FnMut() -> u32>>> = RefCell::new(None);
+        static SYS_TIME_HOOK: RefCell<Option<Box<dyn FnMut() -> u64>>> = RefCell::new(None);
     }
 
-    // 2. Die EINE globale Definition der no_mangle Funktionen für Tests
     #[unsafe(no_mangle)]
     fn write_tracing_data(data: &[u8]) {
         WRITE_HOOK.with(|hook| {
             if let Some(h) = hook.borrow_mut().as_mut() {
-                h(data);
-            } else {
-                // Fallback oder Panic, falls kein Mock gesetzt ist
-                println!(
-                    "Warning: write_tracing_data called without mock! Data len: {}",
-                    data.len()
-                );
+                return h(data);
             }
+
+            // Fallback
+            println!(
+                "Warning: write_tracing_data called without mock! Data len: {}",
+                data.len()
+            );
         });
     }
 
     #[unsafe(no_mangle)]
-    fn get_tracing_time_us() -> u32 {
-        TIME_HOOK.with(|hook| {
+    fn get_tracing_raw_ticks() -> u32 {
+        RAW_TIME_HOOK.with(|hook| {
             if let Some(h) = hook.borrow_mut().as_mut() {
-                h()
-            } else {
-                0 // Default Zeit
+                return h();
             }
+
+            // Fallback
+            println!("Warning: get_tracing_raw_ticks called without mock! Returning 0.");
+            0
         })
     }
 
-    // 3. Helper-Funktion für deine Tests
-    // Diese Funktion setzt die Mocks für den aktuellen Scope (den Test)
-    pub fn with_mocks<W, T, F>(mut write_fn: W, mut time_fn: T, test_body: F)
+    #[unsafe(no_mangle)]
+    fn get_system_time_us() -> u64 {
+        SYS_TIME_HOOK.with(|hook| {
+            if let Some(h) = hook.borrow_mut().as_mut() {
+                return h();
+            }
+
+            // Fallback
+            println!("Warning: get_system_time_us called without mock! Returning 0.");
+            0
+        })
+    }
+
+    // Method to inject mocks for a test that will be automatically removed after the test
+    pub fn with_mocks<W, T, S, F>(write_fn: W, raw_time_fn: T, sys_time_fn: S, test_body: F)
     where
         W: FnMut(&[u8]) + 'static,
         T: FnMut() -> u32 + 'static,
+        S: FnMut() -> u64 + 'static,
         F: FnOnce(),
     {
-        // Mocks setzen
+        // Mocks
         WRITE_HOOK.with(|h| *h.borrow_mut() = Some(Box::new(write_fn)));
-        TIME_HOOK.with(|h| *h.borrow_mut() = Some(Box::new(time_fn)));
+        RAW_TIME_HOOK.with(|h| *h.borrow_mut() = Some(Box::new(raw_time_fn)));
+        SYS_TIME_HOOK.with(|h| *h.borrow_mut() = Some(Box::new(sys_time_fn)));
 
-        // Test ausführen
+        // Run the test body
         test_body();
 
-        // Aufräumen (wichtig, damit state nicht in andere Tests leakt)
+        // Clean up
         WRITE_HOOK.with(|h| *h.borrow_mut() = None);
-        TIME_HOOK.with(|h| *h.borrow_mut() = None);
+        RAW_TIME_HOOK.with(|h| *h.borrow_mut() = None);
+        SYS_TIME_HOOK.with(|h| *h.borrow_mut() = None);
+    }
+
+    /// Simple mock time provider that returns a fixed timestamp (123_456_789)
+    pub fn mock_time_provider() -> u32 {
+        123_456_789
+    }
+
+    /// Mock trace writer that checks the written data to match the expected event payload and
+    /// timestamp (123_456_789) from the mock time provider.
+    pub fn mock_trace_writer(expected: EventPayload) -> impl Fn(&[u8]) {
+        move |data: &[u8]| {
+            let mut buffer = BufferReader::new(data);
+            let (timestamp, event) =
+                read_tracing_event(&mut buffer).expect("Failed to read tracing event");
+
+            assert_eq!(event, expected);
+            assert_eq!(timestamp.get_delta_us(), 123_456_789);
+        }
     }
 }
