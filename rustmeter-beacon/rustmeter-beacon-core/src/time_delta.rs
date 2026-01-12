@@ -177,7 +177,8 @@ impl TimeDelta {
         }
     }
 
-    pub fn get_delta_us(&self) -> u32 {
+    /// Returns the delta in microseconds
+    pub fn delta(&self) -> u32 {
         self.delta
     }
 }
