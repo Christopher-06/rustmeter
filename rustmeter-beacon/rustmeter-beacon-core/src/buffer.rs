@@ -123,6 +123,24 @@ impl<'a> BufferReader<'a> {
         }
     }
 
+    /// Reads a little-endian u16 from the buffer
+    pub fn read_u16(&mut self) -> Result<u16, ReadTracingError> {
+        let bytes = self.read_bytes(2)?;
+        Ok(u16::from_le_bytes(bytes.try_into().unwrap()))
+    }
+
+    /// Reads a little-endian u32 from the buffer
+    pub fn read_u32(&mut self) -> Result<u32, ReadTracingError> {
+        let bytes = self.read_bytes(4)?;
+        Ok(u32::from_le_bytes(bytes.try_into().unwrap()))
+    }
+
+    /// Reads a little-endian u64 from the buffer
+    pub fn read_u64(&mut self) -> Result<u64, ReadTracingError> {
+        let bytes = self.read_bytes(8)?;
+        Ok(u64::from_le_bytes(bytes.try_into().unwrap()))
+    }
+
     pub fn get_position(&self) -> usize {
         self.position
     }

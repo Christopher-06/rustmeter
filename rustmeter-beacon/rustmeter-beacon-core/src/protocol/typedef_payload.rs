@@ -164,21 +164,8 @@ impl TypeDefinitionPayload {
             }
             // EmbassyTaskEnded
             1 => {
-                // Read full TaskID
-                let mut task_id_bytes = [0u8; 4];
-                for byte in task_id_bytes.iter_mut() {
-                    *byte = buffer.read_byte()?;
-                }
-                let task_id = u32::from_le_bytes(task_id_bytes);
-
-                // Read full ExecutorIDLong
-                let mut executor_id_long_bytes = [0u8; 4];
-                for byte in executor_id_long_bytes.iter_mut() {
-                    *byte = buffer.read_byte()?;
-                }
-                let executor_id_long = u32::from_le_bytes(executor_id_long_bytes);
-
-                // Read ExecutorIDShort
+                let task_id = buffer.read_u32()?;
+                let executor_id_long = buffer.read_u32()?;
                 let executor_id_short = u3::new(buffer.read_byte()?);
 
                 Ok(TypeDefinitionPayload::EmbassyTaskEnded {
@@ -190,13 +177,7 @@ impl TypeDefinitionPayload {
             // FunctionMonitor
             2 => {
                 let monitor_id = buffer.read_byte()?;
-
-                // Read FnAddress
-                let mut fn_address_bytes = [0u8; 4];
-                for byte in fn_address_bytes.iter_mut() {
-                    *byte = buffer.read_byte()?;
-                }
-                let fn_address = u32::from_le_bytes(fn_address_bytes);
+                let fn_address = buffer.read_u32()?;
 
                 Ok(TypeDefinitionPayload::FunctionMonitor {
                     monitor_id,
@@ -253,19 +234,8 @@ impl TypeDefinitionPayload {
             }
             // GlobalClockConfiguration
             5 => {
-                // Read system Frequency
-                let mut system_frequency_bytes = [0u8; 4];
-                for byte in system_frequency_bytes.iter_mut() {
-                    *byte = buffer.read_byte()?;
-                }
-                let system_frequency_hz = u32::from_le_bytes(system_frequency_bytes);
-
-                // Read Tick Divider
-                let mut tick_divider_bytes = [0u8; 2];
-                for byte in tick_divider_bytes.iter_mut() {
-                    *byte = buffer.read_byte()?;
-                }
-                let tick_divider = u16::from_le_bytes(tick_divider_bytes);
+                let system_frequency_hz = buffer.read_u32()?;
+                let tick_divider = buffer.read_u16()?;
 
                 Ok(TypeDefinitionPayload::GlobalClockConfiguration {
                     system_frequency_hz,
@@ -274,22 +244,9 @@ impl TypeDefinitionPayload {
             }
             // CoreClockReference
             6 => {
-                // Read Core ID
                 let core_id = buffer.read_byte()?;
-
-                // Read Systimer US
-                let mut systimer_us_bytes = [0u8; 8];
-                for byte in systimer_us_bytes.iter_mut() {
-                    *byte = buffer.read_byte()?;
-                }
-                let systimer_us = u64::from_le_bytes(systimer_us_bytes);
-
-                // Read CPU Ticks
-                let mut cpu_ticks_bytes = [0u8; 4];
-                for byte in cpu_ticks_bytes.iter_mut() {
-                    *byte = buffer.read_byte()?;
-                }
-                let cpu_ticks = u32::from_le_bytes(cpu_ticks_bytes);
+                let systimer_us = buffer.read_u64()?;
+                let cpu_ticks = buffer.read_u32()?;
 
                 Ok(TypeDefinitionPayload::CoreClockReference {
                     core_id,

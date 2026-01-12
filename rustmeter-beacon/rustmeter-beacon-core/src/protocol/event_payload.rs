@@ -167,23 +167,17 @@ impl EventPayload {
         match event_id.as_u8() {
             // EmbassyTaskReady
             EMBASSY_TASK_READY => {
-                let mut data = [0u8; 2];
-                for byte in data.iter_mut() {
-                    *byte = buffer.read_byte()?;
-                }
+                let task_id = buffer.read_u16()?;
                 Ok(EventPayload::EmbassyTaskReady {
-                    task_id: u16::from_le_bytes(data),
+                    task_id,
                     executor_id: sub_id,
                 })
             }
             // EmbassyTaskExecBegin
             EMBASSY_TASK_EXEC_BEGIN => {
-                let mut data = [0u8; 2];
-                for byte in data.iter_mut() {
-                    *byte = buffer.read_byte()?;
-                }
+                let task_id = buffer.read_u16()?;
                 Ok(EventPayload::EmbassyTaskExecBegin {
-                    task_id: u16::from_le_bytes(data),
+                    task_id,
                     executor_id: sub_id,
                 })
             }
@@ -221,14 +215,8 @@ impl EventPayload {
             }
             // DataLossEvent
             DATA_LOSS_EVENT => {
-                let mut data = [0u8; 4];
-                for byte in data.iter_mut() {
-                    *byte = buffer.read_byte()?;
-                }
-
-                Ok(EventPayload::DataLossEvent {
-                    dropped_events: u32::from_le_bytes(data),
-                })
+                let dropped_events = buffer.read_u32()?;
+                Ok(EventPayload::DataLossEvent { dropped_events })
             }
             // DefmtDataEvent
             DEFMT_DATA_EVENT => {
@@ -239,12 +227,7 @@ impl EventPayload {
                 #[cfg(feature = "std")]
                 {
                     let len = buffer.read_byte()?;
-
-                    // Read data
-                    let mut data = vec![0u8; len as usize];
-                    for byte in data.iter_mut() {
-                        *byte = buffer.read_byte()?;
-                    }
+                    let data = buffer.read_bytes(len as usize)?.to_vec();
                     Ok(EventPayload::DefmtData { len, data })
                 }
             }
@@ -290,6 +273,10 @@ mod tests {
                 name: "test_scope".to_string(),
             }),
             EventPayload::DataLossEvent { dropped_events: 10 },
+            EventPayload::DefmtData {
+                len: 4,
+                data: vec![1, 2, 3, 4],
+            },
         ];
 
         for event in events {
