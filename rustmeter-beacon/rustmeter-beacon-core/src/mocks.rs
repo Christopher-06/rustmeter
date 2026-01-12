@@ -86,7 +86,7 @@ pub mod test_mocks {
                 read_tracing_event(&mut buffer).expect("Failed to read tracing event");
 
             assert_eq!(event, expected);
-            assert_eq!(timestamp.get_delta_us(), 123_456_789);
+            assert_eq!(timestamp.delta(), 123_456_789);
         }
     }
 }

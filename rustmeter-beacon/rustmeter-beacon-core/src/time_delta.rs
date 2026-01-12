@@ -4,7 +4,7 @@ use arbitrary_int::traits::Integer;
 use crate::{
     buffer::{BufferReader, BufferWriter},
     protocol::{EventPayload, TypeDefinitionPayload},
-    tracing::write_tracing_event,
+    tracing::{ReadTracingError, write_tracing_event},
 };
 
 #[cfg(not(feature = "multicore"))]
@@ -154,7 +154,8 @@ impl TimeDelta {
 
     /// Reads a TimeDelta from the provided reader. Returns None if reading fails.
     /// It automatically detects whether the format is single (2 bytes) or extended (4 bytes) based on the highest bit.
-    pub fn read_bytes(reader: &mut BufferReader) -> Option<Self> {
+    /// This method can only "fail" if there is not enough data in the reader.
+    pub fn read_bytes(reader: &mut BufferReader) -> Result<Self, ReadTracingError> {
         // Read first 2 bytes to determine format
         let first_byte = reader.read_byte()?;
         let second_byte = reader.read_byte()?;
@@ -162,7 +163,7 @@ impl TimeDelta {
         if (first_byte & 0x80) == 0 {
             // Single format
             let delta = u16::from_be_bytes([first_byte, second_byte]) as u32;
-            Some(TimeDelta { delta })
+            Ok(TimeDelta { delta })
         } else {
             // Extended format, read additional 2 bytes
             let next_two_bytes = reader.read_bytes(2)?;
@@ -173,7 +174,7 @@ impl TimeDelta {
                 next_two_bytes[1],
             ]);
             let delta = extended_value & 0x7FFF_FFFF; // Clear highest bit
-            Some(TimeDelta { delta })
+            Ok(TimeDelta { delta })
         }
     }
 

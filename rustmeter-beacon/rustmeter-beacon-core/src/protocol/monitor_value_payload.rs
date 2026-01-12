@@ -2,6 +2,7 @@ use arbitrary_int::{traits::Integer, u3};
 
 use crate::{
     buffer::{BufferReader, BufferWriter},
+    tracing::ReadTracingError,
     varint::ZigZag,
 };
 
@@ -50,28 +51,36 @@ impl MonitorValuePayload {
     pub(crate) fn from_bytes(
         type_id: u3,
         buffer: &mut BufferReader,
-    ) -> Option<MonitorValuePayload> {
+    ) -> Result<MonitorValuePayload, ReadTracingError> {
         match type_id.as_u8() {
             0 => {
                 let value = buffer.read_varint()?;
-                Some(MonitorValuePayload::Unsigned(value))
+                Ok(MonitorValuePayload::Unsigned(value))
             }
             1 => {
                 let enc = buffer.read_varint()?;
                 let value = i64::zigzag_decode(enc);
-                Some(MonitorValuePayload::Signed(value))
+                Ok(MonitorValuePayload::Signed(value))
             }
             2 => {
                 let bytes = buffer.read_bytes(4)?;
-                let value = f32::from_le_bytes(bytes.try_into().ok()?);
-                Some(MonitorValuePayload::Float32(value))
+                let value = f32::from_le_bytes(
+                    bytes
+                        .try_into()
+                        .map_err(|_| ReadTracingError::FloatConversionError)?,
+                );
+                Ok(MonitorValuePayload::Float32(value))
             }
             3 => {
                 let bytes = buffer.read_bytes(8)?;
-                let value = f64::from_le_bytes(bytes.try_into().ok()?);
-                Some(MonitorValuePayload::Float64(value))
+                let value = f64::from_le_bytes(
+                    bytes
+                        .try_into()
+                        .map_err(|_| ReadTracingError::FloatConversionError)?,
+                );
+                Ok(MonitorValuePayload::Float64(value))
             }
-            _ => None,
+            _ => Err(ReadTracingError::InvalidValueTypeID),
         }
     }
 

@@ -1,6 +1,7 @@
 use crate::{
     buffer::{BufferReader, BufferWriter},
     protocol::{MonitorValuePayload, TypeDefinitionPayload},
+    tracing::ReadTracingError,
 };
 use arbitrary_int::{traits::Integer, u3, u5};
 
@@ -155,7 +156,10 @@ impl EventPayload {
     /// Reads an EventPayload from the provided buffer based on the given type ID. Params:
     /// - event_type: The combined event type byte containing event ID and executor short ID.
     /// - buffer: The buffer reader to read additional event data from.
-    pub fn from_bytes(event_type: u8, buffer: &mut BufferReader) -> Option<EventPayload> {
+    pub fn from_bytes(
+        event_type: u8,
+        buffer: &mut BufferReader,
+    ) -> Result<EventPayload, ReadTracingError> {
         let event_id = u5::new(event_type >> 3);
         let sub_id = u3::new(event_type & 0x07);
 
@@ -167,7 +171,7 @@ impl EventPayload {
                 for byte in data.iter_mut() {
                     *byte = buffer.read_byte()?;
                 }
-                Some(EventPayload::EmbassyTaskReady {
+                Ok(EventPayload::EmbassyTaskReady {
                     task_id: u16::from_le_bytes(data),
                     executor_id: sub_id,
                 })
@@ -178,42 +182,42 @@ impl EventPayload {
                 for byte in data.iter_mut() {
                     *byte = buffer.read_byte()?;
                 }
-                Some(EventPayload::EmbassyTaskExecBegin {
+                Ok(EventPayload::EmbassyTaskExecBegin {
                     task_id: u16::from_le_bytes(data),
                     executor_id: sub_id,
                 })
             }
             // EmbassyTaskExecEnd
-            EMBASSY_TASK_EXEC_END => Some(EventPayload::EmbassyTaskExecEnd {
+            EMBASSY_TASK_EXEC_END => Ok(EventPayload::EmbassyTaskExecEnd {
                 executor_id: sub_id,
             }),
             // EmbassyExecutorPollStart
-            EMBASSY_EXECUTOR_POLL_START => Some(EventPayload::EmbassyExecutorPollStart {
+            EMBASSY_EXECUTOR_POLL_START => Ok(EventPayload::EmbassyExecutorPollStart {
                 executor_id: sub_id,
             }),
             // EmbassyExecutorIdle
-            EMBASSY_EXECUTOR_IDLE => Some(EventPayload::EmbassyExecutorIdle {
+            EMBASSY_EXECUTOR_IDLE => Ok(EventPayload::EmbassyExecutorIdle {
                 executor_id: sub_id,
             }),
             // MonitorStart
             MONITOR_START => {
                 let monitor_id = buffer.read_byte()?;
-                Some(EventPayload::MonitorStart { monitor_id })
+                Ok(EventPayload::MonitorStart { monitor_id })
             }
             // MonitorEnd
-            MONITOR_END => Some(EventPayload::MonitorEnd),
+            MONITOR_END => Ok(EventPayload::MonitorEnd),
             // MonitorValue
             MONITOR_VALUE => {
                 let value_id = buffer.read_byte()?;
                 let value = MonitorValuePayload::from_bytes(sub_id, buffer)?;
 
-                Some(EventPayload::MonitorValue { value_id, value })
+                Ok(EventPayload::MonitorValue { value_id, value })
             }
             // TypeDefinition
             TYPE_DEFINITION => {
                 let typedef_it = buffer.read_byte()?;
                 let def = TypeDefinitionPayload::from_bytes(typedef_it, buffer)?;
-                Some(EventPayload::TypeDefinition(def))
+                Ok(EventPayload::TypeDefinition(def))
             }
             // DataLossEvent
             DATA_LOSS_EVENT => {
@@ -222,7 +226,7 @@ impl EventPayload {
                     *byte = buffer.read_byte()?;
                 }
 
-                Some(EventPayload::DataLossEvent {
+                Ok(EventPayload::DataLossEvent {
                     dropped_events: u32::from_le_bytes(data),
                 })
             }
@@ -241,10 +245,10 @@ impl EventPayload {
                     for byte in data.iter_mut() {
                         *byte = buffer.read_byte()?;
                     }
-                    Some(EventPayload::DefmtData { len, data })
+                    Ok(EventPayload::DefmtData { len, data })
                 }
             }
-            _ => None,
+            _ => return Err(ReadTracingError::InvalidEventType),
         }
     }
 }

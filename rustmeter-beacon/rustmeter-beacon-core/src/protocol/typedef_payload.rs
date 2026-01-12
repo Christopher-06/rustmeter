@@ -1,6 +1,6 @@
 use arbitrary_int::{traits::Integer, u3};
 
-use crate::buffer::{BufferReader, BufferWriter};
+use crate::{buffer::{BufferReader, BufferWriter}, tracing::ReadTracingError};
 
 /// Type Definition Event Payloads
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -135,7 +135,7 @@ impl TypeDefinitionPayload {
         }
     }
 
-    pub(crate) fn from_bytes(typedef_id: u8, buffer: &mut BufferReader) -> Option<Self> {
+    pub(crate) fn from_bytes(typedef_id: u8, buffer: &mut BufferReader) -> Result<Self, ReadTracingError> {
         match typedef_id {
             // EmbassyTaskCreated
             0 => {
@@ -156,7 +156,7 @@ impl TypeDefinitionPayload {
                 // Read ExecutorIDShort
                 let executor_id_short = u3::new(buffer.read_byte()?);
 
-                Some(TypeDefinitionPayload::EmbassyTaskCreated {
+                Ok(TypeDefinitionPayload::EmbassyTaskCreated {
                     task_id,
                     executor_id_long,
                     executor_id_short,
@@ -181,7 +181,7 @@ impl TypeDefinitionPayload {
                 // Read ExecutorIDShort
                 let executor_id_short = u3::new(buffer.read_byte()?);
 
-                Some(TypeDefinitionPayload::EmbassyTaskEnded {
+                Ok(TypeDefinitionPayload::EmbassyTaskEnded {
                     task_id,
                     executor_id_long,
                     executor_id_short,
@@ -198,7 +198,7 @@ impl TypeDefinitionPayload {
                 }
                 let fn_address = u32::from_le_bytes(fn_address_bytes);
 
-                Some(TypeDefinitionPayload::FunctionMonitor {
+                Ok(TypeDefinitionPayload::FunctionMonitor {
                     monitor_id,
                     fn_address,
                 })
@@ -222,9 +222,9 @@ impl TypeDefinitionPayload {
                         }
                         name_bytes.push(byte);
                     }
-                    let name = core::str::from_utf8(&name_bytes).ok()?.to_string();
+                    let name = core::str::from_utf8(&name_bytes)?.to_string();
 
-                    Some(TypeDefinitionPayload::ScopeMonitor { monitor_id, name })
+                    Ok(TypeDefinitionPayload::ScopeMonitor { monitor_id, name })
                 }
             }
             // ValueMonitor
@@ -246,9 +246,9 @@ impl TypeDefinitionPayload {
                         }
                         name_bytes.push(byte);
                     }
-                    let name = core::str::from_utf8(&name_bytes).ok()?.to_string();
+                    let name = core::str::from_utf8(&name_bytes)?.to_string();
 
-                    Some(TypeDefinitionPayload::ValueMonitor { value_id, name })
+                    Ok(TypeDefinitionPayload::ValueMonitor { value_id, name })
                 }
             }
             // GlobalClockConfiguration
@@ -267,7 +267,7 @@ impl TypeDefinitionPayload {
                 }
                 let tick_divider = u16::from_le_bytes(tick_divider_bytes);
 
-                Some(TypeDefinitionPayload::GlobalClockConfiguration {
+                Ok(TypeDefinitionPayload::GlobalClockConfiguration {
                     system_frequency_hz,
                     tick_divider,
                 })
@@ -291,13 +291,13 @@ impl TypeDefinitionPayload {
                 }
                 let cpu_ticks = u32::from_le_bytes(cpu_ticks_bytes);
 
-                Some(TypeDefinitionPayload::CoreClockReference {
+                Ok(TypeDefinitionPayload::CoreClockReference {
                     core_id,
                     systimer_us,
                     cpu_ticks,
                 })
             }
-            _ => None,
+            _ => Err(ReadTracingError::InvalidTypedefID),
         }
     }
 }
@@ -331,6 +331,15 @@ mod tests {
             TypeDefinitionPayload::ValueMonitor {
                 value_id: 13,
                 name: "TestValue".to_string(),
+            },
+            TypeDefinitionPayload::GlobalClockConfiguration {
+                system_frequency_hz: 48_000_000,
+                tick_divider: 64,
+            },
+            TypeDefinitionPayload::CoreClockReference {
+                core_id: 1,
+                systimer_us: 1_000_000,
+                cpu_ticks: 123456,
             },
         ];
 

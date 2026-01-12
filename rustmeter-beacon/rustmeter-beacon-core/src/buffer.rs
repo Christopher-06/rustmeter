@@ -1,6 +1,6 @@
 use core::mem::MaybeUninit;
 
-use crate::varint::VarIntWritable;
+use crate::{tracing::ReadTracingError, varint::VarIntWritable};
 
 /// Internal buffer writer for tracing events using a fixed-size buffer with uninitialized memory for efficiency
 pub struct BufferWriter {
@@ -77,29 +77,29 @@ impl<'a> BufferReader<'a> {
     }
 
     /// Reads a single byte from the buffer. Returns None if end of buffer is reached.
-    pub fn read_byte(&mut self) -> Option<u8> {
+    pub fn read_byte(&mut self) -> Result<u8, ReadTracingError> {
         if self.position >= self.buffer.len() {
-            return None;
+            return Err(ReadTracingError::InsufficientData);
         }
 
         let byte = self.buffer[self.position];
         self.position += 1;
-        Some(byte)
+        Ok(byte)
     }
 
     /// Reads a slice of bytes of the given length from the buffer. Returns None if not enough data is available.
-    pub fn read_bytes(&mut self, length: usize) -> Option<&[u8]> {
+    pub fn read_bytes(&mut self, length: usize) -> Result<&[u8], ReadTracingError> {
         if self.position + length > self.buffer.len() {
-            return None;
+            return Err(ReadTracingError::InsufficientData);
         }
 
         let bytes = &self.buffer[self.position..self.position + length];
         self.position += length;
-        Some(bytes)
+        Ok(bytes)
     }
 
     /// Reads a LEB128 (VarInt) encoded u64.
-    pub fn read_varint(&mut self) -> Option<u64> {
+    pub fn read_varint(&mut self) -> Result<u64, ReadTracingError> {
         let mut result = 0u64;
         let mut shift = 0;
 
@@ -111,14 +111,14 @@ impl<'a> BufferReader<'a> {
 
             // If continuation bit is not set, we are done
             if (byte & 0x80) == 0 {
-                return Some(result);
+                return Ok(result);
             }
 
             shift += 7;
 
             // Protection against overflow / bad data (max 10 bytes for u64)
             if shift >= 70 {
-                return None;
+                return Err(ReadTracingError::VarIntOverflow);
             }
         }
     }
@@ -147,10 +147,10 @@ mod tests {
         let data = [0x9A, 0xBC, 0xDE, 0xF0];
         let mut reader = BufferReader::new(&data);
 
-        assert_eq!(reader.read_byte(), Some(0x9A));
-        assert_eq!(reader.read_bytes(2), Some(&[0xBC, 0xDE][..]));
-        assert_eq!(reader.read_byte(), Some(0xF0));
-        assert_eq!(reader.read_byte(), None);
+        assert_eq!(reader.read_byte(), Ok(0x9A));
+        assert_eq!(reader.read_bytes(2), Ok(&[0xBC, 0xDE][..]));
+        assert_eq!(reader.read_byte(), Ok(0xF0));
+        assert_eq!(reader.read_byte(), Err(ReadTracingError::InsufficientData));
     }
 
     #[test]
@@ -169,15 +169,15 @@ mod tests {
         let mut reader = BufferReader::new(data);
         assert_eq!(
             reader.read_bytes(5),
-            Some(&[0x01, 0x02, 0x03, 0x04, 0x05][..])
+            Ok(&[0x01, 0x02, 0x03, 0x04, 0x05][..])
         );
-        assert_eq!(reader.read_varint(), Some(1u64));
-        assert_eq!(reader.read_varint(), Some(300u64));
-        assert_eq!(reader.read_varint(), Some(70000u64));
-        assert_eq!(reader.read_varint(), Some(123456789u64));
+        assert_eq!(reader.read_varint(), Ok(1u64));
+        assert_eq!(reader.read_varint(), Ok(300u64));
+        assert_eq!(reader.read_varint(), Ok(70000u64));
+        assert_eq!(reader.read_varint(), Ok(123456789u64));
         assert_eq!(
             reader.read_bytes(5),
-            Some(&[0x01, 0x02, 0x03, 0x04, 0x05][..])
+            Ok(&[0x01, 0x02, 0x03, 0x04, 0x05][..])
         );
     }
 }

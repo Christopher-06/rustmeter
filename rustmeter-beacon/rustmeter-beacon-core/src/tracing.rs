@@ -31,12 +31,30 @@ pub fn write_tracing_event(event: EventPayload) {
     });
 }
 
-pub fn read_tracing_event(buffer: &mut BufferReader) -> Option<(TimeDelta, EventPayload)> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReadTracingError {
+    InvalidEventType,
+    InvalidTypedefID,
+    InvalidValueTypeID,
+    VarIntOverflow,
+    FloatConversionError,
+    StringConversionError(core::str::Utf8Error),
+    InsufficientData,
+}
+
+impl From<core::str::Utf8Error> for ReadTracingError {
+    fn from(err: core::str::Utf8Error) -> Self {
+        ReadTracingError::StringConversionError(err)
+    }
+}
+
+/// Reads a tracing event with timestamp from the provided buffer
+pub fn read_tracing_event(buffer: &mut BufferReader) -> Result<(TimeDelta, EventPayload), ReadTracingError> {
     let event_type = buffer.read_byte()?;
     let event = EventPayload::from_bytes(event_type, buffer)?;
     let timestamp = TimeDelta::read_bytes(buffer)?;
 
-    Some((timestamp, event))
+    Ok((timestamp, event))
 }
 
 #[cfg(test)]
