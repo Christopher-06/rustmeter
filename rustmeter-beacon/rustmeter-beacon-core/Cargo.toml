@@ -12,7 +12,8 @@ repository = "https://github.com/Christopher-06/rustmeter"
 portable-atomic = "1"
 arbitrary-int = "2"
 critical-section = "1"
+serde = { version = "1", features = ["derive"], optional = true}
 
 [features]
-std = ["portable-atomic/std", "critical-section/std"]
+std = ["portable-atomic/std", "critical-section/std", "serde", "arbitrary-int/serde"]
 multicore = []

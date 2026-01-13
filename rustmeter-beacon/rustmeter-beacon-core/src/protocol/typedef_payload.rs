@@ -4,6 +4,7 @@ use crate::{buffer::{BufferReader, BufferWriter}, tracing::ReadTracingError};
 
 /// Type Definition Event Payloads
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TypeDefinitionPayload {
     /// New Embassy Task created.
     /// TaskID is the full task ID used in TaskReady events. (Can be compressed on host side to gather shorter taskid)
