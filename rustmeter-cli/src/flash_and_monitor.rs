@@ -7,14 +7,16 @@ use crate::{
     probe_rs::{
         connect_to_first_probe, flashing::flash_and_start_controller, rtt_listener::RttListener,
     },
-    tracing::trace_data_decoder::CoreTracingData,
+    tracing::{CoreTracingData, TracingDecodeError},
 };
 
 /// Simple Trait for Chip Monitoring Tool (e.g., probe-rs RTT or espflash Serial)
 pub trait ChipMonitoringTool {
-    fn get_defmt_bytes_recver(&self) -> crossbeam::channel::Receiver<Box<[u8]>>;
-    fn get_tracing_bytes_recver(&self) -> crossbeam::channel::Receiver<CoreTracingData>;
-    fn get_error_recver(&self) -> crossbeam::channel::Receiver<anyhow::Error>;
+    fn get_tracing_bytes_recver(
+        &self,
+    ) -> crossbeam::channel::Receiver<Result<CoreTracingData, TracingDecodeError>>;
+    fn get_request_sender(&self)
+    -> crossbeam::channel::Sender<rustmeter_beacon::protocol::Request>;
 }
 
 pub fn flash_and_monitor_chip(

@@ -1,73 +1,87 @@
 use crossbeam::channel::{Receiver, Sender};
 use espflash::connection::Connection;
+use rustmeter_beacon::{buffer::BufferWriter, protocol::Request};
 
-use std::io::{ErrorKind, Read};
+use std::{
+    io::{ErrorKind, Read, Write},
+    thread,
+    time::Duration,
+};
 
-use crate::{flash_and_monitor::ChipMonitoringTool, tracing::trace_data_decoder::CoreTracingData};
+use crate::{
+    flash_and_monitor::ChipMonitoringTool,
+    tracing::{CoreTracingData, TracingDecodeError},
+};
 
 pub struct SerialListener {
-    defmt_bytes_recver: Receiver<Box<[u8]>>,
-    tracing_bytes_recver: Receiver<CoreTracingData>,
-    error_recver: Receiver<anyhow::Error>,
+    tracing_bytes_recver: Receiver<Result<CoreTracingData, TracingDecodeError>>,
+    req_sender: Sender<Request>,
 }
 
 impl SerialListener {
     pub fn new(espflash_conn: Connection) -> anyhow::Result<Self> {
-        let (defmt_bytes_sender, defmt_bytes_recver) = crossbeam::channel::unbounded();
         let (tracing_bytes_sender, tracing_bytes_recver) = crossbeam::channel::unbounded();
-        let (error_sender, error_recver) = crossbeam::channel::unbounded();
+        let (req_sender, req_recver) = crossbeam::channel::unbounded();
 
         std::thread::spawn(move || {
-            serial_reader_thread(
-                espflash_conn,
-                defmt_bytes_sender,
-                tracing_bytes_sender,
-                error_sender,
-            )
+            serial_reader_thread(espflash_conn, tracing_bytes_sender, req_recver)
         });
 
         Ok(Self {
-            defmt_bytes_recver,
             tracing_bytes_recver,
-            error_recver,
+            req_sender,
         })
     }
 }
 
 impl ChipMonitoringTool for SerialListener {
-    fn get_defmt_bytes_recver(&self) -> Receiver<Box<[u8]>> {
-        self.defmt_bytes_recver.clone()
-    }
-
-    fn get_tracing_bytes_recver(&self) -> Receiver<CoreTracingData> {
+    fn get_tracing_bytes_recver(&self) -> Receiver<Result<CoreTracingData, TracingDecodeError>> {
         self.tracing_bytes_recver.clone()
     }
 
-    fn get_error_recver(&self) -> Receiver<anyhow::Error> {
-        self.error_recver.clone()
+    fn get_request_sender(&self) -> Sender<Request> {
+        self.req_sender.clone()
     }
 }
 
 fn serial_reader_thread(
     espflash_conn: Connection,
-    defmt_bytes_sender: Sender<Box<[u8]>>,
-    tracing_bytes_sender: Sender<CoreTracingData>,
-    error_sender: Sender<anyhow::Error>,
+    tracing_bytes_sender: Sender<Result<CoreTracingData, TracingDecodeError>>,
+    req_recver: Receiver<Request>,
 ) {
     let mut serial_port = espflash_conn.into_serial();
     let mut buffer = [0u8; 4096];
 
-    let mut decoding: Vec<u8> = Vec::new();
+    let mut decoding: Vec<u8> = Vec::with_capacity(buffer.len());
+    let mut valid_in_stream = false; // check if we had previously valid frames in the stream
 
     loop {
-        // Try Read from serial port
+        // Check for requests one at a time
+        if let Ok(request) = req_recver.try_recv() {
+            let mut writer = BufferWriter::new();
+            request.write_bytes(&mut writer);
+
+            if let Err(e) = serial_port.write_all(writer.as_slice()) {
+                // Currently, we just log the error and continue
+                println!("Warning: Failed to send request over serial port: {}", e);
+            }
+        }
+
+        // Try Read from serial port, else continue on timeout
         let read_count: usize = match serial_port.read(&mut buffer) {
             Ok(count) => count,
-            Err(e) if e.kind() == ErrorKind::TimedOut => 0,
+            Err(e) if e.kind() == ErrorKind::TimedOut => continue,
             Err(e) if e.kind() == ErrorKind::Interrupted => continue,
             Err(e) => {
-                let _ =
-                    error_sender.send(anyhow::Error::new(e).context("Failed to read serial_port"));
+                // Send error and continue
+                let ch_closed = tracing_bytes_sender
+                    .send(Err(TracingDecodeError::SerialPortError(e)))
+                    .is_err();
+                if ch_closed {
+                    break;
+                }
+
+                thread::sleep(Duration::from_millis(100));
                 continue;
             }
         };
@@ -94,28 +108,64 @@ fn serial_reader_thread(
             for &b in &decoding[(frame_starts + 1)..(frame_starts + 3 + length)] {
                 calculated_checksum ^= b;
             }
+
+            // Verify checksum
             let received_checksum = decoding[frame_starts + 3 + length];
             if calculated_checksum != received_checksum {
                 // Invalid checksum, discard this start byte and continue
                 decoding.drain(0..(frame_starts + 1));
-                let _ = error_sender.send(anyhow::anyhow!("Invalid checksum in serial frame"));
+
+                if valid_in_stream {
+                    let ch_closed = tracing_bytes_sender
+                        .send(Err(TracingDecodeError::ChecksumMismatch))
+                        .is_err();
+                    if ch_closed {
+                        break;
+                    }
+                }
+
+                valid_in_stream = false;
                 continue;
             }
 
-            let paylaod = &decoding[(frame_starts + 3)..(frame_starts + 3 + length)];
+            let payload = &decoding[(frame_starts + 3)..(frame_starts + 3 + length)];
 
-            match type_id {
+            let ch_closed = match type_id {
                 0xF0 => {
                     // tracing frame from core 0
-                    let _ = tracing_bytes_sender.send(CoreTracingData::Core0(paylaod.to_vec().into_boxed_slice()));
+                    valid_in_stream = true;
+                    tracing_bytes_sender
+                        .send(Ok(CoreTracingData::Core0(
+                            payload.to_vec().into_boxed_slice(),
+                        )))
+                        .is_err()
                 }
-                0xF1 => { 
+                0xF1 => {
                     // tracing frame from core 1
-                    let _ = tracing_bytes_sender.send(CoreTracingData::Core1(paylaod.to_vec().into_boxed_slice()));
+                    valid_in_stream = true;
+                    tracing_bytes_sender
+                        .send(Ok(CoreTracingData::Core1(
+                            payload.to_vec().into_boxed_slice(),
+                        )))
+                        .is_err()
                 }
                 _ => {
-                    println!("Unknown frame type id: {}", type_id);
+                    // Unknown frame type, discard and continue
+                    if valid_in_stream {
+                        valid_in_stream = false;
+
+                        tracing_bytes_sender
+                            .send(Err(TracingDecodeError::InvalidFrameID(type_id)))
+                            .is_err()
+                    } else {
+                        false
+                    }
                 }
+            };
+
+            if ch_closed {
+                // Receiver has been closed, exit thread
+                break;
             }
 
             // Remove processed frame from decoding buffer
