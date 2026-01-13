@@ -1,5 +1,6 @@
 use crate::buffer::BufferWriter;
 
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum Request {
     GetGlobalClockDefinition,
     GetCoreClockReference { core_id: u8 },

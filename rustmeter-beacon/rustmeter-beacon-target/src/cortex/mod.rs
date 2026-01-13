@@ -1,6 +1,7 @@
 mod rtt_minimal;
 pub use rtt_minimal::_SEGGER_RTT;
 use rustmeter_beacon_core::protocol::{EventPayload, TypeDefinitionPayload};
+mod connector;
 mod tracing_rtt;
 
 #[cfg(feature = "defmt")]
@@ -9,7 +10,7 @@ mod defmt_logger;
 mod cortex_config;
 pub use cortex_config::CortexConfig as RustmeterConfig;
 
-use crate::timing;
+use crate::cortex::connector::connector;
 
 #[cfg(any(feature = "rp2040", feature = "rp235xa", feature = "rp235xb"))]
 pub const NUM_CORES: usize = 2;
@@ -25,20 +26,11 @@ pub enum InitializationError {
 /// This spawns the printing task that handles all output
 pub fn init_rustmeter_beacon(
     config: RustmeterConfig,
-    _spawner: &embassy_executor::Spawner,
+    spawner: &embassy_executor::Spawner,
 ) -> Result<(), InitializationError> {
-    send_global_clock_configuration(&config);
+    spawner.spawn(connector(config).map_err(InitializationError::TaskSpawnError)?);
 
     Ok(())
-}
-
-fn send_global_clock_configuration(config: &RustmeterConfig) {
-    rustmeter_beacon_core::tracing::write_tracing_event(EventPayload::TypeDefinition(
-        TypeDefinitionPayload::GlobalClockConfiguration {
-            system_frequency_hz: config.system_frequency_hz,
-            tick_divider: timing::TICK_DIVIDER as u16,
-        },
-    ));
 }
 
 #[cfg(feature = "stm32")]

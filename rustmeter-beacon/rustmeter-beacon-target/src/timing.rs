@@ -1,8 +1,11 @@
+#[cfg(not(feature = "rp2040"))]
 pub const TICK_DIVIDER: u32 = 64; // Shift 6 bits to shrink precision and save time-delta space (so it mostly fits in 2 byte instead of 4 byte <8,7ms with 240 Mhz )
+#[cfg(feature = "rp2040")]
+pub const TICK_DIVIDER : u32 = 1; // No division on RP2040 as its timer is already only 1MHz
 
 // Check that Time Shift is even
 const _: () = assert!(
-    TICK_DIVIDER % 2 == 0,
+    TICK_DIVIDER % 2 == 0 || TICK_DIVIDER == 1,
     "TICK_DIVIDER must be even for better optimization"
 );
 
@@ -72,7 +75,7 @@ pub fn get_tracing_raw_ticks() -> u32 {
     #[cfg(feature = "rp2040")]
     unsafe {
         // 1Mhz Timer on RP2040
-        return *(0x40054028 as *const u32);
+        return *(0x40054028 as *const u32) / TICK_DIVIDER;
 
         // Systick Current Value Register
         //    return (!(*(0xE000E018 as *const u32)) & 0x00FFFFFF) / TICK_DIVIDER;
