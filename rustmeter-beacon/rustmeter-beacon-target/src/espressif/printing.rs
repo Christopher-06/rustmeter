@@ -94,6 +94,8 @@ pub async fn connector(mut out_route: PrinterRoute, cpu_freq: Rate) {
     // Receive buffer
     let mut recvd_buffer = SimpleRingBuffer::<128>::new();
 
+    send_global_clock_configuration(cpu_freq.as_hz());
+
     loop {
         // Wait for any new datadata or timeout
         let _ = select(
@@ -140,14 +142,9 @@ pub async fn connector(mut out_route: PrinterRoute, cpu_freq: Rate) {
             match Request::from_bytes(recvd_buffer.iter()) {
                 Some((request, n)) => {
                     match request {
-                        Request::GetGlobalClockDefinition => {
-                            // Send clock definition response via TypeDefinition
-                            write_tracing_event(EventPayload::TypeDefinition(
-                                TypeDefinitionPayload::GlobalClockConfiguration {
-                                    system_frequency_hz: cpu_freq.as_hz(),
-                                    tick_divider: TICK_DIVIDER as u16,
-                                },
-                            ));
+                        Request::GetGlobalClockDefinition => { 
+                            // Send global clock definition
+                            send_global_clock_configuration(cpu_freq.as_hz());
                         }
                         Request::GetCoreClockReference { core_id } => {
                             // Reset core clock referenced
@@ -178,4 +175,13 @@ fn calculate_checksum(data: &[u8]) -> u8 {
         checksum ^= b;
     }
     checksum
+}
+
+pub fn send_global_clock_configuration(system_frequency_hz: u32) {
+    rustmeter_beacon_core::tracing::write_tracing_event(EventPayload::TypeDefinition(
+        TypeDefinitionPayload::GlobalClockConfiguration {
+            system_frequency_hz,
+            tick_divider: crate::timing::TICK_DIVIDER as u16,
+        },
+    ));
 }
