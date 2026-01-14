@@ -9,7 +9,7 @@ use std::{
 };
 
 use crate::{
-    flash_and_monitor::ChipMonitoringTool,
+    commands::flash_and_monitor::ChipMonitoringTool,
     tracing::{CoreTracingData, TracingDecodeError},
 };
 

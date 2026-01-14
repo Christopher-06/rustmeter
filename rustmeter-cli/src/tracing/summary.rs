@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use rustmeter_beacon::protocol::TypeDefinitionPayload;
 use time::OffsetDateTime;
 
+use crate::{cargo::elf_file::FirmwareAddressMap, cli::RunArgs};
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct TracingSummary {
     start_datetime: OffsetDateTime,
@@ -11,6 +13,12 @@ pub struct TracingSummary {
     stream_errors: HashMap<u32, Option<String>>,
     /// Container to hold type definitions encountered during tracing
     typedefs: HashMap<u32, Vec<TypeDefinitionPayload>>,
+    /// Mapping from firmware addresses to symbol names
+    fw_addr_map: FirmwareAddressMap,
+    /// Chip name used during tracing
+    chip: String,
+    /// Indicates whether the firmware is a release build
+    release: bool,
 
     /// Indicates whether the summary has been updated since last write
     #[serde(skip)]
@@ -18,14 +26,36 @@ pub struct TracingSummary {
 }
 
 impl TracingSummary {
-    pub fn new(start_datetime: OffsetDateTime) -> Self {
+    pub fn new(
+        start_datetime: OffsetDateTime,
+        fw_addr_map: FirmwareAddressMap,
+        args: &RunArgs,
+    ) -> Self {
         Self {
             start_datetime,
             end_datetime: None,
             stream_errors: HashMap::new(),
             typedefs: HashMap::new(),
             updated: true,
+            fw_addr_map,
+            chip: args.chip.clone(),
+            release: args.release,
         }
+    }
+
+    /// Get the chip name used during tracing
+    pub fn chip(&self) -> &str {
+        &self.chip
+    }
+
+    /// Check if the firmware is a release build
+    pub fn is_release(&self) -> bool {
+        self.release
+    }
+
+    /// Get the symbol name for a given firmware address
+    pub fn get_fw_symbol_name(&self, addr: u64) -> Option<String> {
+        self.fw_addr_map.get_symbol_name(addr)
     }
 
     /// Set the end datetime of the tracing session

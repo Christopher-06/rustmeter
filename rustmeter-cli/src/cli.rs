@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::Parser;
+use clap::{Args, Parser, Subcommand};
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum FlashingTool {
@@ -12,9 +12,8 @@ pub enum FlashingTool {
     Auto,
 }
 
-#[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
-pub struct CommandLineArgs {
+#[derive(Args, Debug)]
+pub struct RunArgs {
     /// Path to the compiled executable file (ELF)
     #[arg(value_name = "EXECUTABLE")]
     pub executable: Option<PathBuf>,
@@ -37,6 +36,22 @@ pub struct CommandLineArgs {
     /// - probe-rs for all other chips (with rtt target)
     #[clap(long, value_enum, default_value_t = FlashingTool::Auto)]
     pub tool: FlashingTool,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    /// Flash, Monitor and Analyze afterwards
+    Run(RunArgs),
+
+    /// Analyze existing trace files directly
+    Analyze,
+}
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+pub struct CommandLineArgs {
+    #[command(subcommand)]
+    pub command: Commands,
 }
 
 impl CommandLineArgs {

@@ -1,8 +1,8 @@
 use std::{path::PathBuf, time::Duration};
 
 use crate::{
+    cargo::elf_file::FirmwareAddressMap,
     cli::FlashingTool,
-    elf_file::FirmwareAddressMap,
     espflash::{flashing::flash_esp, get_espflash_connection, serial_listener},
     probe_rs::{
         connect_to_first_probe, flashing::flash_and_start_controller, rtt_listener::RttListener,

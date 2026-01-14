@@ -5,7 +5,7 @@ use probe_rs::rtt::Rtt;
 use rustmeter_beacon::{buffer::BufferWriter, protocol::Request};
 
 use crate::{
-    flash_and_monitor::ChipMonitoringTool,
+    commands::flash_and_monitor::ChipMonitoringTool,
     probe_rs::atomic_session::AtomicSession,
     tracing::{CoreTracingData, TracingDecodeError},
 };

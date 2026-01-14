@@ -13,6 +13,8 @@ use time::OffsetDateTime;
 
 use crate::{
     CoreInfo,
+    cargo::elf_file::FirmwareAddressMap,
+    cli::RunArgs,
     tracing::{
         CoreTracingData, TracingDecodeError, buffered_writer::BufferedWriter,
         defmt_buffer::DefmtLogBuffer, defmt_decoder::DefmtDecoder, request_agent::RequestAgent,
@@ -40,10 +42,12 @@ impl TracingSink {
         elf_path: &PathBuf,
         tracing_bytes_recver: Receiver<Result<CoreTracingData, TracingDecodeError>>,
         req_sender: Sender<Request>,
+        args: &RunArgs,
     ) -> anyhow::Result<Self> {
         let start = Instant::now();
 
-        let mut summary = TracingSummary::new(OffsetDateTime::now_utc());
+        let fw_addr_map = FirmwareAddressMap::new_from_elf_path(elf_path)?;
+        let mut summary = TracingSummary::new(OffsetDateTime::now_utc(), fw_addr_map, args);
         let current_stream_id = summary.register_new_stream();
 
         Ok(Self {

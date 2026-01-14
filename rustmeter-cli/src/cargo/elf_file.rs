@@ -2,7 +2,7 @@ use anyhow::Context;
 use object::{Object, ObjectSymbol};
 use std::{collections::HashMap, path::Path, sync::Arc};
 
-#[derive(Clone)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct FirmwareAddressMap(Arc<HashMap<u64, String>>);
 
 impl FirmwareAddressMap {
