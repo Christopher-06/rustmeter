@@ -1,6 +1,6 @@
 [target.xtensa-esp32s3-none-elf]
 # runner = "espflash flash --monitor --chip esp32s3 --log-format defmt"
-runner = "../../rustmeter-cli/target/debug/rustmeter --chip esp32s3"
+runner = "../../rustmeter-cli/target/debug/rustmeter run --chip esp32s3"
 
 
 [env]
