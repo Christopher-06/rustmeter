@@ -89,6 +89,15 @@ impl TracingSummary {
             .push(typedef);
     }
 
+    pub fn list_stream_ids(&self) -> impl Iterator<Item = &u32> {
+        self.stream_errors.keys()
+    }
+
+    /// Get an iterator over type definitions for a specific stream ID
+    pub fn iter_typedefs(&self, stream_id: u32) -> Option<impl Iterator<Item = &TypeDefinitionPayload> + Clone> {
+        self.typedefs.get(&stream_id).map(|vec| vec.iter())
+    }
+
     /// Write the summary to a JSON file at the specified path
     pub fn write_summary(&mut self, path: &std::path::Path) -> anyhow::Result<()> {
         if self.updated {

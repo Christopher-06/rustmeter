@@ -1,10 +1,9 @@
-use crate::{
-    cli::{CommandLineArgs, Commands},
-    commands::{analyze, run},
-};
+use crate::cli::{AnalyzeArgs, CommandLineArgs, Commands};
+use anyhow::Context;
 use polars::prelude::*;
 use std::sync::{Arc, OnceLock, atomic::AtomicBool};
 
+mod analyze;
 mod cargo;
 mod cli;
 mod commands;
@@ -13,6 +12,7 @@ mod logs;
 mod perfetto_backend;
 mod probe_rs;
 mod tracing;
+mod utils;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CoreInfo {
@@ -78,14 +78,31 @@ fn main() -> anyhow::Result<()> {
     // Parse command line arguments
     let args = CommandLineArgs::parse();
 
-    if let Commands::Run(args) = args.command {
-        // Do run and after that analyze command
-        let tracing_folder = run::do_run_command(args, exit_flag.clone())?;
-        analyze::do_analyze_command(Some(tracing_folder), exit_flag)?;
-    } else {
-        // Just do analyze command
-        analyze::do_analyze_command(None, exit_flag)?;
-    }
+    let builder = std::thread::Builder::new()
+        .name("worker".into())
+        .stack_size(32 * 1024 * 1024); // 32 MB Stack
+let handler = builder.spawn(|| {
+    match args.command {
+        Commands::Run(args) => {
+            // Do run and after that analyze command
+            let tracing_folder = commands::run::do_run_command(args, exit_flag.clone())?;
+            commands::analyze::do_analyze_command(
+                &AnalyzeArgs {
+                    folder: tracing_folder,
+                },
+                exit_flag,
+            )?;
+        }
+        Commands::Analyze(args) => {
+            // Just do analyze command
+            commands::analyze::do_analyze_command(&args, exit_flag)?;
+        }
+    };
+
+    Ok::<(), anyhow::Error>(())
+}).context("Cant create thread")?;;
+
+    let result = handler.join().expect("Thread panicked")?;
 
     return Ok(());
 }

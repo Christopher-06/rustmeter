@@ -38,13 +38,20 @@ pub struct RunArgs {
     pub tool: FlashingTool,
 }
 
+#[derive(Args, Debug)]
+pub struct AnalyzeArgs {
+    /// Path to the tracing folder
+    #[arg(value_name = "FOLDER", default_value = ".")]
+    pub folder: PathBuf,
+}
+
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Flash, Monitor and Analyze afterwards
     Run(RunArgs),
 
     /// Analyze existing trace files directly
-    Analyze,
+    Analyze(AnalyzeArgs),
 }
 
 #[derive(Parser, Debug)]
