@@ -2,9 +2,10 @@ use arbitrary_int::{traits::Integer, u3};
 
 use crate::{buffer::{BufferReader, BufferWriter}, tracing::ReadTracingError};
 
-/// Type Definition Event Payloads
+/// Type Definition Event Payloads (as tagged enum)
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum TypeDefinitionPayload {
     /// New Embassy Task created.
     /// TaskID is the full task ID used in TaskReady events. (Can be compressed on host side to gather shorter taskid)
