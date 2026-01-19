@@ -15,29 +15,41 @@ static LAST_TIMESTAMP: [portable_atomic::AtomicU32; 2] = [
     portable_atomic::AtomicU32::new(0),
 ];
 
+/// Public static flag to check if local core clock (cpu performance counter) was referenced to
+/// systemtime. Can be reflagged to false via Host
 pub static CORE_CLOCK_REFERENCED: [portable_atomic::AtomicBool; 2] = [
+    portable_atomic::AtomicBool::new(false),
+    portable_atomic::AtomicBool::new(false),
+];
+/// Static flag to check if preinit clock method run. This does only run a single time in the whole
+/// application life cycle and not be resetted!
+static PREINIT_CLOCK_RUN: [portable_atomic::AtomicBool; 2] = [
     portable_atomic::AtomicBool::new(false),
     portable_atomic::AtomicBool::new(false),
 ];
 
 #[inline(always)]
 fn do_core_clock_referencing(core_id: usize) {
+    CORE_CLOCK_REFERENCED[core_id].store(true, portable_atomic::Ordering::Relaxed);
+
     // Send a CoreClockReference event to establish the baseline timestamp for this core. This must be done inside a
     // critical section to avoid interrupts interfering with the timestamp measurement. (Core-local would be sufficient,
     // but critical section is easier to implement cross-platform.)
     // Normally TimeDelta is already inside a critical section when called from tracing event writing, so this should be safe to do
     // without critical section here again. But we do it anyway to be sure.
     critical_section::with(|_| {
-        CORE_CLOCK_REFERENCED[core_id].store(true, portable_atomic::Ordering::Relaxed);
-
+        // Do Clock Preeinit one time
         #[cfg(not(feature = "std"))]
         unsafe {
-            preinit_clock_reference()
+            if PREINIT_CLOCK_RUN[core_id].load(portable_atomic::Ordering::Relaxed) {
+                PREINIT_CLOCK_RUN[core_id].store(true, portable_atomic::Ordering::Relaxed);
+                preinit_clock_reference();
+            }
         };
 
+        // Send Core Clock Reference
         let cpu_ticks = unsafe { get_tracing_raw_ticks() };
         let systimer_us = unsafe { get_system_time_us() };
-
         write_tracing_event(EventPayload::TypeDefinition(
             TypeDefinitionPayload::CoreClockReference {
                 core_id: core_id as u8,
