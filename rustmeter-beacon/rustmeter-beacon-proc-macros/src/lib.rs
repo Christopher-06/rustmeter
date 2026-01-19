@@ -133,16 +133,11 @@ pub fn monitor_fn(attr: TokenStream, item: TokenStream) -> TokenStream {
 
                     // Create guard to signal end of scope
                     let _guard = rustmeter_beacon::monitors::DropGuard::new(|| {
-                        // Create and send MonitorEnd event
-                        let payload = rustmeter_beacon::protocol::EventPayload::MonitorEnd;
-                        rustmeter_beacon::tracing::write_tracing_event(payload);
+                        rustmeter_beacon::protocol::raw_writers::write_monitor_end();
                     });
 
                     // Send MonitorStart event (after guard-created to lower tracing impact on measured scope)
-                    let payload = rustmeter_beacon::protocol::EventPayload::MonitorStart {
-                        monitor_id: local_id as u8
-                    };
-                    rustmeter_beacon::tracing::write_tracing_event(payload);
+                    rustmeter_beacon::protocol::raw_writers::write_monitor_start(local_id as u8);
                 
 
                     // Execute original function body
