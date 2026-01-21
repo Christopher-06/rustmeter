@@ -132,8 +132,8 @@ pub async fn connector(mut out_route: PrinterRoute, cpu_freq: Rate) {
         let n = out_route.read_bytes(&mut buffer[1..128]);
         if n > 0 {
             // Push to ringbuffer or drain old data
-            let to_drain = n - recvd_buffer.free();
-            if to_drain > 0 {
+            if n > recvd_buffer.free() {
+                let to_drain = n - recvd_buffer.free();
                 recvd_buffer.drain(to_drain);
             }
             let _ = recvd_buffer.push_slice(&buffer[1..1 + n]);
