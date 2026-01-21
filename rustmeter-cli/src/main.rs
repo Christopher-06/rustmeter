@@ -81,26 +81,32 @@ fn main() -> anyhow::Result<()> {
     let builder = std::thread::Builder::new()
         .name("worker".into())
         .stack_size(32 * 1024 * 1024); // 32 MB Stack
-let handler = builder.spawn(|| {
-    match args.command {
-        Commands::Run(args) => {
-            // Do run and after that analyze command
-            let tracing_folder = commands::run::do_run_command(args, exit_flag.clone())?;
-            commands::analyze::do_analyze_command(
-                &AnalyzeArgs {
-                    folder: tracing_folder,
-                },
-                exit_flag,
-            )?;
-        }
-        Commands::Analyze(args) => {
-            // Just do analyze command
-            commands::analyze::do_analyze_command(&args, exit_flag)?;
-        }
-    };
+    let handler = builder
+        .spawn(|| {
+            match args.command {
+                Commands::Run(args) => {
+                    // Do run and after that analyze command
+                    let tracing_folder = commands::run::do_run_command(args, exit_flag.clone())?;
 
-    Ok::<(), anyhow::Error>(())
-}).context("Cant create thread")?;;
+                    // Reset exit flag for analyze
+                    exit_flag.store(false, std::sync::atomic::Ordering::SeqCst);
+
+                    commands::analyze::do_analyze_command(
+                        &AnalyzeArgs {
+                            folder: tracing_folder,
+                        },
+                        exit_flag,
+                    )?;
+                }
+                Commands::Analyze(args) => {
+                    // Just do analyze command
+                    commands::analyze::do_analyze_command(&args, exit_flag)?;
+                }
+            };
+
+            Ok::<(), anyhow::Error>(())
+        })
+        .context("Cant create thread")?;
 
     let result = handler.join().expect("Thread panicked")?;
 
