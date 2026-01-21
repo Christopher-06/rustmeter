@@ -106,11 +106,19 @@ impl TracingSink {
             .handle_tracing_item(&item)
             .map_err(TracingDecodeError::Unknown)?;
 
+        // Add clock reference if possible
+        if let Ok(clock_ref) = (&item).try_into() {
+            self.summary
+                .add_clock_reference(self.current_stream_id, clock_ref);
+        }
+
+        // Handle payload specifically
         let payload = item.payload();
         if let EventPayload::TypeDefinition(typedef) = payload {
             // Handle type definition
             self.summary
                 .add_typedef(self.current_stream_id, typedef.clone());
+
             Ok(())
         } else if let EventPayload::DefmtData { data, .. } = payload {
             // Handle defmt data
@@ -187,6 +195,7 @@ impl TracingSink {
             decoder.renew();
         }
 
+        println!("TracingSink: Renewed decoders after error.");
         Ok(())
     }
 
@@ -214,6 +223,7 @@ impl TracingSink {
             match trace_data {
                 Ok(data) => {
                     if let Err(e) = self.handle_new_bytes(data) {
+                        println!("Warning: Tracing decode error: {}", e);
                         self.handle_error(e)?; // error while handling new bytes
                     }
                 }

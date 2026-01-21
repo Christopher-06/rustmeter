@@ -8,7 +8,7 @@ mod defmt_decoder;
 mod request_agent;
 mod timeseries_buffer;
 mod trace_data_decoder;
-mod tracing_item;
+pub mod tracing_item;
 
 pub mod sink;
 pub mod summary;

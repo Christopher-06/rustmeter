@@ -9,7 +9,7 @@ use rustmeter_beacon::protocol::{EventPayload, Request, TypeDefinitionPayload};
 use crate::{CoreInfo, tracing::tracing_item::TracingItem};
 
 /// Period between subsequent requests for successfully retrieved data
-const REQUEST_PERIOD: Duration = Duration::from_secs(10);
+const REQUEST_PERIOD: Duration = Duration::from_secs(3);
 /// Timeout duration before retrying to send a request
 const RETRY_TIMEOUT: Duration = Duration::from_millis(1000);
 /// Dead Time between start / reset and first request send
@@ -51,6 +51,8 @@ impl RequestState {
     }
 }
 
+// TODO: What happens when no Core1 exists and not answering? Stale requests? ==> create a priority system with last recvd time, last req time and retry counts
+
 /// Agent container to manage requests for tracing-related data e.g. core clock references when needed
 pub struct RequestAgent {
     start_time: Instant,
@@ -85,20 +87,25 @@ impl RequestAgent {
         self.start_time = Instant::now();
     }
 
-    /// Request core clock reference if needed
-    fn request_core_clock_ref(&mut self, core: CoreInfo) -> anyhow::Result<()> {
-        let state = self.last_core_clock_ref.get(&core);
-        let do_send = state.is_none_or(RequestState::should_retry);
-
-        if do_send && self.can_send_message() {
-            // send request
-            let req = Request::GetCoreClockReference { core_id: core.id() };
+    /// Send core clock reference request to a specific core
+    fn send_core_clock_ref_request(&mut self, core: CoreInfo) -> anyhow::Result<()> {
+        let req = Request::GetCoreClockReference { core_id: core.id() };
             self.req_sender.send(req)?;
             self.last_sent = Instant::now();
 
             // update state
             self.last_core_clock_ref
                 .insert(core, RequestState::new().with_send_time(Instant::now()));
+        Ok(())
+    }
+
+    /// Request core clock reference if needed
+    fn request_core_clock_ref(&mut self, core: CoreInfo) -> anyhow::Result<()> {
+        let state = self.last_core_clock_ref.get(&core);
+        let do_send = state.is_none_or(RequestState::should_retry);
+
+        if do_send && self.can_send_message() {
+            self.send_core_clock_ref_request(core)?;
         }
 
         Ok(())
@@ -127,6 +134,15 @@ impl RequestAgent {
             TypeDefinitionPayload::CoreClockReference { core_id, .. } => {
                 let core = core_id.try_into()?;
 
+                if core == CoreInfo::Core1 {
+                    // When Core1 clock ref received, also request Core0 state!
+                    let item = self
+                        .last_core_clock_ref
+                        .entry(CoreInfo::Core0)
+                        .or_insert(RequestState::new());
+                    *item = item.with_recvd_time(Instant::now());
+                }
+
                 // Get or insert item
                 let item = self
                     .last_core_clock_ref
@@ -150,8 +166,8 @@ impl RequestAgent {
 
         // Poll agent tasks
         if Instant::now().duration_since(self.start_time) >= DEAD_TIME {
-            self.request_core_clock_ref(CoreInfo::Core0)?;
             self.request_core_clock_ref(CoreInfo::Core1)?;
+            self.request_core_clock_ref(CoreInfo::Core0)?; // core0 will automatically be requested when Core1 Info received
             self.request_clock_definition()?;
         }
 

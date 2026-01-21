@@ -69,18 +69,16 @@ fn get_monitor_ids_lf(summary: &TracingSummary) -> anyhow::Result<LazyFrame> {
 fn get_monitor_ids(summary: &TracingSummary) -> HashMap<u32, String> {
     let mut monitor_ids = HashMap::new();
 
-    for stream_id in summary.list_stream_ids() {
-        if let Some(typedefs) = summary.iter_typedefs(*stream_id) {
-            for typedef in typedefs {
-                match typedef {
-                    TypeDefinitionPayload::ValueMonitor { value_id, name } => {
-                        monitor_ids.insert(*value_id as u32, name.clone());
-                    }
-                    _ => {}
+    summary.get_all_stream_data().for_each(|stream_data| {
+        for typedef in &stream_data.typedefs {
+            match typedef {
+                TypeDefinitionPayload::ValueMonitor { value_id, name } => {
+                    monitor_ids.insert(*value_id as u32, name.clone());
                 }
+                _ => {}
             }
         }
-    }
+    });
 
     monitor_ids
 }

@@ -4,7 +4,7 @@ use rustmeter_beacon::protocol::EventPayload;
 
 use crate::CoreInfo;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TracingItem {
     core: CoreInfo,
     // Absolute time in ticks of the microcontroller

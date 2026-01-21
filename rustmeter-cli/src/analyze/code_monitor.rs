@@ -72,8 +72,8 @@ fn get_code_monitor_names_lf(summary: &TracingSummary) -> anyhow::Result<LazyFra
 fn get_code_monitor_names(summary: &TracingSummary) -> anyhow::Result<HashMap<u32, String>> {
     let mut monitor_names = HashMap::new();
 
-    if let Some(typedefs) = summary.iter_typedefs(0) {
-        for typedef in typedefs {
+    summary.get_all_stream_data().for_each(|stream_data| {
+        for typedef in &stream_data.typedefs {
             match typedef {
                 TypeDefinitionPayload::FunctionMonitor {
                     monitor_id,
@@ -90,7 +90,7 @@ fn get_code_monitor_names(summary: &TracingSummary) -> anyhow::Result<HashMap<u3
                 _ => {}
             }
         }
-    }
-
+    });
+    
     Ok(monitor_names)
 }

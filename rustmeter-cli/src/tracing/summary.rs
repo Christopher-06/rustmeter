@@ -3,23 +3,51 @@ use std::collections::HashMap;
 use rustmeter_beacon::protocol::TypeDefinitionPayload;
 use time::OffsetDateTime;
 
-use crate::{cargo::elf_file::FirmwareAddressMap, cli::RunArgs};
+use crate::{
+    analyze::clocks::{ClockReference, GlobalClockDefinition},
+    cargo::elf_file::FirmwareAddressMap,
+    cli::RunArgs,
+};
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct StreamContainer {
+    /// Stream ID
+    pub stream_id: u32,
+    /// Type definitions encountered during tracing this stream
+    pub typedefs: Vec<TypeDefinitionPayload>,
+    /// Clock references encountered during tracing this stream
+    pub clock_refs: Vec<ClockReference>,
+    /// Error message if any error occurred during tracing this stream
+    pub error: Option<String>,
+}
+
+impl StreamContainer {
+    pub fn new(stream_id: u32) -> Self {
+        Self {
+            stream_id,
+            typedefs: Vec::new(),
+            clock_refs: Vec::new(),
+            error: None,
+        }
+    }
+}
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct TracingSummary {
     start_datetime: OffsetDateTime,
     end_datetime: Option<OffsetDateTime>,
-    /// Mapping from stream ID to error message. None if no error occurred.
-    stream_errors: HashMap<u32, Option<String>>,
-    /// Container to hold type definitions encountered during tracing
-    typedefs: HashMap<u32, Vec<TypeDefinitionPayload>>,
+    /// Mapping from stream ID to StreamContainer
+    stream_data: HashMap<u32, StreamContainer>,
     /// Mapping from firmware addresses to symbol names
     fw_addr_map: FirmwareAddressMap,
     /// Chip name used during tracing
     chip: String,
     /// Indicates whether the firmware is a release build
     release: bool,
-
+    /// ClockReference of first Core1 activation, if any
+    second_core_startup: Option<ClockReference>,
+    /// Global clock definition used during tracing, has to be the same for all streams
+    global_clock_def: Option<GlobalClockDefinition>,
     /// Indicates whether the summary has been updated since last write
     #[serde(skip)]
     updated: bool,
@@ -34,12 +62,13 @@ impl TracingSummary {
         Self {
             start_datetime,
             end_datetime: None,
-            stream_errors: HashMap::new(),
-            typedefs: HashMap::new(),
+            stream_data: HashMap::new(),
             updated: true,
             fw_addr_map,
             chip: args.chip.clone(),
             release: args.release,
+            second_core_startup: None,
+            global_clock_def: None,
         }
     }
 
@@ -68,34 +97,92 @@ impl TracingSummary {
     pub fn register_new_stream(&mut self) -> u32 {
         self.updated = true;
 
-        let new_id = self.stream_errors.len() as u32;
-        self.stream_errors.insert(new_id, None);
-        self.typedefs.insert(new_id, Vec::new());
+        let new_id = self.stream_data.len() as u32;
+        self.stream_data
+            .insert(new_id, StreamContainer::new(new_id));
         new_id
     }
 
     /// Add an error message for a specific stream ID
     pub fn add_stream_error(&mut self, stream_id: u32, error: String) {
         self.updated = true;
-        self.stream_errors.insert(stream_id, Some(error));
+
+        if let Some(container) = self.stream_data.get_mut(&stream_id) {
+            container.error = Some(error);
+        }
     }
 
-    /// Add a type definition payload for a specific stream ID
+    pub fn count_stream_ids(&self) -> usize {
+        self.stream_data.len()
+    }
+
+    /// Add a type definition payload for a specific stream ID. Automatically handles global clock definition
     pub fn add_typedef(&mut self, stream_id: u32, typedef: TypeDefinitionPayload) {
         self.updated = true;
-        self.typedefs
-            .entry(stream_id)
-            .or_insert_with(Vec::new)
-            .push(typedef);
+
+        // Set global clock definition if applicable or check for consistency
+        if let TypeDefinitionPayload::GlobalClockConfiguration { .. } = &typedef {
+            let clock_def = GlobalClockDefinition::try_from(&typedef).unwrap();
+            match &self.global_clock_def {
+                Some(existing) => {
+                    // Check for consistency
+                    if existing.cpu_clock_hz != clock_def.cpu_clock_hz
+                        || existing.tick_divider != clock_def.tick_divider
+                    {
+                        eprintln!(
+                            "Warning: Inconsistent GlobalClockDefinition detected in stream {}! This can damage the accuracy of timestamp calculations.",
+                            stream_id
+                        );
+                    }
+                }
+                None => {
+                    // Set global clock definition first time
+                    self.global_clock_def = Some(clock_def);
+                }
+            }
+        }
+
+        if let Some(container) = self.stream_data.get_mut(&stream_id) {
+            container.typedefs.push(typedef);
+        }
+    }
+
+    /// Add a clock reference for a specific stream ID.
+    /// Sets second_core_startup if the clock reference is for Core1 and not already set.
+    pub fn add_clock_reference(&mut self, stream_id: u32, clock_ref: ClockReference) {
+        self.updated = true;
+
+        // Set second_core_startup if applicable
+        if clock_ref.core_id == 1 && self.second_core_startup.is_none() {
+            self.second_core_startup = Some(clock_ref.clone());
+        }
+
+        // Add clock reference to stream container
+        if let Some(container) = self.stream_data.get_mut(&stream_id) {
+            container.clock_refs.push(clock_ref);
+        }
+    }
+
+    /// Get the ClockReference of the second core activation, if any
+    pub fn get_second_core_startup(&self) -> Option<&ClockReference> {
+        self.second_core_startup.as_ref()
+    }
+
+    /// Get the global clock definition used during tracing, if any
+    pub fn get_global_clock_definition(&self) -> Option<&GlobalClockDefinition> {
+        self.global_clock_def.as_ref()
     }
 
     pub fn list_stream_ids(&self) -> impl Iterator<Item = &u32> {
-        self.stream_errors.keys()
+        self.stream_data.keys()
     }
 
-    /// Get an iterator over type definitions for a specific stream ID
-    pub fn iter_typedefs(&self, stream_id: u32) -> Option<impl Iterator<Item = &TypeDefinitionPayload> + Clone> {
-        self.typedefs.get(&stream_id).map(|vec| vec.iter())
+    pub fn get_stream_data(&self, stream_id: u32) -> Option<&StreamContainer> {
+        self.stream_data.get(&stream_id)
+    }
+
+    pub fn get_all_stream_data<'a>(&'a self) -> impl Iterator<Item = &'a StreamContainer> {
+        self.stream_data.values()
     }
 
     /// Write the summary to a JSON file at the specified path
