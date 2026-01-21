@@ -1,9 +1,7 @@
 use polars::prelude::*;
 
 /// Enrich task IDs in TaskExecEnd events using latest TaskExecBegin event for this executor
-pub fn enrich_task_ids_in_taskexecend_events(
-    lf: LazyFrame,
-) -> LazyFrame {
+pub fn enrich_task_ids_in_taskexecend_events(lf: LazyFrame) -> LazyFrame {
     // Add temp column for running task_id per ExecutorID
     let lf = lf.with_column(
         when(col("event").eq(lit("EmbassyTaskExecBegin")))
@@ -22,5 +20,8 @@ pub fn enrich_task_ids_in_taskexecend_events(
             .alias("task_id"),
     );
 
-    lf
+    // Filter out TaskExecEnd where no task_id was found (when in mid stream)
+    lf.filter(not(col("event")
+        .eq(lit("EmbassyTaskExecEnd"))
+        .and(col("task_id").is_null())))
 }
