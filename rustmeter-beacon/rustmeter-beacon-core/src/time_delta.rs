@@ -41,7 +41,7 @@ fn do_core_clock_referencing(core_id: usize) {
         // Do Clock Preeinit one time
         #[cfg(not(feature = "std"))]
         unsafe {
-            if PREINIT_CLOCK_RUN[core_id].load(portable_atomic::Ordering::Relaxed) {
+            if !PREINIT_CLOCK_RUN[core_id].load(portable_atomic::Ordering::Relaxed) {
                 PREINIT_CLOCK_RUN[core_id].store(true, portable_atomic::Ordering::Relaxed);
                 preinit_clock_reference();
             }
