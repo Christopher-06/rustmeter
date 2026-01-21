@@ -2,7 +2,6 @@ use std::u64;
 
 use anyhow::Context;
 use polars::prelude::*;
-use rustmeter_beacon::protocol::TypeDefinitionPayload;
 
 use crate::{
     analyze::clocks::{ClockReference, GlobalClockDefinition},
@@ -10,109 +9,64 @@ use crate::{
     utils::linreg::LinearRegression,
 };
 
-/// Get the startup time of core 1 in system timer microseconds from type definitions
-pub fn get_core1_startup_time(stream_id: u32, summary: &TracingSummary) -> Option<u64> {
-    summary
-        .iter_typedefs(stream_id)?
-        .filter_map(|typedef| match typedef {
-            TypeDefinitionPayload::CoreClockReference {
-                core_id,
-                systimer_us,
-                ..
-            } if *core_id == 1 => Some(*systimer_us),
-            _ => None,
-        })
-        .next()
-}
-
-/// Prepare CPU ticks by handling wrap around, scaling with tick divider and cpu frequency
-fn prepare_cpu_ticks(cpu_ticks: Vec<f64>, tick_divider: f64, cpu_frequency_hz: f64) -> Vec<f64> {
-    let mut prepared = Vec::with_capacity(cpu_ticks.len());
-
-    for (i, &ticks) in cpu_ticks.iter().enumerate() {
-        let mut current_ticks = ticks * tick_divider;
-        if i > 0 {
-            let prev = prepared[i - 1];
-
-            // Handle wrap around (32 bit)
-            let diff: f64 = current_ticks - prev;
-            if diff < 0.0 {
-                let wraps = (diff.abs().floor() as u64 / 2_u64.pow(32)) + 1;
-                current_ticks += (wraps * 2_u64.pow(32)) as f64;
-            }
-        }
-
-        prepared.push(current_ticks);
-    }
-
-    prepared
-        .iter()
-        .map(|&ticks| {
-            // Scale to microseconds
-            ticks / (cpu_frequency_hz / 1_000_000.0)
-        })
-        .collect()
-}
-
 fn calculate_cpu_to_systime_offset(
     global_clock_def: &GlobalClockDefinition,
-    core_refs: &[ClockReference],
+    core_refs: &[&ClockReference],
 ) -> anyhow::Result<LinearRegression> {
     if core_refs.is_empty() {
         return Err(anyhow::anyhow!("No ClockReference entries found",));
     }
+
+    let tick_divider = global_clock_def.tick_divider as f64;
+    let cpu_frequency_uhz = global_clock_def.cpu_clock_hz as f64 / 1_000_000.0;
+
+    // use uc_timeticks instead of cpu_ticks because of possible inconsistencies in cpu_ticks values when
+    // stream error occured and uc_timeticks get's reset but cpu_ticks not.
 
     if core_refs.len() < 2 {
         // Just use this as fixed offset
         let core_ref = &core_refs[0];
         let slope = 1.0;
         let offset = core_ref.systimer_us as f64
-            - core_ref.cpu_ticks as f64 * global_clock_def.tick_divider as f64
-                / (global_clock_def.cpu_clock_hz as f64 / 1_000_000.0);
+            - core_ref.uc_timeticks as f64 * tick_divider / cpu_frequency_uhz;
 
-        println!(
-            "Only one ClockReference entry found. Using fixed offset: systimer_us = {:.6} * cpu_ticks + {:.2}",
-            slope, offset
-        );
         Ok(LinearRegression { slope, offset })
     } else {
         // Perform linear regression to find CPU ticks to systimer_us relation
-        let cpu_ticks: Vec<f64> = core_refs.iter().map(|cref| cref.cpu_ticks as f64).collect();
-        let core_time = prepare_cpu_ticks(
-            cpu_ticks,
-            global_clock_def.tick_divider as f64,
-            global_clock_def.cpu_clock_hz as f64,
-        );
+        let cpu_time_us: Vec<f64> = core_refs
+            .iter()
+            .map(|cref| cref.uc_timeticks as f64 * tick_divider / cpu_frequency_uhz) // Convert uc_timeticks to us
+            .collect();
+
         let systimer_us: Vec<f64> = core_refs
             .iter()
             .map(|cref| cref.systimer_us as f64)
             .collect();
 
-        let linreg_result = LinearRegression::perform_linear_regression(&core_time, &systimer_us)
+        let linreg_result = LinearRegression::perform_linear_regression(&cpu_time_us, &systimer_us)
             .context("Can't perform timing regression!")?;
-        println!(
-            "Calculated Linear Regression: systimer_us = {:.6} * cpu_ticks + {:.2}",
-            linreg_result.slope, linreg_result.offset
-        );
 
-        // TODO: Estimate error of linear regression with core_refs data points and calculated linreg_result - systimer_us of message.
-        //          Offset of calculated via linreg and used for linreg should be <1us
+        // Estimate error of linear regression with accuracy
+        // for (x, y) in cpu_time_us.iter().zip(systimer_us.iter()) {
+        //     let y_est = linreg_result.slope * x + linreg_result.offset;
+        //     let error = (y_est - y).abs();
 
-        // Check if global_clock_def is available to validate the result
-        // {
-        //     // slope is in systimer_us per cpu_tick
-        //     let measured_cpu_clock_hz = 1_000_000.0 / linreg_result.slope;
-        //     let given_cpu_clock_hz = global_clock_def.cpu_clock_hz as f64;
-
-        //     // Check 5% tolerance
-        //     if (given_cpu_clock_hz - measured_cpu_clock_hz).abs() / given_cpu_clock_hz > 0.05 {
-        //         // TODO: Print warning instead of error?
-        //         return Err(anyhow::anyhow!(
-        //             "Given cpu_clock_hz {} Hz does not match the measured cpu_clock_hz {} Hz",
-        //             given_cpu_clock_hz,
-        //             measured_cpu_clock_hz
-        //         ));
+        //     if error > 10.0 {
+        //         println!(
+        //             "Warning: High timing regression error detected! Estimated: {}, Actual: {}, Error: {}us",
+        //             y_est, y, error
+        //         );
+        //         println!("This can indicate clock drift or invalid GlobalClockDefinition! Time accuracy may be reduced.");
+        //         break;
         //     }
+        // }
+
+        // TODO: Check that slope is around 1.0; else clocks drift away / global clock def is not valid
+        // if linreg_result.slope < 0.9999 || linreg_result.slope > 1.0001 {
+        //     return Err(anyhow::anyhow!(
+        //         "Calculated CPU to Systimer offset slope is too far from 1.0! Slope: {}. This indicates to much clock drift or invalid GlobalClockDefinition to achieve 1us accuracy.",
+        //         linreg_result.slope
+        //     ));
         // }
 
         Ok(linreg_result)
@@ -125,18 +79,25 @@ pub fn correct_timestamps(
     stream_id: u32,
     summary: &TracingSummary,
 ) -> anyhow::Result<LazyFrame> {
-    let typedef_iter = summary.iter_typedefs(stream_id).ok_or(anyhow::anyhow!(
-        "No typedefs found for stream ID {}",
-        stream_id
-    ))?;
+    let core1_startup = summary.get_second_core_startup();
+    let core1_startup_us = core1_startup.map(|cr| cr.systimer_us).unwrap_or(u64::MAX);
 
-    let global_clock_def = GlobalClockDefinition::from_typedef_iter(typedef_iter.clone())?;
+    // Get global clock definition
+    let global_clock_def = summary
+        .get_global_clock_definition()
+        .ok_or(anyhow::anyhow!("No GlobalClockDefinition found"))?;
 
-    // TODO: What happens on a second stream_id with core1 activity? ==> Seperation of Part A and B will also take place there
+    // Get Clock Refs
+    let clock_refs = summary
+        .get_stream_data(stream_id)
+        .ok_or(anyhow::anyhow!(
+            "No stream metadata found for stream ID {}. Timing can not be corrected!",
+            stream_id
+        ))?
+        .clock_refs
+        .clone();
 
-    let core1_startup_us = get_core1_startup_time(stream_id, summary).unwrap_or(u64::MAX);
-
-    // Correct uc_timeticks by tick divider and cpu frequency as raw_cpu_time_us
+    // Correct uc_timeticks by tick divider and cpu frequency as raw_cpu_time_us and
     let lf = lf.with_column(
         (col("uc_timeticks") * lit(global_clock_def.tick_divider as f64)
             / lit(global_clock_def.cpu_clock_hz as f64 / 1_000_000.0))
@@ -144,13 +105,13 @@ pub fn correct_timestamps(
     );
 
     // Firstly correct core0 timestamps till core1 startup [PART A]
+    // This will be hopefully only needed once in dual core systems when core1 starts
     let core0_correction_part_a = {
         // Get core0 ClockReference entries before core1 startup
-        let core0_refs: Vec<ClockReference> =
-            ClockReference::all_from_typedef_iter(typedef_iter.clone(), Some(0))
-                .into_iter()
-                .filter(|cref| cref.systimer_us < core1_startup_us)
-                .collect();
+        let core0_refs: Vec<&ClockReference> = clock_refs
+            .iter()
+            .filter(|cref| cref.core_id == 0 && cref.systimer_us < core1_startup_us)
+            .collect();
 
         if core0_refs.is_empty() {
             None
@@ -165,11 +126,10 @@ pub fn correct_timestamps(
     // Then correct core0 timestamps after core1 startup [PART B]
     let core0_correction_part_b = {
         // Get core0 ClockReference entries after core1 startup
-        let core0_refs: Vec<ClockReference> =
-            ClockReference::all_from_typedef_iter(typedef_iter.clone(), Some(0))
-                .into_iter()
-                .filter(|cref| cref.systimer_us >= core1_startup_us)
-                .collect();
+        let core0_refs: Vec<&ClockReference> = clock_refs
+            .iter()
+            .filter(|cref| cref.core_id == 0 && cref.systimer_us >= core1_startup_us)
+            .collect();
 
         if core0_refs.is_empty() {
             None
@@ -183,8 +143,8 @@ pub fn correct_timestamps(
 
     // Finally correct core1 timestamps
     let core1_correction = {
-        let core1_refs: Vec<ClockReference> =
-            ClockReference::all_from_typedef_iter(typedef_iter, Some(1));
+        let core1_refs: Vec<&ClockReference> =
+            clock_refs.iter().filter(|cref| cref.core_id == 1).collect();
 
         // Reuse core0 part B correction if no core1 refs found (this means no core1 activity)
         if core1_refs.is_empty() {
@@ -233,6 +193,22 @@ pub fn correct_timestamps(
         .otherwise(core1_correction))
     .alias("systemtime_us")
     .round(2, RoundMode::HalfAwayFromZero)]);
+
+    // Set max_systime_us column for each core as max of systemtime_us in frame
+    let lf = lf.with_column(
+        when(col("core").cast(DataType::String).eq(lit("Core0")))
+            .then(
+                col("systemtime_us")
+                    .filter(col("core").eq(lit("Core0")))
+                    .max(),
+            )
+            .otherwise(
+                col("systemtime_us")
+                    .filter(col("core").eq(lit("Core1")))
+                    .max(),
+            )
+            .alias("max_systime_us"),
+    );
 
     // Sort by corrected timestamps
     let lf = lf.sort(["systemtime_us"], Default::default());

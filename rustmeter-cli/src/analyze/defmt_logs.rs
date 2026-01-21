@@ -15,7 +15,8 @@ pub fn prepare_defmt_logs(
         PlPath::from_string(lf_path.to_string_lossy().to_string()),
         ScanArgsParquet::default(),
     )?
-    .with_columns([col("core").cast(DataType::String).alias("core")]);
+    .with_columns([col("core").cast(DataType::String).alias("core")])
+    .filter(col("stream_id").eq(lit(stream_id)));
 
     // Correct timestamps to systimer_us
     let lf = correct_timestamps(lf, stream_id, summary)?;

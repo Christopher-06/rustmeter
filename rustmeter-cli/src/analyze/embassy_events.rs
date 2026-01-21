@@ -114,7 +114,6 @@ pub fn prepare_embassy_events(lf: LazyFrame) -> anyhow::Result<LazyFrame> {
     ]);
 
     // Set on last event with task/executor_event next_event_time to max_systime_us to show even end
-    let max_systime_us = col("systemtime_us").max();
     let lf = lf.with_columns([
         // for executor
         when(
@@ -122,7 +121,7 @@ pub fn prepare_embassy_events(lf: LazyFrame) -> anyhow::Result<LazyFrame> {
                 .eq(lit(true))
                 .and(col("next_executor_systemtime_us").is_null()),
         )
-        .then(max_systime_us.clone())
+        .then(col("max_systime_us"))
         .otherwise(col("next_executor_systemtime_us"))
         .alias("next_executor_systemtime_us"),
         // for task
@@ -131,7 +130,7 @@ pub fn prepare_embassy_events(lf: LazyFrame) -> anyhow::Result<LazyFrame> {
                 .eq(lit(true))
                 .and(col("next_task_systemtime_us").is_null()),
         )
-        .then(max_systime_us.clone())
+        .then(col("max_systime_us"))
         .otherwise(col("next_task_systemtime_us"))
         .alias("next_task_systemtime_us"),
         // for core
@@ -140,7 +139,7 @@ pub fn prepare_embassy_events(lf: LazyFrame) -> anyhow::Result<LazyFrame> {
                 .eq(lit(true))
                 .and(col("next_core_systemtime_us").is_null()),
         )
-        .then(max_systime_us.clone())
+        .then(col("max_systime_us"))
         .otherwise(col("next_core_systemtime_us"))
         .alias("next_core_systemtime_us"),
     ]);
@@ -284,11 +283,11 @@ pub fn prepare_embassy_events(lf: LazyFrame) -> anyhow::Result<LazyFrame> {
             .alias("pid"),
         when(col("is_core_event").eq(lit(true)))
             .then(
-                when(col("name").eq(lit("Executor 0")))
+                when(col("core").eq(lit("Core0")))
                     .then(lit(1))
-                    .when(col("name").eq(lit("Executor 1")))
+                    .when(col("core").eq(lit("Core1")))
                     .then(lit(2))
-                    .otherwise(lit(0)),
+                    .otherwise(lit(3)), // Fallback for unknown core, should not happen
             )
             .otherwise(col("tid"))
             .alias("tid"),
