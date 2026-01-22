@@ -15,7 +15,7 @@ const RETRY_TIMEOUT: Duration = Duration::from_millis(1000);
 /// Dead Time between start / reset and first request send
 const DEAD_TIME: Duration = Duration::from_millis(200);
 /// Pause duration between sending subsequent messages
-const MESSAGE_PAUSE: Duration = Duration::from_millis(50);
+const MESSAGE_PAUSE: Duration = Duration::from_millis(100);
 
 #[derive(Debug, Clone, Copy, Default)]
 struct RequestState {
@@ -90,12 +90,12 @@ impl RequestAgent {
     /// Send core clock reference request to a specific core
     fn send_core_clock_ref_request(&mut self, core: CoreInfo) -> anyhow::Result<()> {
         let req = Request::GetCoreClockReference { core_id: core.id() };
-            self.req_sender.send(req)?;
-            self.last_sent = Instant::now();
+        self.req_sender.send(req)?;
+        self.last_sent = Instant::now();
 
-            // update state
-            self.last_core_clock_ref
-                .insert(core, RequestState::new().with_send_time(Instant::now()));
+        // update state
+        self.last_core_clock_ref
+            .insert(core, RequestState::new().with_send_time(Instant::now()));
         Ok(())
     }
 
@@ -136,11 +136,13 @@ impl RequestAgent {
 
                 if core == CoreInfo::Core1 {
                     // When Core1 clock ref received, also request Core0 state!
+                    self.request_core_clock_ref(CoreInfo::Core0)?;
                     let item = self
                         .last_core_clock_ref
                         .entry(CoreInfo::Core0)
                         .or_insert(RequestState::new());
-                    *item = item.with_recvd_time(Instant::now());
+
+                    *item = item.with_send_time(Instant::now());
                 }
 
                 // Get or insert item
