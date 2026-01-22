@@ -9,6 +9,7 @@ repository = "https://github.com/Christopher-06/rustmeter"
 keywords = ["embedded", "tracing", "profiling", "no-std", "embassy"]
 categories = ["embedded", "development-tools::profiling", "no-std"]
 exclude = ["/debug", "/target", ".gitignore"]
+readme = "../README.md"
 
 [dependencies]
 rustmeter-beacon-proc-macros = { path = "rustmeter-beacon-proc-macros", version = "0.1.0" }

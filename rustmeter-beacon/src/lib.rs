@@ -1,4 +1,5 @@
 #![no_std]
+#![doc = include_str!("../README.md")]
 
 pub use rustmeter_beacon_core::*;
 
