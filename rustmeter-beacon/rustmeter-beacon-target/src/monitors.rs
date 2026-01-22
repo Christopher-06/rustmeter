@@ -48,6 +48,18 @@ pub fn defmt_trace_new_monitored_value(name: &str, local_id: usize) {
 }
 
 #[macro_export]
+/// Macro to monitor a numeric value with Rustmeter Beacon.
+/// 
+/// ## Parameters
+/// - $name: A string literal representing the name of the value to be monitored (max 20 characters).
+/// - $val: The numeric value to be monitored. Must be convertible to rustmeter_beacon::protocol::MonitorValue (any primitive).
+/// 
+/// 
+/// # Examples
+/// ```rust,no_run
+/// let temperature: f32 = read_temperature_sensor();
+/// monitor_value!("temperature", temperature);
+/// ```
 macro_rules! monitor_value {
     ($name:literal, $val:expr) => {
         // TODO: Check that val is numeric
@@ -113,6 +125,23 @@ pub fn defmt_trace_new_scope(name: &str, local_id: usize) {
 }
 
 #[macro_export]
+/// Macro to monitor a code scope with Rustmeter Beacon.
+/// ## Parameters
+/// - $name: A string literal representing the name of the scope to be monitored (max 20 characters).
+/// - $body: A block of code representing the scope to be monitored. Must be synchronous.
+/// 
+/// # Examples
+/// ```rust,no_run
+/// fn matrix_multiply(a: &Matrix, b: &Matrix) -> Matrix {
+///     // prepare or anything
+/// 
+///     let result = monitor_scoped!("matrix_mul", {
+///         a * b
+///     });
+/// 
+///     // finalize or anything
+///     result
+/// }
 macro_rules! monitor_scoped {
     ($name:literal, $body:block) => {{
         // Limit name length to 20 characters (BufferWriter is only 32 bytes and we need space for TimeDelta and other fields)

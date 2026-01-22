@@ -24,6 +24,27 @@ pub enum InitializationError {
 
 /// Initialize Rustmeter Beacon tracing and logging system
 /// This spawns the printing task that handles all output
+/// It can run on any executor (Thread or Interrupt) and on any core.
+///
+///
+/// Example:
+/// ```no_run
+/// use rustmeter_beacon_target::*;
+/// 
+/// fn main() -> ! {
+///     // Setup e.q.
+///     let config = esp_hal::Config::default()
+///                         .with_cpu_clock(CpuClock::max()); // any clock config
+///     // ...
+/// 
+///    // Initialize Rustmeter Beacon
+///    init_rustmeter_beacon(
+///        RustmeterConfig::new(config.cpu_clock().frequency()),
+///        &spawner,
+///    );
+/// 
+///    // ... rest of your main function
+/// }
 pub fn init_rustmeter_beacon<P: ConfigPrinterBuild>(
     config: RustmeterConfig<P>,
     spawner: &embassy_executor::Spawner,
