@@ -199,16 +199,19 @@ fn process_traces_stream_id(
     let prepared_lf = prepare_code_monitors(prepared_lf, &summary)
         .context("Error while preparing code monitors")?;
 
-    // Create single parquet file for evented_lf for debugging
-    let mut file =
-        std::fs::File::create(format!("evented_lf_s{}.parquet", stream_id)).context(format!(
-            "Could not create file for evented_lf_s{}.parquet",
-            stream_id
-        ))?;
-    ParquetWriter::new(&mut file)
-        .with_compression(ParquetCompression::Snappy)
-        .finish(&mut prepared_lf.clone().collect()?)
-        .context("Failed to write evented_lf parquet file")?;
+    #[cfg(debug_assertions)]
+    {
+        // Create single parquet file for evented_lf for debugging
+        let mut file = std::fs::File::create(format!("evented_lf_s{}.parquet", stream_id))
+            .context(format!(
+                "Could not create file for evented_lf_s{}.parquet",
+                stream_id
+            ))?;
+        ParquetWriter::new(&mut file)
+            .with_compression(ParquetCompression::Snappy)
+            .finish(&mut prepared_lf.clone().collect()?)
+            .context("Failed to write evented_lf parquet file")?;
+    }
 
     // Reshape to perfetto format
     let perfetto_lf = prepared_lf
