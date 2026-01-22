@@ -148,9 +148,11 @@ async fn busy_loop_task_low_prio() {
         Timer::after(Duration::from_millis(80)).await;
 
         // approx. for 16MHz sysclk (wait ~20ms)
-        let cycles = 16_000 * 20;
-        for _ in 0..cycles {
-            cortex_m::asm::nop();
-        }
+        monitor_scoped!("busy_loop_low_prio", {
+            let cycles = 16_000 * 20;
+            for _ in 0..cycles {
+                cortex_m::asm::nop();
+            }
+        });
     }
 }

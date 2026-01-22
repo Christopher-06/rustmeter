@@ -93,11 +93,11 @@ pub fn prepare_embassy_events(lf: LazyFrame) -> anyhow::Result<LazyFrame> {
     let lf = lf.with_columns([
         col("event")
             .shift(lit(-1))
-            .over([col("core"), col("is_core_event")])
+            .over([col("core"), col("is_core_event"), col("executor_id")])
             .alias("next_core_event"),
         col("systemtime_us")
             .shift(lit(-1))
-            .over([col("core"), col("is_core_event")])
+            .over([col("core"), col("is_core_event"), col("executor_id")])
             .alias("next_core_systemtime_us"),
     ]);
 
