@@ -49,20 +49,6 @@ impl Parse for MonitorArgs {
 
 /// Instruments a function to log execution for rustmeter
 ///
-/// This attribute macro wraps the decorated function to log specific `@EVENT_MONITOR`
-/// messages before execution starts and after it finishes. It captures the function name
-/// (or a custom name) and the current core ID.
-///
-/// It supports both synchronous and `async` functions.
-///
-/// # Arguments
-///
-/// The macro accepts an optional name argument to override the default function name in the logs.
-///
-/// * `#[monitor_fn]` - Uses the name of the function.
-/// * `#[monitor_fn("custom_name")]` - Uses the provided string literal.
-/// * `#[monitor_fn(name = "custom_name")]` - Explicit key-value syntax.
-///
 /// # Examples
 ///
 /// Basic usage using the function's name:
@@ -92,15 +78,9 @@ pub fn monitor_fn(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     if input.sig.asyncness.is_some() {
-        // ASYNC FUNCTION
+        // ASYNC FUNCTION not supported yet
         quote! {
-        let core_id = rustmeter_beacon::core_id::get_current_core_id();
-        async move {
-                // defmt::info!("@EVENT_MONITOR_START(function_name={=istr},core_id={})", defmt::intern!(#output_name), core_id);
-                let result = { #block };
-                // defmt::info!("@EVENT_MONITOR_END(function_name={=istr},core_id={})", defmt::intern!(#output_name), core_id);
-                result
-            }
+            compile_error!("`monitor_fn` macro does not support async functions yet.");
         }
         .into()
     } else {
