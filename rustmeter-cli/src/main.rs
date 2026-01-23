@@ -10,8 +10,6 @@ mod cargo;
 mod cli;
 mod commands;
 mod espflash;
-mod logs;
-mod perfetto_backend;
 mod probe_rs;
 mod tracing;
 mod utils;
