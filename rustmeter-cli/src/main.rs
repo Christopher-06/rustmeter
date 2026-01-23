@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 use crate::cli::{AnalyzeArgs, CommandLineArgs, Commands};
 use anyhow::Context;
 use polars::prelude::*;

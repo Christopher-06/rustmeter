@@ -1,30 +1,32 @@
 # RustMeter
 
-**RustMeter** is a comprehensive profiling, tracing, and monitoring system designed specifically for **Embedded Rust** applications. It is highly integrated with the [Embassy](https://github.com/embassy-rs/embassy) async framework and leverages [defmt](https://github.com/knurling-rs/defmt) for efficient data transmission.
+**RustMeter** is a comprehensive profiling, tracing, and monitoring system designed specifically for **Embedded Rust** applications. It is highly integrated with the [Embassy](https://github.com/embassy-rs/embassy) async framework and [defmt](https://github.com/knurling-rs/defmt) logging system. The collected data is converted into a format that can be directly visualized in the **[Perfetto UI](https://ui.perfetto.dev/)**, providing detailed insights into runtime behavior, task scheduling, and firmware performance.
 
-The collected data is converted into a format that can be directly visualized in the **[Perfetto UI](https://ui.perfetto.dev/)**, providing detailed insights into runtime behavior, task scheduling, and firmware performance.
+![Perfetto UI Screenshot](https://raw.githubusercontent.com/Christopher-06/rustmeter/refs/heads/main/ressources/perfetto-ui-esp32-multicore.png)
 
-![Perfetto UI Screenshot](ressources/perfetto-ui-esp32-multicore.png)
+## Features
 
-## ✨ Features
-
-- **Embassy Task Tracing:** Automatically visualizes the lifecycle of async tasks (Spawned, Waiting, Running, Preempted, Idle).
-- **Function Monitoring:** Simple macro `#[monitor_fn]` to measure execution times of synchronous and asynchronous functions.
-- **Scoped Tracing:** Granular measurement of specific code blocks within functions using `monitor_scoped!`.
-- **Custom Metrics:** Record values over time (e.g., sensor data, memory usage) using `event_metric!`.
+- **Embassy Task Tracing:** Automatically visualizes the lifecycle of async tasks (Spawned, Waiting, Running, Idle).
+- **Function Monitoring:** Simple macro `#[monitor_fn]` to measure execution times of functions and granular measurement of specific code blocks using `monitor_scoped!`.
+- **Custom Metrics:** Record values over time (e.g., sensor data, memory usage) using `monitor_value!`.
 - **Multicore Support:** Detects and visualizes events separated by processor cores (e.g., ESP32 App/Pro CPU).
-- **Host CLI:** A wrapper around `cargo run` that filters and parses logs to generate a trace file while still displaying normal logs.
+- **Defmt Timestamp:** Visualizes defmt log messages in the timeline for better correlation with events (even without defmt timestamp feature!).
 
-## 📦 Project Structure
+## Project Structure
 
 The repository consists of two main components:
 
-1.  **`rustmeter-beacon`**: The library (crate) included in your embedded firmware. It provides macros and hooks for `embassy-executor`.
+1.  **`rustmeter-beacon`**: The library included in your embedded firmware. It provides macros and hooks for `embassy-executor` and `defmt`.
+
 2.  **`rustmeter-cli`**: The command-line tool for the developer PC. It runs the project, collects tracing data, and creates the JSON file for Perfetto.
 
 ## 🚀 Installation & Setup
 
-### 1. Install CLI
+### 1. Prepare Embedded Project
+
+Add rustmeter-beacon to your embedded project's `Cargo.toml` and initialize it in your code. Follow the instructions in the [rustmeter-beacon README](https://github.com/Christopher-06/rustmeter/blob/main/rustmeter-beacon/README.md) for detailed setup and usage.
+
+### 2. Install CLI
 
 Install the host tool locally:
 
@@ -32,122 +34,57 @@ Install the host tool locally:
 cargo install rustmeter
 ```
 
-### 2. Prepare Embedded Project
-
-Add rustmeter-beacon to your firmware's dependencies and enable the `trace` feature of `embassy-executor` (Cargo.toml):
-
-```toml
-[dependencies]
-rustmeter-beacon = { version = "X" }
-defmt = "X"
-
-# IMPORTANT: Enable the `trace` feature of embassy-executor!
-embassy-executor = { version = "X", features = ["trace", ... ] }
-```
-
-**Attention**: Ensure that `defmt` with `rtt` is already set up in your project, as `rustmeter-beacon` relies on it for logging. All defmt logs need a timestamp. So make sure you defmt ist configured properly with a timer source (See [defmt documentation](https://defmt.ferrous-systems.com/timestamps) for more details).
-
-### 3. Add Instrumentation
-
-Import the crate in your main.rs to activate the trace hooks:
-
-```rust
-use rustmeter_beacon::*;
-```
-
-## 🛠️ Usage
-
-### Monitor Functions
-
-Use the #[monitor_fn] attribute to automatically track a function:
-
-```rust
-#[monitor_fn] // Name is automatically inferred
-async fn process_sensor_data() {
-    // ... complex calculation
-}
-
-#[monitor_fn("CustomName")] // Custom name for the trace
-fn irq_handler() {
-    // ...
-}
-```
-
-### Monitor Code Blocks
-
-For finer measurements within functions, use monitor_scoped!:
-
-```rust
-fn calculate() {
-    let result = monitor_scoped!("MatrixMult", {
-        // Time-intensive calculation here
-        matrix_a * matrix_b
-    });
-}
-```
-
-### Record Metrics
-
-Record value trends, which are displayed as a counter graph in Perfetto:
-
-```rust
-let temperature = sensor.read();
-event_metric!("temperature_celsius", temperature);
-```
-
-### Start Tracing
-
-Navigate to your embedded project directory and start it with rustmeter instead of cargo run:
+and run your embedded project with:
 
 ```bash
-# Debug Build
-rustmeter
-
-# Release Build
-rustmeter --release
+rustmeter run --release --chip <YOUR_CHIP>
 ```
 
-You should see your normal defmt logs in the terminal. Press Ctrl+C to stop recording. A trace file should appear in the current directory.
+or adjust your cargo runner in `.cargo/config.toml`:
 
-**Attention**: If you encounter flooding logs in your terminal starting with "@EVENT...", ensure that your defmt logger is correctly configured with timestamps, as rustmeter relies on them for proper parsing.
+```toml
+[target.XXX-XXX-XXX]
+runner = "rustmeter run --chip <YOUR_CHIP>" # Adjust target accordingly
+```
 
-## Analysis
+and use `cargo run` as usual:
 
-1. After stopping, you will find a file named `rustmeter-perfetto-debug.json` (or `-release.json`) in your directory.
+```bash
+cargo run --release
+```
 
-2. Open [ui.perfetto.dev](https://ui.perfetto.dev/) in your browser
 
-3. Click on "Open trace file" and select the generated JSON file
+## Benchmarking
 
-You will now see a timeline containing:
+Any tracing system introduces some overhead. RustMeter is designed to be lightweight, but it's essential to understand its impact on your application. Any measurement or event emitted incurs a small time cost. The future goal is to even lower the following overheads; especially on Cortex-M based MCUs to <1us. RustMeter uses a lock-free ringbuffer per core to fastly enqueue events, which are then sent out via RTT or UART/Serial JTAG in the background. This approach minimizes the blocking time in your application code and allows high-frequency logging; e.q. multiple tasks have to run each millisecond. 
 
-- All CPU cores
+**Espressif** MCUs have been optimized to cost around 0.4 - 1.2us per event, depending on the clock speed and bus usage (e.q. tested on ESP32 and ESP32-C3). 
 
-- The Embassy Executors and their status (Idle/Polling)
+**Cortex-M** based MCUs like STM32 and RP2040 currently have a higher overhead of around 2 - 10us per event due to lower frequencies, the lack of optimized atomic operations and cache mechanisms. Further optimizations are planned for future releases (e.q. tested on STM32F446 and RP2040).
 
-- Individual tasks and their states (Running, Waiting, Preempted)
+All measured times then include not only the actual event time, but also this overhead, which determines the accuracy of rustmeter. So any instrumentation should be used judiciously in performance-critical sections. However, for many applications, the overhead is negligible compared to the insights gained from detailed profiling. Any measurement value  
 
-- Your custom function calls and metrics
 
 ## Troubleshooting
 
-- **Log Flooding**: If you see excessive logs starting with "@EVENT...", double-check your defmt configuration to ensure timestamps are enabled.
+- **Deadlock Debugging**: If you encounter a deadlock in your code and the printing task was started on the same
+core, the trace may not show the last events because the printing task is blocked as well. To avoid this, create a dedicated interrupt executor with a higher priority and initialize rustmeter-beacon with this executor.
 - **Missing Embassy Events**: If certain events are not appearing in the trace, ensure that the `trace` feature is enabled for `embassy-executor` in your Cargo.toml.
 - **Performance Issues**: While RustMeter is designed to be lightweight, excessive instrumentation may impact performance. Use monitoring macros judiciously in performance-critical sections.
-- **No Data in Perfetto**: If the generated JSON file does not contain expected data, verify that your embedded application is running and generating events during the tracing session. rustmeter-beacon uses defmt::info!. Ensure your log level is set appropriately to capture these events.
+- **No Data in Perfetto**: If the generated JSON file does not contain expected data, verify that your embedded application is running and generating events during the tracing session. Try some basic instrumentation first to confirm functionality like `#[monitor_fn]` on a simple function and logging via `defmt`.
 
 ## 🤝 License
 
 This project is licensed under the MIT License. See LICENCE for details.
 
-## TODOs
+## Roadmap
 
-- [ ] Add more examples and documentation
-- [ ] Support more embedded platforms and architectures (currently tested on ESP32. Planned: RP2040, STM32)
-- [ ] Include RTOS Tracing suport (e.g. ESP-RTOS)
-- [ ] Implement advanced filtering and analysis features in rustmeter (CPU usage, memory consumption, etc.)
+- [ ] Add more examples, tests and documentation
+- [ ] Support NRF chips
+- [ ] Include RTOS Tracing suport (ESP-RTOS)
+- [ ] Implement advanced analysis (CPU usage, max waiting time, task jitter, etc.)
 - [ ] Optimize performance and reduce overhead further
-- [ ] Add CI/CD for automated testing of core functionality
-- [ ] Create an own book documentation site for better user guidance
+- [ ] Introduce an optional ruling file to enforce specific monitoring rules (e.q. value constraints, critical waiting time, critical CPU usage)
+- [ ] Leverage the bidirectional communication to user requests like dynamic enabling/disabling of monitoring points or setting value thresholds and flags
 
-Note: This tool is still under development. APIs are subject to change.
+Note: This tool is still under heavy development. APIs are subject to change.

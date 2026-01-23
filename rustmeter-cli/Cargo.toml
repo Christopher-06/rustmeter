@@ -9,6 +9,7 @@ repository = "https://github.com/Christopher-06/rustmeter"
 keywords = ["embedded", "profiling", "tracing", "cli", "perfetto"]
 categories = ["embedded", "development-tools::profiling", "command-line-utilities"]
 exclude = ["/debug", "/target", ".gitignore"]
+readme = "../README.md"
 
 [dependencies]
 clap = { version = "4.5.53", features = ["derive"] }
