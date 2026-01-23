@@ -2,7 +2,7 @@
 
 [target.thumbv7em-none-eabi]
 # runner = 'probe-rs run --chip STM32F446RCTx'
-runner = "../../rustmeter-cli/target/debug/rustmeter run --chip STM32F446RCTx"
+runner = "rustmeter run --chip STM32F446RCTx"
 
 [build]
 target = "thumbv7em-none-eabi"

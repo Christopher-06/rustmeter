@@ -1,6 +1,6 @@
 [target.'cfg(all(target_arch = "arm", target_os = "none"))']
 # runner = "probe-rs run --chip RP2040"
-runner = "../../rustmeter-cli/target/debug/rustmeter run --chip rp2040"
+runner = "rustmeter run --chip rp2040"
 
 [build]
 target = "thumbv6m-none-eabi"
