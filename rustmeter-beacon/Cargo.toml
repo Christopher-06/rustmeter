@@ -1,6 +1,6 @@
 [package]
 name = "rustmeter-beacon"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 authors = ["Christopher Kock"]
@@ -12,9 +12,9 @@ exclude = ["/debug", "/target", ".gitignore"]
 readme = "../README.md"
 
 [dependencies]
-rustmeter-beacon-proc-macros = { path = "rustmeter-beacon-proc-macros", version = "0.1.0" }
-rustmeter-beacon-core = { path = "rustmeter-beacon-core", version = "0.1.0" }
-rustmeter-beacon-target = { path = "rustmeter-beacon-target", version = "0.1.0", optional = true }
+rustmeter-beacon-proc-macros = { path = "rustmeter-beacon-proc-macros", version = "0.2.0" }
+rustmeter-beacon-core = { path = "rustmeter-beacon-core", version = "0.2.0" }
+rustmeter-beacon-target = { path = "rustmeter-beacon-target", version = "0.2.0", optional = true }
 
 defmt = { version = "1", optional = true }
 portable-atomic = "1"

@@ -3544,7 +3544,7 @@ dependencies = [
 
 [[package]]
 name = "rustmeter"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "arbitrary-int",
@@ -3570,7 +3570,7 @@ dependencies = [
 
 [[package]]
 name = "rustmeter-beacon"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "portable-atomic",
  "rustmeter-beacon-core",
@@ -3579,7 +3579,7 @@ dependencies = [
 
 [[package]]
 name = "rustmeter-beacon-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arbitrary-int",
  "critical-section",
@@ -3589,7 +3589,7 @@ dependencies = [
 
 [[package]]
 name = "rustmeter-beacon-proc-macros"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",

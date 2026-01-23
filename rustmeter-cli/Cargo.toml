@@ -1,6 +1,6 @@
 [package]
 name = "rustmeter"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 authors = ["Christopher Kock"]
@@ -24,7 +24,7 @@ ctrlc = "3.5.1"
 colored = "3.0.0"
 probe-rs = "0.30.0"
 
-rustmeter-beacon = { path = "../rustmeter-beacon", features = ["std"]}
+rustmeter-beacon = { path = "../rustmeter-beacon", version = "0.2.0", features = ["std"]}
 indicatif = "0.18.3"
 defmt-decoder = "1.0.0"
 defmt-parser = "1.0.0"
