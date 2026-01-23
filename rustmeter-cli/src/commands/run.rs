@@ -12,10 +12,19 @@ use crate::{
 
 /// Execute the 'run' command: build (if needed), flash, and monitor tracing data. Returns the
 /// tracing folder path
-pub fn do_run_command(args: RunArgs, exit_flag: Arc<AtomicBool>) -> anyhow::Result<PathBuf> {
+pub fn do_run_command(mut args: RunArgs, exit_flag: Arc<AtomicBool>) -> anyhow::Result<PathBuf> {
     // Get elf path
     let elf_path = match &args.executable {
-        Some(path) => path.clone(), // use provided elf path
+        Some(path) => {
+            // use provided elf path
+
+            // check for release build (this info is not given when used in cargo runner)
+            if path.to_string_lossy().contains("/release/") {
+                args.release = true;
+            }
+
+            path.clone()
+        }
         None => {
             // build project and get elf path
             let mut cargo_child_process =
