@@ -103,7 +103,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                 self.core_origin.push(item.core().as_str());
                 self.event_type
                     .push(TimeSeriesEvent::EmbassyTaskReady.as_str());
-                self.uc_timeticks.push(item.uc_timeticks() as u64);
+                self.uc_timeticks.push(item.uc_timeticks());
                 self.pc_timestamps_us
                     .push(item.pc_timestamp().as_micros() as u64);
                 self.task_ids.push(Some(*task_id as u32));
@@ -116,7 +116,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                 self.core_origin.push(item.core().as_str());
                 self.event_type
                     .push(TimeSeriesEvent::EmbassyExecutorIdle.as_str());
-                self.uc_timeticks.push(item.uc_timeticks() as u64);
+                self.uc_timeticks.push(item.uc_timeticks());
                 self.pc_timestamps_us
                     .push(item.pc_timestamp().as_micros() as u64);
                 self.task_ids.push(None);
@@ -129,7 +129,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                 self.core_origin.push(item.core().as_str());
                 self.event_type
                     .push(TimeSeriesEvent::EmbassyExecutorPollBegin.as_str());
-                self.uc_timeticks.push(item.uc_timeticks() as u64);
+                self.uc_timeticks.push(item.uc_timeticks());
                 self.pc_timestamps_us
                     .push(item.pc_timestamp().as_micros() as u64);
                 self.task_ids.push(None);
@@ -145,7 +145,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                 self.core_origin.push(item.core().as_str());
                 self.event_type
                     .push(TimeSeriesEvent::EmbassyTaskExecBegin.as_str());
-                self.uc_timeticks.push(item.uc_timeticks() as u64);
+                self.uc_timeticks.push(item.uc_timeticks());
                 self.pc_timestamps_us
                     .push(item.pc_timestamp().as_micros() as u64);
                 self.task_ids.push(Some(*task_id as u32));
@@ -158,7 +158,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                 self.core_origin.push(item.core().as_str());
                 self.event_type
                     .push(TimeSeriesEvent::EmbassyTaskExecEnd.as_str());
-                self.uc_timeticks.push(item.uc_timeticks() as u64);
+                self.uc_timeticks.push(item.uc_timeticks());
                 self.pc_timestamps_us
                     .push(item.pc_timestamp().as_micros() as u64);
                 self.task_ids.push(None);
@@ -171,7 +171,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                 self.core_origin.push(item.core().as_str());
                 self.event_type
                     .push(TimeSeriesEvent::CodeMonitorStart.as_str());
-                self.uc_timeticks.push(item.uc_timeticks() as u64);
+                self.uc_timeticks.push(item.uc_timeticks());
                 self.pc_timestamps_us
                     .push(item.pc_timestamp().as_micros() as u64);
                 self.task_ids.push(None);
@@ -184,7 +184,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                 self.core_origin.push(item.core().as_str());
                 self.event_type
                     .push(TimeSeriesEvent::CodeMonitorEnd.as_str());
-                self.uc_timeticks.push(item.uc_timeticks() as u64);
+                self.uc_timeticks.push(item.uc_timeticks());
                 self.pc_timestamps_us
                     .push(item.pc_timestamp().as_micros() as u64);
                 self.task_ids.push(None);
@@ -196,7 +196,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
             EventPayload::MonitorValue { value_id, value } => {
                 self.core_origin.push(item.core().as_str());
                 self.event_type.push(TimeSeriesEvent::ValueMonitor.as_str());
-                self.uc_timeticks.push(item.uc_timeticks() as u64);
+                self.uc_timeticks.push(item.uc_timeticks());
                 self.pc_timestamps_us
                     .push(item.pc_timestamp().as_micros() as u64);
                 self.task_ids.push(None);

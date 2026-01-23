@@ -39,7 +39,7 @@ impl FlashProgress {
         let pg = self.progress_container.add(pg);
 
         pg.set_style(self.style.clone());
-        pg.set_message(format!("   {:?}", operation));
+        pg.set_message(format!("   {operation:?}"));
 
         self.progress_bars.insert(to_string!(operation), pg);
     }
@@ -62,7 +62,7 @@ impl FlashProgress {
         // Finish progress bar
         if let Some(pb) = self.progress_bars.get(&to_string!(operation)) {
             let icon = if success { "✅" } else { "❌" };
-            pb.finish_with_message(format!("{icon} {:?}", operation));
+            pb.finish_with_message(format!("{icon} {operation:?}"));
         }
     }
 }

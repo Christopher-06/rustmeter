@@ -202,7 +202,7 @@ impl TracingSink {
     /// Continuously sink tracing bytes until stop is requested. Automatically handles channel closure
     /// or TracingDecodeErrors. Errors while handling errors are returned to the caller.
     pub fn sink_bytes(&mut self, stop: Arc<AtomicBool>) -> anyhow::Result<()> {
-        while stop.load(Ordering::Relaxed) == false {
+        while !stop.load(Ordering::Relaxed) {
             // Read next tracing data
             let trace_data = match self
                 .tracing_bytes_recver
@@ -223,7 +223,7 @@ impl TracingSink {
             match trace_data {
                 Ok(data) => {
                     if let Err(e) = self.handle_new_bytes(data) {
-                        println!("Warning: Tracing decode error: {}", e);
+                        println!("Warning: Tracing decode error: {e}");
                         self.handle_error(e)?; // error while handling new bytes
                     }
                 }
@@ -258,7 +258,7 @@ impl TracingSink {
 impl Drop for TracingSink {
     fn drop(&mut self) {
         if let Err(e) = self.finalize_internal() {
-            println!("[ERROR] Finalizing TracingSink: {}", e);
+            println!("[ERROR] Finalizing TracingSink: {e}");
         }
     }
 }

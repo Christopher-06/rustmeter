@@ -363,7 +363,11 @@ fn rename_event_states(lf: LazyFrame) -> LazyFrame {
     // current: EmbassyTaskExecBegin => "Running (Task <ID>)"
     // current: EmbassyTaskExecEnd => "Polling"
     // current: EmbassyExecutorIdle => "Idle"
-    let lf = lf.with_column(
+    
+
+    // TODO: add row to name the tid 0 as "Executor"
+
+    lf.with_column(
         when(col("is_executor_event").eq(lit(true)))
             .then(
                 when(col("event").eq(lit("EmbassyExecutorPollBegin")))
@@ -386,9 +390,5 @@ fn rename_event_states(lf: LazyFrame) -> LazyFrame {
             )
             .otherwise(col("name"))
             .alias("name"),
-    );
-
-    // TODO: add row to name the tid 0 as "Executor"
-
-    lf
+    )
 }

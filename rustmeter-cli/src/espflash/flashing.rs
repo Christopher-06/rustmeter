@@ -77,7 +77,7 @@ impl ProgressCallbacks for FlashProgress {
     fn init(&mut self, addr: u32, total: usize) {
         self.progress_bar = ProgressBar::new(total as u64);
         self.progress_bar
-            .set_message(format!("Flashing {:X}...", addr));
+            .set_message(format!("Flashing {addr:X}..."));
         self.progress_bar.set_style(self.style.clone());
     }
 

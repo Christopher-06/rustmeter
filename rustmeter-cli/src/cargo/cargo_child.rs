@@ -25,7 +25,7 @@ impl CargoChildProcess {
             .wait()
             .context("Failed to wait on child process")?;
         if !exit_status.success() {
-            bail!("Child process exited with non-zero status: {}", exit_status);
+            bail!("Child process exited with non-zero status: {exit_status}");
         }
 
         // get executable path

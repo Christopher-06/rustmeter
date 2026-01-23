@@ -91,8 +91,7 @@ pub fn correct_timestamps(
     let clock_refs = summary
         .get_stream_data(stream_id)
         .ok_or(anyhow::anyhow!(
-            "No stream metadata found for stream ID {}. Timing can not be corrected!",
-            stream_id
+            "No stream metadata found for stream ID {stream_id}. Timing can not be corrected!"
         ))?
         .clock_refs
         .clone();
@@ -117,7 +116,7 @@ pub fn correct_timestamps(
             None
         } else {
             Some(calculate_cpu_to_systime_offset(
-                &global_clock_def,
+                global_clock_def,
                 &core0_refs,
             )?)
         }
@@ -135,7 +134,7 @@ pub fn correct_timestamps(
             None
         } else {
             Some(calculate_cpu_to_systime_offset(
-                &global_clock_def,
+                global_clock_def,
                 &core0_refs,
             )?)
         }
@@ -151,7 +150,7 @@ pub fn correct_timestamps(
             None
         } else {
             Some(calculate_cpu_to_systime_offset(
-                &global_clock_def,
+                global_clock_def,
                 &core1_refs,
             )?)
         }

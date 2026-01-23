@@ -20,7 +20,7 @@ pub fn prepare_monitor_values(
         .alias("ph")]);
     // Set pid for all monitor value events
     let lf = lf.with_columns([when(col("event").eq(lit("ValueMonitor")))
-        .then(lit(VALUE_MONITOR_PID as u32))
+        .then(lit(VALUE_MONITOR_PID))
         .otherwise(col("pid"))
         .alias("pid")]);
 
@@ -71,11 +71,8 @@ fn get_monitor_ids(summary: &TracingSummary) -> HashMap<u32, String> {
 
     summary.get_all_stream_data().for_each(|stream_data| {
         for typedef in &stream_data.typedefs {
-            match typedef {
-                TypeDefinitionPayload::ValueMonitor { value_id, name } => {
-                    monitor_ids.insert(*value_id as u32, name.clone());
-                }
-                _ => {}
+            if let TypeDefinitionPayload::ValueMonitor { value_id, name } = typedef {
+                monitor_ids.insert(*value_id as u32, name.clone());
             }
         }
     });

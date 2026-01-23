@@ -140,7 +140,7 @@ impl RequestAgent {
                     let item = self
                         .last_core_clock_ref
                         .entry(CoreInfo::Core0)
-                        .or_insert(RequestState::new());
+                        .or_default();
 
                     *item = item.with_send_time(Instant::now());
                 }
@@ -149,7 +149,7 @@ impl RequestAgent {
                 let item = self
                     .last_core_clock_ref
                     .entry(core)
-                    .or_insert(RequestState::new());
+                    .or_default();
                 *item = item.with_recvd_time(Instant::now());
             }
             TypeDefinitionPayload::GlobalClockConfiguration { .. } => {
@@ -161,10 +161,7 @@ impl RequestAgent {
     }
 
     pub fn handle_tracing_item(&mut self, item: &TracingItem) -> anyhow::Result<()> {
-        match item.payload() {
-            EventPayload::TypeDefinition(typedef) => self.handle_typedef(typedef)?,
-            _ => {}
-        }
+        if let EventPayload::TypeDefinition(typedef) = item.payload() { self.handle_typedef(typedef)? }
 
         // Poll agent tasks
         if Instant::now().duration_since(self.start_time) >= DEAD_TIME {

@@ -48,7 +48,7 @@ pub fn do_analyze_command(args: &AnalyzeArgs, exit_flag: Arc<AtomicBool>) -> any
     let progress_container = MultiProgress::new();
     let pb_overall = progress_container
         .add(ProgressBar::new(summary.count_stream_ids() as u64))
-        .with_message(format!("Analyzing"));
+        .with_message("Analyzing".to_string());
     pb_overall.enable_steady_tick(Duration::from_millis(100));
     pb_overall.set_style(
         ProgressStyle::with_template(
@@ -69,8 +69,7 @@ pub fn do_analyze_command(args: &AnalyzeArgs, exit_flag: Arc<AtomicBool>) -> any
             Err(e) => {
                 // TODO: Show Error in perfetto? Error bar from start to end?
                 println!(
-                    "Error while processing stream id {}: {:?}. Skipping this stream id.",
-                    stream_id, e
+                    "Error while processing stream id {stream_id}: {e:?}. Skipping this stream id."
                 );
             }
         }
@@ -81,8 +80,7 @@ pub fn do_analyze_command(args: &AnalyzeArgs, exit_flag: Arc<AtomicBool>) -> any
             Err(e) => {
                 // TODO: Show Error in perfetto?
                 println!(
-                    "Error while processing defmt logs for stream id {}: {:?}. Skipping defmt logs for this stream id.",
-                    stream_id, e
+                    "Error while processing defmt logs for stream id {stream_id}: {e:?}. Skipping defmt logs for this stream id."
                 );
             }
         }
@@ -107,7 +105,7 @@ pub fn do_analyze_command(args: &AnalyzeArgs, exit_flag: Arc<AtomicBool>) -> any
     };
     let inputs = tracedata_lfs
         .into_iter()
-        .chain(defmt_lfs.into_iter())
+        .chain(defmt_lfs)
         .chain(vec![metadata_df.lazy()])
         .collect::<Vec<LazyFrame>>();
     let finished_df = concat(inputs, args).context("Error while concatenating final outputs")?;
@@ -186,7 +184,7 @@ fn process_traces_stream_id(
     // let lf = lf.limit(5_000);
 
     // Correct timestamps
-    let corrected_lf = correct_timestamps(lf, stream_id, &summary)?;
+    let corrected_lf = correct_timestamps(lf, stream_id, summary)?;
 
     // Enrich
     let enriched_lf = enrich_task_ids_in_taskexecend_events(corrected_lf);
@@ -194,18 +192,17 @@ fn process_traces_stream_id(
     // Prepare
     let prepared_lf =
         prepare_embassy_events(enriched_lf).context("Error while preparing embassy events")?;
-    let prepared_lf = prepare_monitor_values(prepared_lf, &summary)
+    let prepared_lf = prepare_monitor_values(prepared_lf, summary)
         .context("Error while preparing monitor values")?;
-    let prepared_lf = prepare_code_monitors(prepared_lf, &summary)
+    let prepared_lf = prepare_code_monitors(prepared_lf, summary)
         .context("Error while preparing code monitors")?;
 
     #[cfg(debug_assertions)]
     {
         // Create single parquet file for evented_lf for debugging
-        let mut file = std::fs::File::create(format!("evented_lf_s{}.parquet", stream_id))
+        let mut file = std::fs::File::create(format!("evented_lf_s{stream_id}.parquet"))
             .context(format!(
-                "Could not create file for evented_lf_s{}.parquet",
-                stream_id
+                "Could not create file for evented_lf_s{stream_id}.parquet"
             ))?;
         ParquetWriter::new(&mut file)
             .with_compression(ParquetCompression::Snappy)
@@ -250,39 +247,36 @@ fn summary_metadata(summary: &TracingSummary) -> anyhow::Result<DataFrame> {
     // Convert summary task spawned to naming items
     summary.get_all_stream_data().for_each(|stream_data| {
         for typedef in stream_data.typedefs.iter() {
-            match typedef {
-                TypeDefinitionPayload::EmbassyTaskCreated {
+            if let TypeDefinitionPayload::EmbassyTaskCreated {
                     task_id,
                     executor_id_long,
                     executor_id_short,
-                } => {
-                    // Name Task
-                    let task_name = summary
-                        .get_fw_symbol_name(*task_id as u64)
-                        .unwrap_or(format!("Task 0x{:X}", task_id));
-                    let task_id = compressed_task_id(*task_id);
-                    task_metadata.push(Metadata {
-                        name: "thread_name".to_string(),
-                        tid: task_id as u32,
-                        pid: executor_id_short.as_u32(),
-                        args: HashMap::from([("name".to_string(), task_name)]),
-                    });
+                } = typedef {
+                // Name Task
+                let task_name = summary
+                    .get_fw_symbol_name(*task_id as u64)
+                    .unwrap_or(format!("Task 0x{task_id:X}"));
+                let task_id = compressed_task_id(*task_id);
+                task_metadata.push(Metadata {
+                    name: "thread_name".to_string(),
+                    tid: task_id as u32,
+                    pid: executor_id_short.as_u32(),
+                    args: HashMap::from([("name".to_string(), task_name)]),
+                });
 
-                    // Name Executor
-                    let executor_name = summary
-                        .get_fw_symbol_name(*executor_id_long as u64)
-                        .unwrap_or(format!("Executor 0x{:X}", executor_id_long));
-                    executor_metadata.insert(
-                        executor_id_short.as_u32(),
-                        Metadata {
-                            name: "process_name".to_string(),
-                            tid: 0,
-                            pid: executor_id_short.as_u32(),
-                            args: HashMap::from([("name".to_string(), executor_name)]),
-                        },
-                    );
-                }
-                _ => {}
+                // Name Executor
+                let executor_name = summary
+                    .get_fw_symbol_name(*executor_id_long as u64)
+                    .unwrap_or(format!("Executor 0x{executor_id_long:X}"));
+                executor_metadata.insert(
+                    executor_id_short.as_u32(),
+                    Metadata {
+                        name: "process_name".to_string(),
+                        tid: 0,
+                        pid: executor_id_short.as_u32(),
+                        args: HashMap::from([("name".to_string(), executor_name)]),
+                    },
+                );
             }
         }
     });

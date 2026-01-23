@@ -81,7 +81,7 @@ fn get_code_monitor_names(summary: &TracingSummary) -> anyhow::Result<HashMap<u3
                 } => {
                     let fn_name = summary
                         .get_fw_symbol_name(*fn_address as u64)
-                        .unwrap_or_else(|| format!("Function {:X}", fn_address));
+                        .unwrap_or_else(|| format!("Function {fn_address:X}"));
                     monitor_names.insert(*monitor_id as u32, fn_name);
                 }
                 TypeDefinitionPayload::ScopeMonitor { monitor_id, name } => {

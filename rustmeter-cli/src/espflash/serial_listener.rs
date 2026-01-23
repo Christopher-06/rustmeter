@@ -63,7 +63,7 @@ fn serial_reader_thread(
 
             if let Err(e) = serial_port.write_all(writer.as_slice()) {
                 // Currently, we just log the error and continue
-                println!("Warning: Failed to send request over serial port: {}", e);
+                println!("Warning: Failed to send request over serial port: {e}");
             }
         }
 

@@ -130,8 +130,7 @@ impl TracingSummary {
                         || existing.tick_divider != clock_def.tick_divider
                     {
                         eprintln!(
-                            "Warning: Inconsistent GlobalClockDefinition detected in stream {}! This can damage the accuracy of timestamp calculations.",
-                            stream_id
+                            "Warning: Inconsistent GlobalClockDefinition detected in stream {stream_id}! This can damage the accuracy of timestamp calculations."
                         );
                     }
                 }
@@ -181,7 +180,7 @@ impl TracingSummary {
         self.stream_data.get(&stream_id)
     }
 
-    pub fn get_all_stream_data<'a>(&'a self) -> impl Iterator<Item = &'a StreamContainer> {
+    pub fn get_all_stream_data(&self) -> impl Iterator<Item = &StreamContainer> {
         self.stream_data.values()
     }
 

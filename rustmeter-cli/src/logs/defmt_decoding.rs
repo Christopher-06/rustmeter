@@ -59,7 +59,7 @@ fn defmt_decoder_thread(
                     let defmt_line = frame.try_into(); // turn into DefmtLine
                     match defmt_line {
                         Err(e) => {
-                            println!("[DEFMT Line Error] {}", e);
+                            println!("[DEFMT Line Error] {e}");
                         }
                         Ok(defmt_line) => {
                             if print_to_console {
@@ -77,7 +77,7 @@ fn defmt_decoder_thread(
                     break;
                 }
                 Err(e) => {
-                    eprintln!("[DEFMT Error] {}", e);
+                    eprintln!("[DEFMT Error] {e}");
                     break;
                 }
             }
@@ -88,18 +88,16 @@ fn defmt_decoder_thread(
 fn read_defmt_table(elf_path: &PathBuf) -> anyhow::Result<defmt_decoder::Table> {
     // read elf file
     let bytes = std::fs::read(elf_path)
-        .map_err(|e| anyhow::anyhow!("Failed to read elf file {:?}: {}", elf_path, e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to read elf file {elf_path:?}: {e}"))?;
 
     // parse defmt table
     let table = Table::parse(&bytes)
         .map_err(|e| {
             anyhow::anyhow!(
-                "Failed to parse defmt table from elf file {:?}: {}",
-                elf_path,
-                e
+                "Failed to parse defmt table from elf file {elf_path:?}: {e}"
             )
         })?
-        .ok_or_else(|| anyhow::anyhow!("No .defmt data found in elf file {:?}", elf_path))?;
+        .ok_or_else(|| anyhow::anyhow!("No .defmt data found in elf file {elf_path:?}"))?;
 
     // Check if all indices have location info
     let locs = table.get_locations(&bytes)?;

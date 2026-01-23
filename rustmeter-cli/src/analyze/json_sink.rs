@@ -41,7 +41,7 @@ impl JsonSink {
         for entry in std::fs::read_dir(source_folder)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "parquet") {
+            if path.extension().is_some_and(|ext| ext == "parquet") {
                 source.push(path);
             }
         }

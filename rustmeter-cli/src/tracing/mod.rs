@@ -50,31 +50,31 @@ pub enum TracingDecodeError {
 impl Display for TracingDecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let err: anyhow::Error = self.into();
-        write!(f, "{}", err)
+        write!(f, "{err}")
     }
 }
 
-impl Into<anyhow::Error> for &TracingDecodeError {
-    fn into(self) -> anyhow::Error {
-        match self {
-            TracingDecodeError::InvalidData(e) => anyhow::anyhow!("Invalid tracing data: {:?}", e),
+impl From<&TracingDecodeError> for anyhow::Error {
+    fn from(val: &TracingDecodeError) -> Self {
+        match val {
+            TracingDecodeError::InvalidData(e) => anyhow::anyhow!("Invalid tracing data: {e:?}"),
             TracingDecodeError::DroppedEvents(n) => {
-                anyhow::anyhow!("Dropped {} tracing events", n)
+                anyhow::anyhow!("Dropped {n} tracing events")
             }
             TracingDecodeError::ChecksumMismatch => anyhow::anyhow!("Checksum mismatch"),
             TracingDecodeError::SerialPortError(e) => {
-                anyhow::anyhow!("Serial port error: {}", e)
+                anyhow::anyhow!("Serial port error: {e}")
             }
             TracingDecodeError::InvalidFrameID(id) => {
-                anyhow::anyhow!("Invalid frame ID: {}", id)
+                anyhow::anyhow!("Invalid frame ID: {id}")
             }
             TracingDecodeError::RttFailure(e) => {
-                anyhow::anyhow!("RTT failure: {}", e)
+                anyhow::anyhow!("RTT failure: {e}")
             }
             TracingDecodeError::ProbeRsError(e) => {
-                anyhow::anyhow!("ProbeRs error: {}", e)
+                anyhow::anyhow!("ProbeRs error: {e}")
             }
-            TracingDecodeError::Unknown(e) => anyhow::anyhow!("Unknown error: {}", e),
+            TracingDecodeError::Unknown(e) => anyhow::anyhow!("Unknown error: {e}"),
         }
     }
 }

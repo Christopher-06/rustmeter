@@ -27,8 +27,7 @@ impl RttListener {
                     Err(_) => {
                         // fallback to normal attach
                         println!(
-                            "Warning: Could not attach to RTT at address 0x{:X}, falling back to normal RTT attach",
-                            addr
+                            "Warning: Could not attach to RTT at address 0x{addr:X}, falling back to normal RTT attach"
                         );
                         session.attach_rtt()?
                     }
@@ -100,7 +99,7 @@ fn rtt_reader_thread(
         if let Ok(req) = req_recver.try_recv() {
             if let Err(e) = send_request(req, &mut rtt, &session) {
                 // Currently just log the error
-                eprintln!("Error sending RTT request: {:?}", e);
+                eprintln!("Error sending RTT request: {e:?}");
             }
         }
 

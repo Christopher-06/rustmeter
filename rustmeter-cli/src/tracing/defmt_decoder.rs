@@ -32,9 +32,7 @@ impl DefmtDecoder {
         // Handle errors
         if let Err(e) = table {
             return Err(anyhow::anyhow!(
-                "Failed to initialize defmt decoder for {:?}: {}",
-                core,
-                e
+                "Failed to initialize defmt decoder for {core:?}: {e}"
             ));
         }
 
@@ -64,14 +62,13 @@ impl DefmtDecoder {
             Ok(frame) => {
                 // Print frame
                 let str = format!("{}", frame.display(true));
-                println!("{}", str);
+                println!("{str}");
 
                 // Extract defmt timestamp from str
                 let defmt_timestamp_s = str
                     .split_whitespace()
                     .next()
-                    .map(|s| s.parse::<f64>().ok())
-                    .flatten();
+                    .and_then(|s| s.parse::<f64>().ok());
 
                 // Return defmt line
                 Some(DefmtLine {
@@ -95,18 +92,16 @@ impl DefmtDecoder {
 fn read_defmt_table(elf_path: &PathBuf) -> anyhow::Result<defmt_decoder::Table> {
     // read elf file
     let bytes = std::fs::read(elf_path)
-        .map_err(|e| anyhow::anyhow!("Failed to read elf file {:?}: {}", elf_path, e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to read elf file {elf_path:?}: {e}"))?;
 
     // parse defmt table
     let table = Table::parse(&bytes)
         .map_err(|e| {
             anyhow::anyhow!(
-                "Failed to parse defmt table from elf file {:?}: {}",
-                elf_path,
-                e
+                "Failed to parse defmt table from elf file {elf_path:?}: {e}"
             )
         })?
-        .ok_or_else(|| anyhow::anyhow!("No .defmt data found in elf file {:?}", elf_path))?;
+        .ok_or_else(|| anyhow::anyhow!("No .defmt data found in elf file {elf_path:?}"))?;
 
     // Check if all indices have location info
     let locs = table.get_locations(&bytes)?;

@@ -63,7 +63,7 @@ impl TryFrom<&u8> for CoreInfo {
         match value {
             0 => Ok(CoreInfo::Core0),
             1 => Ok(CoreInfo::Core1),
-            _ => Err(anyhow::anyhow!("Invalid CoreInfo id: {}", value)),
+            _ => Err(anyhow::anyhow!("Invalid CoreInfo id: {value}")),
         }
     }
 }
@@ -110,9 +110,9 @@ fn main() -> anyhow::Result<()> {
         })
         .context("Cant create thread")?;
 
-    let result = handler.join().expect("Thread panicked")?;
+    handler.join().expect("Thread panicked")?;
 
-    return Ok(());
+    Ok(())
 }
 
 #[unsafe(no_mangle)]
