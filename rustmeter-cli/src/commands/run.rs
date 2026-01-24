@@ -19,7 +19,7 @@ pub fn do_run_command(mut args: RunArgs, exit_flag: Arc<AtomicBool>) -> anyhow::
             // use provided elf path
 
             // check for release build (this info is not given when used in cargo runner)
-            if path.to_string_lossy().contains("/release/") {
+            if path.to_string_lossy().contains("release") {
                 args.release = true;
             }
 
