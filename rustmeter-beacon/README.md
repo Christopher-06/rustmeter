@@ -3,7 +3,6 @@
 **The embedded instrumentation library for the RustMeter profiling system.**
 
 [`rustmeter-beacon`](https://crates.io/crates/rustmeter-beacon) is a lightweight tracing library designed for embedded Rust applications. It serves as the device-side component that captures runtime events, performance metrics, and task transitions.
-
 It is built to integrate seamlessly with the [Embassy](https://github.com/embassy-rs/embassy) async executor and logging via [defmt](https://github.com/knurling-rs/defmt).
 
 ## ✨ Features
@@ -44,7 +43,7 @@ esp-println = "X"  # <- REMOVE THIS
 
 1. Setup
 
-Simply initialize the beacon once with the system frequency and an executor to spawn the internal tracing task. This task has to be polled regularly to flush the system trace data! You can use any spawner (Thread or Interrupt) on any core depending on your architecture.
+Simply initialize the beacon once with the system frequency and an executor to spawn the internal printing task. This task has to be polled regularly to flush the system trace data! You can use any spawner (Thread or Interrupt) on any core depending on your architecture.
 
 ```rust
 use rustmeter_beacon::*;

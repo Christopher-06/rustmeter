@@ -56,11 +56,11 @@ cargo run --release
 
 ## Benchmarking
 
-Any tracing system introduces some overhead. RustMeter is designed to be lightweight, but it's essential to understand its impact on your application. Any measurement or event emitted incurs a small time cost. The future goal is to even lower the following overheads; especially on Cortex-M based MCUs to <1us. RustMeter uses a lock-free ringbuffer per core to fastly enqueue events, which are then sent out via RTT or UART/Serial JTAG in the background. This approach minimizes the blocking time in your application code and allows high-frequency logging; e.q. multiple tasks have to run each millisecond. 
+Any tracing system introduces some overhead. RustMeter is designed to be lightweight, but it's essential to understand its impact on your application. Any measurement or event emitted incurs a small time cost. The future goal is to even lower the following overheads; especially on Cortex-M based MCUs to <1us. RustMeter uses a lock-free ringbuffer per core to fastly enqueue events, which are then sent out via RTT or UART/Serial JTAG in the background. This approach minimizes the blocking time in your application code and allows high-frequency logging; e.q. multiple tasks running each millisecond! 
 
-**Espressif** MCUs have been optimized to cost around 0.4 - 1.2us per event, depending on the clock speed and bus usage (e.q. tested on ESP32 and ESP32-C3). 
+**Espressif** MCUs have been optimized to cost around 0.4 - 1.2us per event, depending on the clock speed and bus usage (e.q. tested on ESP32 @ 100 Mhz and ESP32-S3 @ 240 Mhz). 
 
-**Cortex-M** based MCUs like STM32 and RP2040 currently have a higher overhead of around 2 - 10us per event due to lower frequencies, the lack of optimized atomic operations and cache mechanisms. Further optimizations are planned for future releases (e.q. tested on STM32F446 and RP2040).
+**Cortex-M** based MCUs like STM32 and RP2040 currently have a higher overhead of around 1 - 8us per event due to lower frequencies, the lack of optimized atomic operations and cache mechanisms. Further optimizations are planned in future releases (e.q. tested on STM32F446 @ 80 Mhz and RP2040 @ 100 Mhz).
 
 All measured times then include not only the actual event time, but also this overhead, which determines the accuracy of rustmeter. So any instrumentation should be used judiciously in performance-critical sections. However, for many applications, the overhead is negligible compared to the insights gained from detailed profiling. Any measurement value  
 
@@ -71,7 +71,7 @@ All measured times then include not only the actual event time, but also this ov
 core, the trace may not show the last events because the printing task is blocked as well. To avoid this, create a dedicated interrupt executor with a higher priority and initialize rustmeter-beacon with this executor.
 - **Missing Embassy Events**: If certain events are not appearing in the trace, ensure that the `trace` feature is enabled for `embassy-executor` in your Cargo.toml.
 - **Performance Issues**: While RustMeter is designed to be lightweight, excessive instrumentation may impact performance. Use monitoring macros judiciously in performance-critical sections.
-- **No Data in Perfetto**: If the generated JSON file does not contain expected data, verify that your embedded application is running and generating events during the tracing session. Try some basic instrumentation first to confirm functionality like `#[monitor_fn]` on a simple function and logging via `defmt`.
+- **No Data in Perfetto**: If the generated JSON file does not contain expected data, verify that your embedded application is running and generating events during the tracing session. Try some basic instrumentation first to confirm functionality like `#[monitor_fn]` on a simple function and logging via `defmt`. Ensure that you are not using incompatible crates like `esp-println` or `rtt-target` which interfere communication.
 
 ## 🤝 License
 
