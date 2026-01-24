@@ -1,11 +1,11 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use polars::prelude::*;
 
 use crate::{analyze::timing::correct_timestamps, tracing::summary::TracingSummary};
 
 pub fn prepare_defmt_logs(
-    tracing_folder: &PathBuf,
+    tracing_folder: &Path,
     stream_id: u32,
     summary: &TracingSummary,
 ) -> anyhow::Result<LazyFrame> {

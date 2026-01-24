@@ -27,7 +27,7 @@ impl CoreTracingData {
         }
     }
 
-    pub fn data(&self) -> &Box<[u8]> {
+    pub fn data(&self) -> &[u8] {
         match self {
             CoreTracingData::Core0(data) => data,
             CoreTracingData::Core1(data) => data,

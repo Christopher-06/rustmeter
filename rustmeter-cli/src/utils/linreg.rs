@@ -18,7 +18,7 @@ impl LinearRegression {
         let sum_x2: f64 = x.iter().map(|xi| xi * xi).sum();
 
         let denominator = n * sum_x2 - sum_x * sum_x;
-        if denominator.abs() < std::f64::EPSILON {
+        if denominator.abs() < f64::EPSILON {
             return None; // Prevent division by zero
         }
 

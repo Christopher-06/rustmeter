@@ -80,7 +80,7 @@ impl TracingSink {
     fn handle_defmt_bytes(
         &mut self,
         core: CoreInfo,
-        data: &Vec<u8>,
+        data: &[u8],
         uc_timeticks: u64,
     ) -> Result<(), TracingDecodeError> {
         // Feed defmt decoder

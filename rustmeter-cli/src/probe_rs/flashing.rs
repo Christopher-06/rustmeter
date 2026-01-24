@@ -19,7 +19,7 @@ fn define_download_options<'a>() -> DownloadOptions<'a> {
 }
 
 /// Flash the given ELF file to the target and start the controller core.
-pub fn flash_and_start_controller<'a>(
+pub fn flash_and_start_controller(
     session: &AtomicSession,
     elf_path: &PathBuf,
 ) -> anyhow::Result<()> {

@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -155,7 +155,7 @@ pub fn do_analyze_command(args: &AnalyzeArgs, exit_flag: Arc<AtomicBool>) -> any
 }
 
 fn process_traces_stream_id(
-    folder: &PathBuf,
+    folder: &Path,
     stream_id: u32,
     summary: &TracingSummary,
 ) -> anyhow::Result<LazyFrame> {
@@ -200,10 +200,9 @@ fn process_traces_stream_id(
     #[cfg(debug_assertions)]
     {
         // Create single parquet file for evented_lf for debugging
-        let mut file = std::fs::File::create(format!("evented_lf_s{stream_id}.parquet"))
-            .context(format!(
-                "Could not create file for evented_lf_s{stream_id}.parquet"
-            ))?;
+        let mut file = std::fs::File::create(format!("evented_lf_s{stream_id}.parquet")).context(
+            format!("Could not create file for evented_lf_s{stream_id}.parquet"),
+        )?;
         ParquetWriter::new(&mut file)
             .with_compression(ParquetCompression::Snappy)
             .finish(&mut prepared_lf.clone().collect()?)
@@ -248,10 +247,11 @@ fn summary_metadata(summary: &TracingSummary) -> anyhow::Result<DataFrame> {
     summary.get_all_stream_data().for_each(|stream_data| {
         for typedef in stream_data.typedefs.iter() {
             if let TypeDefinitionPayload::EmbassyTaskCreated {
-                    task_id,
-                    executor_id_long,
-                    executor_id_short,
-                } = typedef {
+                task_id,
+                executor_id_long,
+                executor_id_short,
+            } = typedef
+            {
                 // Name Task
                 let task_name = summary
                     .get_fw_symbol_name(*task_id as u64)

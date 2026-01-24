@@ -51,7 +51,7 @@ impl DefmtDecoder {
     }
 
     /// Feed defmt bytes into the decoder
-    pub fn feed(&mut self, data: &Vec<u8>, uc_timeticks: u64) {
+    pub fn feed(&mut self, data: &[u8], uc_timeticks: u64) {
         self.decoder.received(data);
         self.last_uc_timeticks = Some(uc_timeticks);
     }
@@ -97,9 +97,7 @@ fn read_defmt_table(elf_path: &PathBuf) -> anyhow::Result<defmt_decoder::Table> 
     // parse defmt table
     let table = Table::parse(&bytes)
         .map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to parse defmt table from elf file {elf_path:?}: {e}"
-            )
+            anyhow::anyhow!("Failed to parse defmt table from elf file {elf_path:?}: {e}")
         })?
         .ok_or_else(|| anyhow::anyhow!("No .defmt data found in elf file {elf_path:?}"))?;
 

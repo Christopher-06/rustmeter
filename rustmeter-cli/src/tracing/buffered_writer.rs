@@ -14,7 +14,8 @@ pub trait WritableBuffer {
     fn is_full(&self) -> bool;
     /// Get current length of the buffer
     fn len(&self) -> usize;
-    /// Convert buffer into a DataFrame
+    /// Convert buffer into a DataFrame. Consume the buffer in the process
+    #[allow(clippy::wrong_self_convention)]
     fn as_dataframe(self) -> Result<DataFrame>;
 }
 

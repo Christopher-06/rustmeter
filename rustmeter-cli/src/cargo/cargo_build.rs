@@ -33,12 +33,11 @@ impl CargoBuildMessage {
 
     /// Returns the executable path if this is a CompilerArtifact message with an executable info
     pub fn get_elf_path(&self) -> Option<PathBuf> {
-        if let CargoBuildMessage::CompilerArtifact { executable, .. } = self {
-            if let Some(path) = executable {
-                return Some(PathBuf::from(path));
+        match self {
+            CargoBuildMessage::CompilerArtifact { executable, .. } => {
+                executable.as_ref().map(PathBuf::from)
             }
+            _ => None,
         }
-
-        None
     }
 }

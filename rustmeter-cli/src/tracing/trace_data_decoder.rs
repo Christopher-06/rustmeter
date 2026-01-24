@@ -28,15 +28,15 @@ impl TraceDataDecoder {
     }
 
     /// Renew the decoder state, reset time ticks, keeping the internal buffer.
-    pub fn renew(&mut self)  {
+    pub fn renew(&mut self) {
         self.valid = false;
         self.uc_timeticks = 0;
         self.byte_buffer.clear();
     }
 
     /// Feeds new data into the decoder's internal buffer
-    pub fn feed(&mut self, data: &Box<[u8]>) {
-        self.byte_buffer.extend(data.iter());
+    pub fn feed(&mut self, data: &[u8]) {
+        self.byte_buffer.extend(data);
     }
 
     /// Decode a single tracing item from the internal byte buffer from the core.
