@@ -9,7 +9,7 @@ description = "Target side library for rustmeter-beacon"
 repository = "https://github.com/Christopher-06/rustmeter"
 
 [dependencies]
-rustmeter-beacon-core = { path = "../rustmeter-beacon-core" }
+rustmeter-beacon-core = { version = "0.2.0", path = "../rustmeter-beacon-core" }
 portable-atomic = {version = "1"}
 arbitrary-int = "2"
 embassy-time = { version = "0.5" }

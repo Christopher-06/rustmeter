@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, time::Instant};
 
-use rustmeter_beacon::{
+use rustmeter_beacon_core::{
     buffer::BufferReader,
     tracing::{ReadTracingError, read_tracing_event},
 };

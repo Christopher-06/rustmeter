@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crossbeam::channel::{Receiver, Sender};
 use probe_rs::rtt::Rtt;
-use rustmeter_beacon::{buffer::BufferWriter, protocol::Request};
+use rustmeter_beacon_core::{buffer::BufferWriter, protocol::Request};
 
 use crate::{
     commands::flash_and_monitor::ChipMonitoringTool,

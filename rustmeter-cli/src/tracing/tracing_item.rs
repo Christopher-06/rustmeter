@@ -1,6 +1,6 @@
 use std::{fmt::Display, time::Duration};
 
-use rustmeter_beacon::protocol::EventPayload;
+use rustmeter_beacon_core::protocol::EventPayload;
 
 use crate::CoreInfo;
 

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use rustmeter_beacon::protocol::{EventPayload, TypeDefinitionPayload};
+use rustmeter_beacon_core::protocol::{EventPayload, TypeDefinitionPayload};
 
 use crate::tracing::tracing_item::TracingItem;
 

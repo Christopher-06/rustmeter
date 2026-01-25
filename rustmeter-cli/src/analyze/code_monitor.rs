@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use polars::prelude::*;
-use rustmeter_beacon::protocol::TypeDefinitionPayload;
+use rustmeter_beacon_core::protocol::TypeDefinitionPayload;
 
 use crate::tracing::summary::TracingSummary;
 

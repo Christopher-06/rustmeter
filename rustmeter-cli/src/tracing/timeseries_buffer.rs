@@ -3,7 +3,7 @@ use std::{sync::OnceLock, vec::Vec};
 use anyhow::Context;
 use arbitrary_int::traits::Integer;
 use polars::prelude::*;
-use rustmeter_beacon::protocol::EventPayload;
+use rustmeter_beacon_core::protocol::EventPayload;
 
 use crate::{
     CoreInfo,

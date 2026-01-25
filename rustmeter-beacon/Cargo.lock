@@ -16,9 +16,6 @@ name = "arbitrary-int"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c858caffa49edfc4ecc45a4bec37abd3e88041a2903816f10f990b7b41abc281"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "arrayvec"
@@ -1520,7 +1517,7 @@ dependencies = [
 
 [[package]]
 name = "rustmeter-beacon"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "defmt",
  "portable-atomic",
@@ -1531,17 +1528,16 @@ dependencies = [
 
 [[package]]
 name = "rustmeter-beacon-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arbitrary-int",
  "critical-section",
  "portable-atomic",
- "serde",
 ]
 
 [[package]]
 name = "rustmeter-beacon-proc-macros"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",
@@ -1551,7 +1547,7 @@ dependencies = [
 
 [[package]]
 name = "rustmeter-beacon-target"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arbitrary-int",
  "cfg-if",

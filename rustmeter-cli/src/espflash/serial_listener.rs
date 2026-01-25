@@ -1,6 +1,6 @@
 use crossbeam::channel::{Receiver, Sender};
 use espflash::connection::Connection;
-use rustmeter_beacon::{buffer::BufferWriter, protocol::Request};
+use rustmeter_beacon_core::{buffer::BufferWriter, protocol::Request};
 
 use std::{
     io::{ErrorKind, Read, Write},

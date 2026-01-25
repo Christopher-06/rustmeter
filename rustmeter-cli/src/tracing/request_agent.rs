@@ -4,7 +4,7 @@ use std::{
 };
 
 use crossbeam::channel::Sender;
-use rustmeter_beacon::protocol::{EventPayload, Request, TypeDefinitionPayload};
+use rustmeter_beacon_core::protocol::{EventPayload, Request, TypeDefinitionPayload};
 
 use crate::{CoreInfo, tracing::tracing_item::TracingItem};
 

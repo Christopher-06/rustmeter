@@ -12,7 +12,7 @@ use anyhow::Context;
 use arbitrary_int::traits::Integer;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use polars::prelude::*;
-use rustmeter_beacon::{compressed_task_id, protocol::TypeDefinitionPayload};
+use rustmeter_beacon_core::{compressed_task_id, protocol::TypeDefinitionPayload};
 
 use crate::{
     analyze::{

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rustmeter_beacon::protocol::TypeDefinitionPayload;
+use rustmeter_beacon_core::protocol::TypeDefinitionPayload;
 use time::OffsetDateTime;
 
 use crate::{

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use rustmeter_beacon::tracing::ReadTracingError;
+use rustmeter_beacon_core::tracing::ReadTracingError;
 
 mod buffered_writer;
 mod defmt_buffer;

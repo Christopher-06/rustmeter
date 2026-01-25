@@ -16,7 +16,7 @@ pub trait ChipMonitoringTool {
         &self,
     ) -> crossbeam::channel::Receiver<Result<CoreTracingData, TracingDecodeError>>;
     fn get_request_sender(&self)
-    -> crossbeam::channel::Sender<rustmeter_beacon::protocol::Request>;
+    -> crossbeam::channel::Sender<rustmeter_beacon_core::protocol::Request>;
 }
 
 pub fn flash_and_monitor_chip(

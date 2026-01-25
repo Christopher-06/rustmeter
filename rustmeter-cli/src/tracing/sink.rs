@@ -8,7 +8,7 @@ use std::{
 };
 
 use crossbeam::channel::{Receiver, Sender};
-use rustmeter_beacon::protocol::{EventPayload, Request};
+use rustmeter_beacon_core::protocol::{EventPayload, Request};
 use time::OffsetDateTime;
 
 use crate::{
