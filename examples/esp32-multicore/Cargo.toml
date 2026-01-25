@@ -25,7 +25,7 @@ esp-backtrace = { version = "0.18.1", features = [
 
 critical-section = "1.2.0"
 static_cell = "2.1.1"
-rustmeter-beacon = { path = "../../rustmeter-beacon", features = ["esp32", "defmt"] }
+rustmeter-beacon = { version = "0.2.0", features = ["esp32", "defmt"] }
 
 [profile.dev]
 # Rust debug is too slow.

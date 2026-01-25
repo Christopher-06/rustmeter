@@ -723,6 +723,8 @@ dependencies = [
 [[package]]
 name = "rustmeter-beacon"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "650a407f27ebf645586d2d7a9a3c551aa417bf9b5eb683113dc85a8b1746f254"
 dependencies = [
  "defmt 1.0.1",
  "portable-atomic",
@@ -734,6 +736,8 @@ dependencies = [
 [[package]]
 name = "rustmeter-beacon-core"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe8ccc18644e36c7d86e7e5a2db8d4de7d65e245a80e34c45462a249ea404a3f"
 dependencies = [
  "arbitrary-int",
  "critical-section",
@@ -743,6 +747,8 @@ dependencies = [
 [[package]]
 name = "rustmeter-beacon-proc-macros"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d8e0c2c935f935a3603b07f327e8f62ffd12a1fc613dd4cd8e25f0bbd9de1f7"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",
@@ -753,6 +759,8 @@ dependencies = [
 [[package]]
 name = "rustmeter-beacon-target"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e76727daf0fbb6f5e0bd1ff2012a57ab40dd7aa9e297c571211f178aeb2d047e"
 dependencies = [
  "arbitrary-int",
  "cfg-if",

@@ -24,7 +24,7 @@ esp-backtrace = { version = "0.18.1", features = [
 
 critical-section = "1.2.0"
 static_cell = "2.1.1"
-rustmeter-beacon = { path = "../../rustmeter-beacon", features = ["esp32s3", "defmt"], default-features = false}
+rustmeter-beacon = { version = "0.2.0", features = ["esp32s3", "defmt"], default-features = false}
 smart-leds = "0.4.0"
 esp-hal-smartled = { version = "0.17.0", features = ["esp32s3"] }
 embedded-io-async = "0.7.0"

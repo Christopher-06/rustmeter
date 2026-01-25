@@ -350,10 +350,11 @@ checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 [[package]]
 name = "embassy-embedded-hal"
 version = "0.5.0"
+source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
 dependencies = [
- "embassy-futures 0.1.2",
+ "embassy-futures 0.1.2 (git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f)",
  "embassy-hal-internal",
- "embassy-sync 0.7.2",
+ "embassy-sync 0.7.2 (git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f)",
  "embedded-hal 0.2.7",
  "embedded-hal 1.0.0",
  "embedded-hal-async",
@@ -365,6 +366,7 @@ dependencies = [
 [[package]]
 name = "embassy-executor"
 version = "0.9.1"
+source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
 dependencies = [
  "cordyceps",
  "cortex-m",
@@ -377,6 +379,7 @@ dependencies = [
 [[package]]
 name = "embassy-executor-macros"
 version = "0.7.0"
+source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
 dependencies = [
  "darling 0.20.11",
  "proc-macro2",
@@ -387,10 +390,7 @@ dependencies = [
 [[package]]
 name = "embassy-executor-timer-queue"
 version = "0.1.0"
-
-[[package]]
-name = "embassy-futures"
-version = "0.1.2"
+source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
 
 [[package]]
 name = "embassy-futures"
@@ -399,8 +399,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc2d050bdc5c21e0862a89256ed8029ae6c290a93aecefc73084b3002cdebb01"
 
 [[package]]
+name = "embassy-futures"
+version = "0.1.2"
+source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
+
+[[package]]
 name = "embassy-hal-internal"
-version = "0.3.0"
+version = "0.4.0"
+source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
 dependencies = [
  "cortex-m",
  "critical-section",
@@ -410,6 +416,7 @@ dependencies = [
 [[package]]
 name = "embassy-rp"
 version = "0.9.0"
+source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
 dependencies = [
  "cfg-if",
  "cortex-m",
@@ -417,9 +424,9 @@ dependencies = [
  "critical-section",
  "document-features",
  "embassy-embedded-hal",
- "embassy-futures 0.1.2",
+ "embassy-futures 0.1.2 (git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f)",
  "embassy-hal-internal",
- "embassy-sync 0.7.2",
+ "embassy-sync 0.7.2 (git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f)",
  "embassy-time",
  "embassy-time-driver",
  "embassy-time-queue-utils",
@@ -428,8 +435,8 @@ dependencies = [
  "embedded-hal 1.0.0",
  "embedded-hal-async",
  "embedded-hal-nb",
- "embedded-io 0.6.1",
- "embedded-io-async 0.6.1",
+ "embedded-io 0.7.1",
+ "embedded-io-async 0.7.0",
  "embedded-storage",
  "embedded-storage-async",
  "fixed",
@@ -441,18 +448,6 @@ dependencies = [
  "rp2040-boot2",
  "sha2-const-stable",
  "smart-leds",
-]
-
-[[package]]
-name = "embassy-sync"
-version = "0.7.2"
-dependencies = [
- "cfg-if",
- "critical-section",
- "embedded-io-async 0.6.1",
- "futures-core",
- "futures-sink",
- "heapless",
 ]
 
 [[package]]
@@ -470,8 +465,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "embassy-sync"
+version = "0.7.2"
+source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
+dependencies = [
+ "cfg-if",
+ "critical-section",
+ "embedded-io-async 0.7.0",
+ "futures-core",
+ "futures-sink",
+ "heapless",
+]
+
+[[package]]
 name = "embassy-time"
 version = "0.5.0"
+source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
 dependencies = [
  "cfg-if",
  "critical-section",
@@ -487,6 +496,7 @@ dependencies = [
 [[package]]
 name = "embassy-time-driver"
 version = "0.2.1"
+source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
 dependencies = [
  "document-features",
 ]
@@ -494,6 +504,7 @@ dependencies = [
 [[package]]
 name = "embassy-time-queue-utils"
 version = "0.3.0"
+source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
 dependencies = [
  "embassy-executor-timer-queue",
  "heapless",
@@ -502,8 +513,9 @@ dependencies = [
 [[package]]
 name = "embassy-usb-driver"
 version = "0.2.0"
+source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
 dependencies = [
- "embedded-io-async 0.6.1",
+ "embedded-io-async 0.7.0",
 ]
 
 [[package]]
@@ -1157,6 +1169,8 @@ dependencies = [
 [[package]]
 name = "rustmeter-beacon"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "650a407f27ebf645586d2d7a9a3c551aa417bf9b5eb683113dc85a8b1746f254"
 dependencies = [
  "defmt",
  "portable-atomic",
@@ -1168,6 +1182,8 @@ dependencies = [
 [[package]]
 name = "rustmeter-beacon-core"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe8ccc18644e36c7d86e7e5a2db8d4de7d65e245a80e34c45462a249ea404a3f"
 dependencies = [
  "arbitrary-int",
  "critical-section",
@@ -1177,6 +1193,8 @@ dependencies = [
 [[package]]
 name = "rustmeter-beacon-proc-macros"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d8e0c2c935f935a3603b07f327e8f62ffd12a1fc613dd4cd8e25f0bbd9de1f7"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",
@@ -1187,6 +1205,8 @@ dependencies = [
 [[package]]
 name = "rustmeter-beacon-target"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e76727daf0fbb6f5e0bd1ff2012a57ab40dd7aa9e297c571211f178aeb2d047e"
 dependencies = [
  "arbitrary-int",
  "cfg-if",

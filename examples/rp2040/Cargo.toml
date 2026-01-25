@@ -17,12 +17,12 @@ panic-probe = { version = "1.0.0", features = ["print-defmt"] }
 
 static_cell = "2.1"
 portable-atomic = { version = "1.5.0", features = ["critical-section"] }
-rustmeter-beacon = {path = "../../rustmeter-beacon", features = ["rp2040", "defmt"]} 
+rustmeter-beacon = { version = "0.2.0", features = ["rp2040", "defmt"] }
 
 [patch.crates-io] # Currently needed to enable "trace" feature in embassy crates
-embassy-time = { path = "../../../embassy/embassy-time" }
-embassy-executor = { path = "../../../embassy/embassy-executor" }
-embassy-rp = { path = "../../../embassy/embassy-rp" }
+embassy-time = { git = "https://github.com/embassy-rs/embassy.git", rev = "d41b6b00d00cf13b4fa9b5923ac445e33cc7607f" }
+embassy-executor = { git = "https://github.com/embassy-rs/embassy.git", rev = "d41b6b00d00cf13b4fa9b5923ac445e33cc7607f" }
+embassy-rp = { git = "https://github.com/embassy-rs/embassy.git", rev = "d41b6b00d00cf13b4fa9b5923ac445e33cc7607f" }
 
 [profile.release]
 codegen-units = 1        # LLVM can perform better optimizations using a single thread
