@@ -1,0 +1,44 @@
+[package]
+name = "rustmeter-beacon-target"
+version = "0.2.0"
+edition = "2024"
+exclude = ["/debug", "/target", ".gitignore"]
+license = "MIT"
+authors = ["Christopher Kock"]
+description = "Target side library for rustmeter-beacon"
+repository = "https://github.com/Christopher-06/rustmeter"
+
+[dependencies]
+rustmeter-beacon-core = { version = "0.2.0", path = "../rustmeter-beacon-core" }
+portable-atomic = {version = "1"}
+arbitrary-int = "2"
+embassy-time = { version = "0.5" }
+
+esp-hal = { version = "1", optional = true}
+embassy-rp = { version = "0.9", optional = true, default-features = false}
+defmt = { version = "1" , optional = true }
+embassy-sync = "0.7.2"
+critical-section = "1.2.0"
+esp-sync ={ version = "0.1", optional = true }
+embassy-executor = "0.9"
+embassy-futures = "0.1.2"
+cfg-if = "1.0.4"
+embedded-io-async = "0.7.0"
+cortex-m = "0.7.7"
+
+[features]
+defmt = ["dep:defmt"]
+
+esp32   = ["dep:esp-hal", "esp-hal/esp32",   "esp-sync/esp32", "rustmeter-beacon-core/multicore" ]
+esp32c2 = ["dep:esp-hal", "esp-hal/esp32c2", "esp-sync/esp32c2"]
+esp32c3 = ["dep:esp-hal", "esp-hal/esp32c3", "esp-sync/esp32c3"]
+esp32c6 = ["dep:esp-hal", "esp-hal/esp32c6", "esp-sync/esp32c6"]
+esp32h2 = ["dep:esp-hal", "esp-hal/esp32h2", "esp-sync/esp32h2"]
+esp32s2 = ["dep:esp-hal", "esp-hal/esp32s2", "esp-sync/esp32s2"]
+esp32s3 = ["dep:esp-hal", "esp-hal/esp32s3", "esp-sync/esp32s3", "rustmeter-beacon-core/multicore"]
+
+stm32 = []
+rp2040 = [ "dep:embassy-rp", "embassy-rp/rp2040", "portable-atomic/critical-section", "rustmeter-beacon-core/multicore"]
+rp235xa = ["dep:embassy-rp", "embassy-rp/rp235xa", "portable-atomic/critical-section", "rustmeter-beacon-core/multicore"]
+rp235xb = ["dep:embassy-rp", "embassy-rp/rp235xb", "portable-atomic/critical-section", "rustmeter-beacon-core/multicore"]
+esp-sync = ["dep:esp-sync"]

@@ -1,9 +1,0 @@
-[workspace]
-resolver = "2"
-
-members = [
-    "rustmeter-cli",
-    "rustmeter-beacon",
-    "rustmeter-beacon/rustmeter-beacon-function-monitor",
-    "rustmeter-beacon/rustmeter-beacon-core"
-]

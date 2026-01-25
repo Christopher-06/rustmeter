@@ -1,6 +1,6 @@
 [package]
 name = "rustmeter"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 authors = ["Christopher Kock"]
@@ -9,6 +9,7 @@ repository = "https://github.com/Christopher-06/rustmeter"
 keywords = ["embedded", "profiling", "tracing", "cli", "perfetto"]
 categories = ["embedded", "development-tools::profiling", "command-line-utilities"]
 exclude = ["/debug", "/target", ".gitignore"]
+readme = "../README.md"
 
 [dependencies]
 clap = { version = "4.5.53", features = ["derive"] }
@@ -21,3 +22,14 @@ rustc-demangle = "0.1"
 color-print = "0.3.7"
 ctrlc = "3.5.1"
 colored = "3.0.0"
+probe-rs = "0.30.0"
+
+rustmeter-beacon-core = { path = "../rustmeter-beacon/rustmeter-beacon-core", version = "0.2.0", features = ["std"]}
+indicatif = "0.18.3"
+defmt-decoder = "1.0.0"
+defmt-parser = "1.0.0"
+arbitrary-int = "2.0.0"
+espflash = { version = "4.3.0", default-features = false, features = ["serialport"] }
+serialport = { version = "4.7.0", features = ["usbportinfo-interface"] }
+polars = { version = "0.51.0", features = ["lazy", "dtype-categorical", "sql", "parquet", "describe", "moment", "csv", "serde", "serde-lazy", "json"] }
+time = { version = "0.3.45", features = ["serde"] }

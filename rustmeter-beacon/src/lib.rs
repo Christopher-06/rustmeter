@@ -1,6 +1,11 @@
 #![no_std]
+#![doc = include_str!("../README.md")]
 
 pub use rustmeter_beacon_core::*;
-pub use rustmeter_beacon_function_monitor::*;
+pub use rustmeter_beacon_proc_macros::*;
+pub use rustmeter_beacon_target::*;
 
-mod embassy;
+#[doc(hidden)]
+pub mod _private {
+    pub use portable_atomic; 
+}

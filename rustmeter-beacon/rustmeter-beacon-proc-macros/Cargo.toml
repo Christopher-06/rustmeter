@@ -1,0 +1,20 @@
+[package]
+name = "rustmeter-beacon-proc-macros"
+version = "0.2.0"
+edition = "2024"
+exclude = ["/debug", "/target", ".gitignore"]
+license = "MIT"
+authors = ["Christopher Kock"]
+description = "Proc-macro for rustmeter-beacon"
+repository = "https://github.com/Christopher-06/rustmeter"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+darling = "0.23.0"
+proc-macro2 = "1.0.103"
+quote = "1.0.42"
+syn = { version = "2.0.111", features = ["full", "extra-traits"] }
+
+[features]
