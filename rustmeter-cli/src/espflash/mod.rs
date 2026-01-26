@@ -25,11 +25,11 @@ pub fn get_espflash_connection() -> anyhow::Result<Connection> {
     };
 
     // open serial port
-    let com_port = serialport::COMPort::open(&serialport::new(port.port_name, 115200))
-        .context("Cannot open ComPort")?;
+    let serial = espflash::connection::Port::open(&serialport::new(port.port_name, 115200))
+        .context("Cannot open serial port")?;
 
     Ok(espflash::connection::Connection::new(
-        com_port,
+        serial,
         usb_info,
         ResetAfterOperation::NoReset,
         ResetBeforeOperation::DefaultReset,
