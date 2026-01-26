@@ -1,0 +1,15 @@
+{
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {
+    "ghcr.io/devcontainers/features/rust:1": {}
+  },
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y libudev-dev pkg-config mingw-w64 && rustup target add x86_64-pc-windows-gnu",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer", 
+        "tamasfe.even-better-toml"
+      ]
+    }
+  }
+}
