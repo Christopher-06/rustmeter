@@ -8,9 +8,9 @@ use esp_hal::uart::Uart;
 use rustmeter_beacon_core::protocol::{EventPayload, Request, TypeDefinitionPayload};
 use rustmeter_beacon_core::tracing::write_tracing_event;
 
-use crate::timing::TICK_DIVIDER;
 use crate::espressif::tracing_esp;
 use crate::ringbuffer::SimpleRingBuffer;
+use crate::timing::TICK_DIVIDER;
 
 pub enum PrinterRoute {
     Uart(Uart<'static, Async>),
@@ -86,10 +86,11 @@ impl PrinterRoute {
 pub async fn connector(mut out_route: PrinterRoute, cpu_freq: Rate) {
     // Get pipes
     let (trace_buffers, trace_data_signal) = tracing_esp::get_tracing_buffers_and_signaller();
+    let mut seq_id: [usize; _] = [0; 2];
 
     // Working buffer buffer
     let mut buffer = [0u8; 256]; // 128 byte buffer is ESP UART FIFO size and 64 bytes is USB Serial-JTAG FIFO size. Payload-Length is max 252 bytes
-    buffer[0] = 0xFF; // Start byte
+    buffer[0] = 0xFF; // Start byte normally
 
     // Receive buffer
     let mut recvd_buffer = SimpleRingBuffer::<128>::new();
@@ -106,22 +107,25 @@ pub async fn connector(mut out_route: PrinterRoute, cpu_freq: Rate) {
 
         // Process tracing data per core
         for (core_id, buf) in trace_buffers.iter().enumerate() {
-            for _ in 0..10 {
-                let len = {
-                    let buf0 = unsafe { &mut *buf.get() };
-                    buf0.pop_slice(&mut buffer[3..255])
-                };
+            for _ in 0..16 {
+                // peek bytes
+                let buf = unsafe { &mut *buf.get() };
+                let len = buf.peek_slice(&mut buffer[3..255]);
 
                 if len > 0 {
                     trace_data_signal.reset();
 
-                    // Create Header
-                    buffer[1] = 0xF0 + (core_id as u8);
+                    // Pack data
+                    buffer[1] = (core_id << 7) as u8 | seq_id[core_id] as u8; // Core ID + Sequence ID
                     buffer[2] = len as u8; // length byte
+                    buffer[len + 3] = calculate_checksum(&buffer[0..(3 + len)]); // checksum byte
 
-                    // Calculate xor checksum and send
-                    buffer[len + 3] = calculate_checksum(&buffer[1..(3 + len)]);
+                    // Send and afterwars mark as read
                     let _ = out_route.write_all(&buffer[0..3 + len + 1]).await;
+                    buf.drain(len);
+
+                    // Update sequence ID
+                    seq_id[core_id] = (seq_id[core_id] + 1) % 128;
                 } else {
                     break;
                 }
@@ -142,7 +146,7 @@ pub async fn connector(mut out_route: PrinterRoute, cpu_freq: Rate) {
             match Request::from_bytes(recvd_buffer.iter()) {
                 Some((request, n)) => {
                     match request {
-                        Request::GetGlobalClockDefinition => { 
+                        Request::GetGlobalClockDefinition => {
                             // Send global clock definition
                             send_global_clock_configuration(cpu_freq.as_hz());
                         }

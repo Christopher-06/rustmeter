@@ -200,22 +200,25 @@ impl<const N: usize> AtomicRingBuffer<N> {
         Some(free - len)
     }
 
-    pub fn pop_slice(&mut self, out: &mut [u8]) -> usize {
-        // IMPORTANT: Memory Barrier
+    /// Peek into the buffer without removing data. Important Memory Barriers must be ensured by the caller.
+    pub fn peek_slice(&mut self, out: &mut [u8]) -> usize {
         let current_write = self.write.load(Ordering::Acquire);
         let current_read = self.read.load(Ordering::Relaxed);
 
+        // Calculate available data
         let available = if current_write >= current_read {
             current_write - current_read
         } else {
             N - current_read + current_write
         };
 
+        // Handle read length
         let to_read = core::cmp::min(out.len(), available);
         if to_read == 0 {
             return 0;
         }
 
+        // Copy data
         unsafe {
             let dst = out.as_mut_ptr();
             let src_base = self.buf.as_ptr();
@@ -230,11 +233,25 @@ impl<const N: usize> AtomicRingBuffer<N> {
             }
         }
 
-        // Release: We free the space. Producer sees this only now.
-        let new_read = (current_read + to_read) % N;
-        self.read.store(new_read, Ordering::Release);
-
         to_read
+    }
+
+    /// Drain data from the buffer. Important Memory Barriers must be ensured by the caller.
+    pub fn drain(&mut self, len: usize) {
+        let current_write = self.write.load(Ordering::Acquire);
+        let current_read = self.read.load(Ordering::Relaxed);
+
+        // Calculate available data
+        let available = if current_write >= current_read {
+            current_write - current_read
+        } else {
+            N - current_read + current_write
+        };
+
+        // Handle drain length
+        let to_drain = core::cmp::min(len, available);
+        let new_read = (current_read + to_drain) % N;
+        self.read.store(new_read, Ordering::Release);
     }
 
     pub fn is_empty(&self) -> bool {

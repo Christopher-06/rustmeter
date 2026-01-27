@@ -41,7 +41,11 @@ pub enum TracingDecodeError {
     DroppedEvents(u32),
     ChecksumMismatch,
     SerialPortError(std::io::Error),
-    InvalidFrameID(u8),
+    SequenceIdMismatch {
+        expected: u8,
+        received: u8,
+        core_id: u8,
+    },
     RttFailure(probe_rs::rtt::Error),
     ProbeRsError(probe_rs::Error),
     Unknown(anyhow::Error),
@@ -65,9 +69,13 @@ impl From<&TracingDecodeError> for anyhow::Error {
             TracingDecodeError::SerialPortError(e) => {
                 anyhow::anyhow!("Serial port error: {e}")
             }
-            TracingDecodeError::InvalidFrameID(id) => {
-                anyhow::anyhow!("Invalid frame ID: {id}")
-            }
+            TracingDecodeError::SequenceIdMismatch {
+                expected,
+                received,
+                core_id,
+            } => anyhow::anyhow!(
+                "Sequence ID mismatch on core {core_id}: expected {expected}, received {received}"
+            ),
             TracingDecodeError::RttFailure(e) => {
                 anyhow::anyhow!("RTT failure: {e}")
             }
