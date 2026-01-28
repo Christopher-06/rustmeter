@@ -8,6 +8,7 @@ use esp_hal::uart::Uart;
 use rustmeter_beacon_core::protocol::{EventPayload, Request, TypeDefinitionPayload};
 use rustmeter_beacon_core::tracing::write_tracing_event;
 
+use crate::espressif::framing::{FrameMode, create_dataframe};
 use crate::espressif::tracing_esp;
 use crate::ringbuffer::SimpleRingBuffer;
 use crate::timing::TICK_DIVIDER;
@@ -90,7 +91,6 @@ pub async fn connector(mut out_route: PrinterRoute, cpu_freq: Rate) {
 
     // Working buffer buffer
     let mut buffer = [0u8; 256]; // 128 byte buffer is ESP UART FIFO size and 64 bytes is USB Serial-JTAG FIFO size. Payload-Length is max 252 bytes
-    buffer[0] = 0xFF; // Start byte normally
 
     // Receive buffer
     let mut recvd_buffer = SimpleRingBuffer::<128>::new();
@@ -98,7 +98,7 @@ pub async fn connector(mut out_route: PrinterRoute, cpu_freq: Rate) {
     send_global_clock_configuration(cpu_freq.as_hz());
 
     loop {
-        // Wait for any new datadata or timeout
+        // wait for new data or timeout
         let _ = select(
             trace_data_signal.wait(),
             Timer::after(Duration::from_millis(100)),
@@ -107,26 +107,30 @@ pub async fn connector(mut out_route: PrinterRoute, cpu_freq: Rate) {
 
         // Process tracing data per core
         for (core_id, buf) in trace_buffers.iter().enumerate() {
-            for _ in 0..16 {
-                // peek bytes
-                let buf = unsafe { &mut *buf.get() };
-                let len = buf.peek_slice(&mut buffer[3..255]);
+            let inbuf = unsafe { &mut *buf.get() };
 
-                if len > 0 {
-                    trace_data_signal.reset();
+            for round in 0..16 {
+                // peek frame
+                let (framelen, datalen) = create_dataframe(
+                    FrameMode::Normal,
+                    core_id as u8,
+                    inbuf,
+                    &mut buffer,
+                    seq_id[core_id] as u8,
+                );
 
-                    // Pack data
-                    buffer[1] = (core_id << 7) as u8 | seq_id[core_id] as u8; // Core ID + Sequence ID
-                    buffer[2] = len as u8; // length byte
-                    buffer[len + 3] = calculate_checksum(&buffer[0..(3 + len)]); // checksum byte
-
-                    // Send and afterwars mark as read
-                    let _ = out_route.write_all(&buffer[0..3 + len + 1]).await;
-                    buf.drain(len);
+                // send any data if available
+                if datalen > 0 {
+                    // write frame
+                    let _ = out_route.write_all(&buffer[0..framelen]).await;
+                    inbuf.drain(datalen);
 
                     // Update sequence ID
                     seq_id[core_id] = (seq_id[core_id] + 1) % 128;
-                } else {
+                }
+
+                // Stop if only a few bytes are left for next round to allow other core-data to be sent
+                if round > 0 && inbuf.len() < 128 {
                     break;
                 }
             }
@@ -169,16 +173,16 @@ pub async fn connector(mut out_route: PrinterRoute, cpu_freq: Rate) {
                 }
             }
         }
-    }
-}
 
-/// Calculate XOR checksum
-fn calculate_checksum(data: &[u8]) -> u8 {
-    let mut checksum: u8 = 0;
-    for &b in data {
-        checksum ^= b;
+        // Look if there is still data left to send
+        let total_bytes_left: usize = trace_buffers
+            .iter()
+            .map(|buf| unsafe { &*buf.get() }.len())
+            .sum();
+        if total_bytes_left < 128 {
+            trace_data_signal.reset();
+        }
     }
-    checksum
 }
 
 pub fn send_global_clock_configuration(system_frequency_hz: u32) {

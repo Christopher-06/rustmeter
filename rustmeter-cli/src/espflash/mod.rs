@@ -3,6 +3,7 @@ use espflash::connection::{Connection, ResetAfterOperation, ResetBeforeOperation
 use serialport::UsbPortInfo;
 
 pub mod flashing;
+mod framing;
 
 pub mod serial_listener;
 

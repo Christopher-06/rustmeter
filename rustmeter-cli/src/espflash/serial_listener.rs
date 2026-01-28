@@ -10,6 +10,7 @@ use std::{
 
 use crate::{
     commands::flash_and_monitor::ChipMonitoringTool,
+    espflash::framing::FrameStream,
     tracing::{CoreTracingData, TracingDecodeError},
 };
 
@@ -75,11 +76,15 @@ fn serial_reader_thread(
             Err(e) if e.kind() == ErrorKind::Interrupted => continue,
             Err(e) => {
                 // Send error and continue
-                let ch_closed = tracing_bytes_sender
-                    .send(Err(TracingDecodeError::SerialPortError(e)))
-                    .is_err();
-                if ch_closed {
-                    break;
+                if valid_in_stream {
+                    valid_in_stream = false;
+
+                    let ch_closed = tracing_bytes_sender
+                        .send(Err(TracingDecodeError::SerialPortError(e)))
+                        .is_err();
+                    if ch_closed {
+                        break;
+                    }
                 }
 
                 thread::sleep(Duration::from_millis(100));
@@ -87,100 +92,97 @@ fn serial_reader_thread(
             }
         };
 
-        // add to decoding
+        // Try to decode frames
         decoding.extend(&buffer[0..read_count]);
+        while let Some((frame_pos, decoded)) = try_decode_single(&decoding, &mut next_seq_id) {
+            // handle decoded frame
+            let ch_closed = match decoded {
+                Ok((frame_len, tracing_data)) => {
+                    // drain decoded frame from stream
+                    decoding.drain(0..(frame_pos + frame_len));
 
-        // Try to decode (Frame starting with 0xFF, type-id, length of payload, payload, checksum)
-        while let Some(frame_starts) = decoding.iter().position(|&b| b == 0xFF) {
-            // Enforce minimum frame size (header)
-            if decoding.len() < frame_starts + 4 {
-                break;
-            }
+                    valid_in_stream = true;
+                    tracing_bytes_sender.send(Ok(tracing_data)).is_err()
+                }
+                Err(e) => {
+                    // drain till frame start + 1
+                    decoding.drain(0..(frame_pos + 1));
 
-            // Read seq id, core id and length
-            let core_id = ((decoding[frame_starts + 1] >> 7) & 0x01) as usize;
-            let seq_id = decoding[frame_starts + 1] & 0x7F;
-            let length = decoding[frame_starts + 2] as usize;
-            if decoding.len() < frame_starts + 4 + length {
-                break;
-            }
+                    // send one error when we had valid frames before
+                    if valid_in_stream {
+                        valid_in_stream = false;
 
-            // Check sequence id
-            assert!(
-                core_id < 2,
-                "Core ID should be one bit. This should never happen."
-            );
-            let as_expected =
-                next_seq_id[core_id].is_none_or(|expected_seq_id| seq_id == expected_seq_id);
-            if !as_expected {
-                // Sequence ID mismatch, discard this start byte and continue
-                decoding.drain(0..(frame_starts + 1));
-
-                if valid_in_stream {
-                    let ch_closed = tracing_bytes_sender
-                        .send(Err(TracingDecodeError::SequenceIdMismatch {
-                            expected: next_seq_id[core_id].unwrap(),
-                            received: seq_id,
-                            core_id: core_id as u8,
-                        }))
-                        .is_err();
-                    if ch_closed {
-                        break;
+                        tracing_bytes_sender.send(Err(e)).is_err()
+                    } else {
+                        // send empty data to check if channel is closed
+                        tracing_bytes_sender
+                            .send(Ok(CoreTracingData::Core0(Box::new([]))))
+                            .is_err()
                     }
                 }
-
-                // clear valid state
-                valid_in_stream = false;
-                next_seq_id = [None, None];
-                continue;
-            }
-            next_seq_id[core_id] = Some((seq_id + 1) % 128);
-
-            // Calculate checksum
-            let mut calculated_checksum: u8 = 0;
-            for &b in &decoding[frame_starts..(frame_starts + 3 + length)] {
-                calculated_checksum ^= b;
-            }
-
-            // Verify checksum
-            let received_checksum = decoding[frame_starts + 3 + length];
-            if calculated_checksum != received_checksum {
-                // Invalid checksum, discard this start byte and continue
-                decoding.drain(0..(frame_starts + 1));
-
-                if valid_in_stream {
-                    let ch_closed = tracing_bytes_sender
-                        .send(Err(TracingDecodeError::ChecksumMismatch))
-                        .is_err();
-                    if ch_closed {
-                        break;
-                    }
-                }
-
-                valid_in_stream = false;
-                next_seq_id = [None, None];
-                continue;
-            }
-
-            // Prepare tracing bytes
-            let payload = &decoding[(frame_starts + 3)..(frame_starts + 3 + length)];
-            let tracing_bytes = match core_id {
-                0 => CoreTracingData::Core0(payload.to_vec().into_boxed_slice()),
-                1 => CoreTracingData::Core1(payload.to_vec().into_boxed_slice()),
-                // This should never happen because of one bit core id.
-                _ => unreachable!("Invalid core id parsed."),
             };
 
-            // Send tracing bytes
-            valid_in_stream = true;
-            let ch_closed = tracing_bytes_sender.send(Ok(tracing_bytes)).is_err();
+            // end if channel closed
             if ch_closed {
-                // Receiver has been closed, exit thread
-                break;
+                return;
             }
-
-            // Remove processed frame from decoding buffer
-            decoding.drain(0..(frame_starts + 4 + length));
         }
     }
+}
+
+/// Try to decode a single frame from the given byte slice. Returns the position of the frame in the
+/// slice and the decoded CoreTracingData with frame len, or a TracingDecodeError if decoding failed.
+fn try_decode_single(
+    buffer: &[u8],
+    next_seq_id: &mut [Option<u8>],
+) -> Option<(usize, Result<(usize, CoreTracingData), TracingDecodeError>)> {
+    // Try to get first frame
+    let stream = FrameStream::from_bytes(&buffer);
+    let (frame_pos, frame) = match stream.get_first_frame_start(None) {
+        Some((pos, frame)) => (pos, frame),
+        None => return None,
+    };
+
+    // TODO: Handle incomplete frames when Panic Mode starts
+    // TODO: Handle same seq id in Panic Mode??? Handle stream failure before Panic Mode!!!
+
+    if !frame.is_complete() {
+        return None;
+    }
+
+    // Check checksum
+    if !frame.verify_checksum().unwrap() {
+        return Some((frame_pos, Err(TracingDecodeError::ChecksumMismatch)));
+    }
+
+    // Check seq id
+    let core_id = frame.core_id().unwrap() as usize;
+    let seq_id = frame.seq_id().unwrap();
+    if !next_seq_id[core_id].is_none_or(|expected| seq_id == expected) {
+        return Some((
+            frame_pos,
+            Err(TracingDecodeError::SequenceIdMismatch {
+                expected: next_seq_id[core_id].unwrap(),
+                received: seq_id,
+                core_id: core_id as u8,
+            }),
+        ));
+    }
+    next_seq_id[core_id] = Some((seq_id + 1) % 128);
+
+    // return tracing data
+    let payload = frame.data().unwrap();
+    let core_mapper = match core_id {
+        0 => CoreTracingData::Core0,
+        1 => CoreTracingData::Core1,
+        // This should never happen because of one bit core id.
+        _ => unreachable!("Invalid core id parsed."),
+    };
+    Some((
+        frame_pos,
+        Ok((
+            frame.len().unwrap(),
+            core_mapper(payload.to_vec().into_boxed_slice()),
+        )),
+    ))
 }
