@@ -13,6 +13,7 @@ pub mod event_ids {
     pub const TYPE_DEFINITION: u8 = 9;
     pub const DATA_LOSS_EVENT: u8 = 10;
     pub const DEFMT_DATA_EVENT: u8 = 11;
+    pub const PANIC_EVENT: u8 = 12;
 }
 
 #[inline(always)]

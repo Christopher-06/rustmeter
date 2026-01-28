@@ -1,6 +1,6 @@
 use crate::{
     buffer::{BufferReader, BufferWriter},
-    protocol::{MonitorValuePayload, TypeDefinitionPayload},
+    protocol::{CustomPanicInfo, MonitorValuePayload, TypeDefinitionPayload},
     tracing::ReadTracingError,
 };
 use arbitrary_int::{traits::Integer, u3, u5};
@@ -9,22 +9,36 @@ use arbitrary_int::{traits::Integer, u3, u5};
 pub enum EventPayload {
     /// Embassy Task is ready to be polled (Waker called).
     /// ExecutorID will also be included
-    EmbassyTaskReady { task_id: u16, executor_id: u3 },
+    EmbassyTaskReady {
+        task_id: u16,
+        executor_id: u3,
+    },
     /// Embassy Task execution began (poll called).
     /// ExecutorID will also be included
-    EmbassyTaskExecBegin { task_id: u16, executor_id: u3 },
+    EmbassyTaskExecBegin {
+        task_id: u16,
+        executor_id: u3,
+    },
     /// Embassy Task execution ended (returned Poll::Ready or yielded Poll::Pending).
     /// ExecutorID is included because it is shorter to transmit than TaskID and we know the executor from the TaskExecBegin event.
-    EmbassyTaskExecEnd { executor_id: u3 },
+    EmbassyTaskExecEnd {
+        executor_id: u3,
+    },
     /// Embassy Executor started polling tasks.
     /// ExecutorID is included because it is the only identifier for the executor.
-    EmbassyExecutorPollStart { executor_id: u3 },
+    EmbassyExecutorPollStart {
+        executor_id: u3,
+    },
     /// Embassy Executor is idle (no tasks to poll).
     /// ExecutorID is included because it is the only identifier for the executor.
-    EmbassyExecutorIdle { executor_id: u3 },
+    EmbassyExecutorIdle {
+        executor_id: u3,
+    },
     /// Function or Scope Monitor started
     /// MonitorID identifies the monitor instance (was assigned via previous TypeDefinition event).
-    MonitorStart { monitor_id: u8 },
+    MonitorStart {
+        monitor_id: u8,
+    },
     /// Function or Scope Monitor ended
     /// MonitorID are not included here because they can be inferred from the corresponding MonitorStart event
     MonitorEnd,
@@ -38,7 +52,9 @@ pub enum EventPayload {
     /// Type Definition Event
     TypeDefinition(TypeDefinitionPayload),
     /// Data Loss Event because of buffer full situation
-    DataLossEvent { dropped_events: u32 },
+    DataLossEvent {
+        dropped_events: u32,
+    },
     DefmtData {
         len: u8,
         #[cfg(not(feature = "std"))]
@@ -46,6 +62,7 @@ pub enum EventPayload {
         #[cfg(feature = "std")]
         data: Vec<u8>,
     },
+    Panic(CustomPanicInfo),
 }
 
 impl EventPayload {
@@ -63,6 +80,7 @@ impl EventPayload {
             EventPayload::TypeDefinition(_) => TYPE_DEFINITION,
             EventPayload::DataLossEvent { .. } => DATA_LOSS_EVENT,
             EventPayload::DefmtData { .. } => DEFMT_DATA_EVENT,
+            EventPayload::Panic(_) => PANIC_EVENT,
         };
 
         u5::new(id)
@@ -150,6 +168,13 @@ impl EventPayload {
                     writer.write_bytes(&data[..*len as usize]);
                 }
             }
+            #[allow(unused_variables)]
+            EventPayload::Panic(panic_info) => {
+                #[cfg(not(feature = "std"))]
+                panic_info.write_bytes(writer);
+                #[cfg(feature = "std")]
+                unimplemented!("Panic event encoding requires the 'std' feature to be disabled.");
+            }
         }
     }
 
@@ -229,6 +254,21 @@ impl EventPayload {
                     let len = buffer.read_byte()?;
                     let data = buffer.read_bytes(len as usize)?.to_vec();
                     Ok(EventPayload::DefmtData { len, data })
+                }
+            }
+            // PanicEvent
+            PANIC_EVENT => {
+                #[cfg(not(feature = "std"))]
+                {
+                    unimplemented!(
+                        "Panic event decoding requires the 'std' feature to be enabled."
+                    );
+                }
+
+                #[cfg(feature = "std")]
+                {
+                    let panic_info = CustomPanicInfo::read_bytes(buffer)?;
+                    Ok(EventPayload::Panic(panic_info))
                 }
             }
             _ => return Err(ReadTracingError::InvalidEventType),
