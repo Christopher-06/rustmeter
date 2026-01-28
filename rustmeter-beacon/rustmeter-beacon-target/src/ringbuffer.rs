@@ -159,6 +159,18 @@ impl<const N: usize> AtomicRingBuffer<N> {
         N - 1
     }
 
+    /// Returns the number of used bytes in the buffer
+    pub fn len(&self) -> usize {
+        let current_write = self.write.load(Ordering::Acquire);
+        let current_read = self.read.load(Ordering::Relaxed);
+
+        if current_write >= current_read {
+            current_write - current_read
+        } else {
+            N - current_read + current_write
+        }
+    }
+
     #[inline(always)]
     pub fn push_slice_fast(&mut self, data: &[u8]) -> Option<usize> {
         let len = data.len();
