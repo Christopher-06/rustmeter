@@ -29,6 +29,24 @@ impl BufferWriter {
         self.position += len;
     }
 
+    /// Writes a little-endian u16 into the buffer
+    pub fn write_u16(&mut self, value: u16) {
+        let bytes = value.to_le_bytes();
+        self.write_bytes(&bytes);
+    }
+
+    /// Writes a little-endian u32 into the buffer
+    pub fn write_u32(&mut self, value: u32) {
+        let bytes = value.to_le_bytes();
+        self.write_bytes(&bytes);
+    }
+
+    /// Writes a little-endian u64 into the buffer
+    pub fn write_u64(&mut self, value: u64) {
+        let bytes = value.to_le_bytes();
+        self.write_bytes(&bytes);
+    }
+
     /// Writes a generic integer using LEB128 (VarInt) encoding
     #[inline]
     pub fn write_varint<T: VarIntWritable>(&mut self, mut value: T) {

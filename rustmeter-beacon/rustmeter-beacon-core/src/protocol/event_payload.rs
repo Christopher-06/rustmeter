@@ -132,13 +132,13 @@ impl EventPayload {
                 task_id,
                 executor_id: _,
             } => {
-                writer.write_bytes(&task_id.to_le_bytes());
+                writer.write_u16(*task_id);
             }
             EventPayload::EmbassyTaskExecBegin {
                 task_id,
                 executor_id: _,
             } => {
-                writer.write_bytes(&task_id.to_le_bytes());
+                writer.write_u16(*task_id);
             }
             EventPayload::EmbassyTaskExecEnd { executor_id: _ } => {}
             EventPayload::EmbassyExecutorPollStart { executor_id: _ } => {}
@@ -155,7 +155,7 @@ impl EventPayload {
                 def.write_bytes(writer);
             }
             EventPayload::DataLossEvent { dropped_events } => {
-                writer.write_bytes(&dropped_events.to_le_bytes());
+                writer.write_u32(*dropped_events);
             }
             EventPayload::DefmtData { data, len } => {
                 writer.write_byte(*len);

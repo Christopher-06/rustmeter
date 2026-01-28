@@ -1,6 +1,9 @@
 use arbitrary_int::{traits::Integer, u3};
 
-use crate::{buffer::{BufferReader, BufferWriter}, tracing::ReadTracingError};
+use crate::{
+    buffer::{BufferReader, BufferWriter},
+    tracing::ReadTracingError,
+};
 
 /// Type Definition Event Payloads (as tagged enum)
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,8 +91,8 @@ impl TypeDefinitionPayload {
                 executor_id_long,
                 executor_id_short,
             } => {
-                writer.write_bytes(&task_id.to_le_bytes()); // send full task ID for mapping
-                writer.write_bytes(&executor_id_long.to_le_bytes());
+                writer.write_u32(*task_id); // send full task ID for mapping
+                writer.write_u32(*executor_id_long);
                 writer.write_byte(executor_id_short.as_u8());
             }
             TypeDefinitionPayload::EmbassyTaskEnded {
@@ -97,8 +100,8 @@ impl TypeDefinitionPayload {
                 executor_id_long,
                 executor_id_short,
             } => {
-                writer.write_bytes(&task_id.to_le_bytes()); // send full task ID for mapping
-                writer.write_bytes(&executor_id_long.to_le_bytes());
+                writer.write_u32(*task_id); // send full task ID for mapping
+                writer.write_u32(*executor_id_long);
                 writer.write_byte(executor_id_short.as_u8());
             }
             TypeDefinitionPayload::FunctionMonitor {
@@ -106,7 +109,7 @@ impl TypeDefinitionPayload {
                 fn_address,
             } => {
                 writer.write_byte(*monitor_id);
-                writer.write_bytes(&fn_address.to_le_bytes());
+                writer.write_u32(*fn_address);
             }
             TypeDefinitionPayload::ScopeMonitor { monitor_id, name } => {
                 writer.write_byte(*monitor_id);
@@ -122,8 +125,8 @@ impl TypeDefinitionPayload {
                 system_frequency_hz,
                 tick_divider,
             } => {
-                writer.write_bytes(&system_frequency_hz.to_le_bytes());
-                writer.write_bytes(&tick_divider.to_le_bytes());
+                writer.write_u32(*system_frequency_hz);
+                writer.write_u16(*tick_divider);
             }
             TypeDefinitionPayload::CoreClockReference {
                 core_id,
@@ -131,13 +134,16 @@ impl TypeDefinitionPayload {
                 cpu_ticks,
             } => {
                 writer.write_byte(*core_id);
-                writer.write_bytes(&systimer_us.to_le_bytes());
-                writer.write_bytes(&cpu_ticks.to_le_bytes());
+                writer.write_u64(*systimer_us);
+                writer.write_u32(*cpu_ticks);
             }
         }
     }
 
-    pub(crate) fn from_bytes(typedef_id: u8, buffer: &mut BufferReader) -> Result<Self, ReadTracingError> {
+    pub(crate) fn from_bytes(
+        typedef_id: u8,
+        buffer: &mut BufferReader,
+    ) -> Result<Self, ReadTracingError> {
         match typedef_id {
             // EmbassyTaskCreated
             0 => {
