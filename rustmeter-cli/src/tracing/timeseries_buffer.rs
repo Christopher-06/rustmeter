@@ -21,10 +21,11 @@ enum TimeSeriesEvent {
     CodeMonitorStart,
     CodeMonitorEnd,
     ValueMonitor,
+    PanicEvent,
 }
 
 impl TimeSeriesEvent {
-    const N_EVENTS: usize = 8;
+    const N_EVENTS: usize = 9;
 
     pub const fn as_str(&self) -> &'static str {
         match self {
@@ -36,6 +37,7 @@ impl TimeSeriesEvent {
             TimeSeriesEvent::CodeMonitorStart => "CodeMonitorStart",
             TimeSeriesEvent::CodeMonitorEnd => "CodeMonitorEnd",
             TimeSeriesEvent::ValueMonitor => "ValueMonitor",
+            TimeSeriesEvent::PanicEvent => "PanicEvent",
         }
     }
 
@@ -204,6 +206,18 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                 self.code_monitor_id.push(None);
                 self.value_monitor_id.push(Some(*value_id as u32));
                 self.value.push(Some(value.as_f64()));
+            }
+            EventPayload::Panic { .. } => {
+                self.core_origin.push(item.core().as_str());
+                self.event_type.push(TimeSeriesEvent::PanicEvent.as_str());
+                self.uc_timeticks.push(item.uc_timeticks());
+                self.pc_timestamps_us
+                    .push(item.pc_timestamp().as_micros() as u64);
+                self.task_ids.push(None);
+                self.executor_ids.push(None);
+                self.code_monitor_id.push(None);
+                self.value_monitor_id.push(None);
+                self.value.push(None);
             }
             _ => {
                 // Ignore other events for now

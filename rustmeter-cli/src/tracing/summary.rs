@@ -1,12 +1,14 @@
+#![allow(dead_code)]
 use std::collections::HashMap;
 
-use rustmeter_beacon_core::protocol::TypeDefinitionPayload;
+use rustmeter_beacon_core::protocol::{CustomPanicInfo, TypeDefinitionPayload};
 use time::OffsetDateTime;
 
 use crate::{
     analyze::clocks::{ClockReference, GlobalClockDefinition},
     cargo::elf_file::FirmwareAddressMap,
     cli::RunArgs,
+    tracing::TracingDecodeError,
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -40,6 +42,8 @@ pub struct TracingSummary {
     stream_data: HashMap<u32, StreamContainer>,
     /// Mapping from firmware addresses to symbol names
     fw_addr_map: FirmwareAddressMap,
+    /// Panic info if any panic occurred during tracing
+    panic_info: Option<CustomPanicInfo>,
     /// Chip name used during tracing
     chip: String,
     /// Indicates whether the firmware is a release build
@@ -63,6 +67,7 @@ impl TracingSummary {
             start_datetime,
             end_datetime: None,
             stream_data: HashMap::new(),
+            panic_info: None,
             updated: true,
             fw_addr_map,
             chip: args.chip.clone(),
@@ -82,6 +87,11 @@ impl TracingSummary {
         self.release
     }
 
+    /// Get the panic info if any panic occurred during tracing
+    pub fn panic_info(&self) -> Option<&CustomPanicInfo> {
+        self.panic_info.as_ref()
+    }
+
     /// Get the symbol name for a given firmware address
     pub fn get_fw_symbol_name(&self, addr: u64) -> Option<String> {
         self.fw_addr_map.get_symbol_name(addr)
@@ -91,6 +101,12 @@ impl TracingSummary {
     pub fn set_end_datetime(&mut self, end_datetime: OffsetDateTime) {
         self.updated = true;
         self.end_datetime = Some(end_datetime);
+    }
+
+    /// Get the duration of the tracing session if end datetime was set
+    pub fn get_tracing_duration(&self) -> Option<time::Duration> {
+        self.end_datetime
+            .and_then(|end| Some(end - self.start_datetime))
     }
 
     /// Register a new stream and return its assigned ID
@@ -109,6 +125,20 @@ impl TracingSummary {
 
         if let Some(container) = self.stream_data.get_mut(&stream_id) {
             container.error = Some(error);
+        }
+    }
+
+    /// Set the panic info if a panic occurred during tracing. This can only be set once during a tracing session.
+    pub fn set_panic_info(&mut self, info: CustomPanicInfo) -> Result<(), TracingDecodeError> {
+        self.updated = true;
+        match &self.panic_info {
+            Some(existing) => Err(TracingDecodeError::Unknown(anyhow::anyhow!(
+                "Panic info has already been set (existing: {existing} vs new: {info})",
+            ))),
+            None => {
+                self.panic_info = Some(info);
+                Ok(())
+            }
         }
     }
 

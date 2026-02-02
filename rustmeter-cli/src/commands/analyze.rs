@@ -175,7 +175,7 @@ fn process_traces_stream_id(
         lit(NULL).alias("args"),
         lit(NULL).alias("cat").cast(DataType::String),
         lit(NULL).alias("dur").cast(DataType::Float64),
-        lit(NULL).alias("scope").cast(DataType::String),
+        lit(NULL).alias("s").cast(DataType::String),
         lit(NULL).alias("cname").cast(DataType::String),
     ])
     .filter(col("stream_id").eq(lit(stream_id)));
@@ -196,6 +196,30 @@ fn process_traces_stream_id(
         .context("Error while preparing monitor values")?;
     let prepared_lf = prepare_code_monitors(prepared_lf, summary)
         .context("Error while preparing code monitors")?;
+
+    // set panic event as marker
+    let prepared_lf = if let Some(info) = summary.panic_info() {
+        prepared_lf.with_columns([
+            when(col("event").eq(lit("PanicEvent")))
+                .then(lit("I"))
+                .otherwise(col("ph"))
+                .alias("ph"),
+            when(col("event").eq(lit("PanicEvent")))
+                .then(lit(format!("{info}")))
+                .otherwise(col("name"))
+                .alias("name"),
+            when(col("event").eq(lit("PanicEvent")))
+                .then(lit("panic"))
+                .otherwise(col("cat"))
+                .alias("cat"),
+            when(col("event").eq(lit("PanicEvent")))
+                .then(lit("g")) // global scope for panic event
+                .otherwise(col("s"))
+                .alias("s"),
+        ])
+    } else {
+        prepared_lf
+    };
 
     #[cfg(debug_assertions)]
     {
@@ -224,7 +248,7 @@ fn process_traces_stream_id(
             col("args"),
             col("dur"),
             col("cat"),
-            col("scope"),
+            col("s"),
             col("cname"),
         ]);
 

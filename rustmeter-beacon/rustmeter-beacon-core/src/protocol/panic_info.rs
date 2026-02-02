@@ -3,6 +3,7 @@ use crate::{buffer::BufferWriter, tracing::ReadTracingError};
 use core::panic::{Location, PanicInfo};
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct CustomPanicInfo {
     core_id: u8,
     // Message Info
