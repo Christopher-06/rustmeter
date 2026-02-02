@@ -4,6 +4,7 @@ use serialport::UsbPortInfo;
 
 pub mod flashing;
 mod framing;
+mod serial_decoder;
 
 pub mod serial_listener;
 
@@ -36,4 +37,38 @@ pub fn get_espflash_connection() -> anyhow::Result<Connection> {
         ResetBeforeOperation::DefaultReset,
         115200,
     ))
+}
+
+#[derive(Debug)]
+pub enum SerialFrameError {
+    ChecksumMismatch,
+    UnknownFrameMode(u8),
+    SequenceIdMismatch {
+        expected: u8,
+        received: u8,
+        core_id: u8,
+    },
+    DuplicateData,
+}
+
+impl From<&SerialFrameError> for anyhow::Error {
+    fn from(val: &SerialFrameError) -> Self {
+        match val {
+            SerialFrameError::ChecksumMismatch => anyhow::anyhow!("Checksum mismatch"),
+            SerialFrameError::SequenceIdMismatch {
+                expected,
+                received,
+                core_id,
+            } => anyhow::anyhow!(
+                "Sequence ID mismatch on core {}: expected {}, received {}",
+                core_id,
+                expected,
+                received
+            ),
+            SerialFrameError::DuplicateData => anyhow::anyhow!("Duplicate frame data received"),
+            SerialFrameError::UnknownFrameMode(mode) => {
+                anyhow::anyhow!("Unknown frame mode: {}", mode)
+            }
+        }
+    }
 }

@@ -2,6 +2,8 @@ use std::fmt::Display;
 
 use rustmeter_beacon_core::tracing::ReadTracingError;
 
+use crate::espflash::SerialFrameError;
+
 mod buffered_writer;
 mod defmt_buffer;
 mod defmt_decoder;
@@ -13,7 +15,7 @@ pub mod tracing_item;
 pub mod sink;
 pub mod summary;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CoreTracingData {
     Core0(Box<[u8]>),
     Core1(Box<[u8]>),
@@ -39,13 +41,8 @@ impl CoreTracingData {
 pub enum TracingDecodeError {
     InvalidData(ReadTracingError),
     DroppedEvents(u32),
-    ChecksumMismatch,
     SerialPortError(std::io::Error),
-    SequenceIdMismatch {
-        expected: u8,
-        received: u8,
-        core_id: u8,
-    },
+    SerialFrameError(SerialFrameError),
     RttFailure(probe_rs::rtt::Error),
     ProbeRsError(probe_rs::Error),
     Unknown(anyhow::Error),
@@ -65,17 +62,12 @@ impl From<&TracingDecodeError> for anyhow::Error {
             TracingDecodeError::DroppedEvents(n) => {
                 anyhow::anyhow!("Dropped {n} tracing events")
             }
-            TracingDecodeError::ChecksumMismatch => anyhow::anyhow!("Checksum mismatch"),
             TracingDecodeError::SerialPortError(e) => {
                 anyhow::anyhow!("Serial port error: {e}")
             }
-            TracingDecodeError::SequenceIdMismatch {
-                expected,
-                received,
-                core_id,
-            } => anyhow::anyhow!(
-                "Sequence ID mismatch on core {core_id}: expected {expected}, received {received}"
-            ),
+            TracingDecodeError::SerialFrameError(e) => {
+                anyhow::anyhow!("Serial frame error: {e:?}")
+            }
             TracingDecodeError::RttFailure(e) => {
                 anyhow::anyhow!("RTT failure: {e}")
             }
@@ -102,5 +94,18 @@ impl From<probe_rs::rtt::Error> for TracingDecodeError {
 impl From<probe_rs::Error> for TracingDecodeError {
     fn from(err: probe_rs::Error) -> Self {
         TracingDecodeError::ProbeRsError(err)
+    }
+}
+
+impl From<SerialFrameError> for TracingDecodeError {
+    fn from(value: SerialFrameError) -> Self {
+        TracingDecodeError::SerialFrameError(value)
+    }
+}
+
+impl PartialEq<TracingDecodeError> for TracingDecodeError {
+    fn eq(&self, other: &TracingDecodeError) -> bool {
+        // stringify the errors and compare
+        format!("{self}") == format!("{other}")
     }
 }

@@ -1,4 +1,4 @@
-use rustmeter_beacon_core::tracing::ReadTracingError;
+use crate::espflash::SerialFrameError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FrameMode {
@@ -6,41 +6,39 @@ pub enum FrameMode {
     Panic = 0xFE,
 }
 
+/// Represents a serial frame received from the device.
+/// First byte: Frame mode (0xFF = normal, 0xFE = panic)
+/// Second byte: Core ID (bit 7) + Sequence ID (bits 0-6)
+/// Third byte: Data length (N)
+/// Next N bytes: Data payload
+/// Last byte: Checksum (xor of all previous bytes)
+#[derive(Debug)]
 pub struct SerialFrame<'a>(&'a [u8]);
 
 impl SerialFrame<'_> {
     /// Get frame mode. Returns None if frame is incomplete.
-    pub fn mode(&self) -> Option<Result<FrameMode, ReadTracingError>> {
+    pub fn mode(&self) -> Result<Option<FrameMode>, SerialFrameError> {
         match self.0.get(0) {
-            Some(0xFF) => Some(Ok(FrameMode::Normal)),
-            Some(0xFE) => Some(Ok(FrameMode::Panic)),
-            Some(other) => Some(Err(ReadTracingError::UnknownFrameMode(*other))), // this should never happen by design
-            None => None,
+            Some(0xFF) => Ok(Some(FrameMode::Normal)),
+            Some(0xFE) => Ok(Some(FrameMode::Panic)),
+            Some(other) => Err(SerialFrameError::UnknownFrameMode(*other)), // this should never happen by design
+            None => Ok(None),
         }
     }
 
     /// Get core ID. Returns None if frame is incomplete.
     pub fn core_id(&self) -> Option<u8> {
-        match self.0.get(1) {
-            Some(byte) => Some((byte & 0x80) >> 7),
-            None => None,
-        }
+        self.0.get(1).map(|byte| (byte & 0x80) >> 7)
     }
 
     /// Get sequence ID. Returns None if frame is incomplete.
     pub fn seq_id(&self) -> Option<u8> {
-        match self.0.get(1) {
-            Some(byte) => Some(byte & 0x7F),
-            None => None,
-        }
+        self.0.get(1).map(|byte| byte & 0x7F)
     }
 
     /// Get data payload length. Returns None if frame is incomplete.
     pub fn data_length(&self) -> Option<usize> {
-        match self.0.get(2) {
-            Some(byte) => Some(*byte as usize),
-            None => None,
-        }
+        self.0.get(2).map(|byte| *byte as usize)
     }
 
     /// Get data payload slice. Returns None if frame is incomplete.
@@ -61,10 +59,7 @@ impl SerialFrame<'_> {
     /// Get checksum byte. Returns None if frame is incomplete.
     pub fn checksum(&self) -> Option<u8> {
         let length = self.data_length()?;
-        if self.0.len() < 3 + length + 1 {
-            return None;
-        }
-        Some(self.0[3 + length])
+        self.0.get(3 + length).copied()
     }
 
     /// Verify checksum of the frame. Returns None if frame is incomplete.
@@ -73,12 +68,13 @@ impl SerialFrame<'_> {
         let checksum = self.checksum()?;
 
         // xor checksum
-        let mut calculated_checksum: u8 = 0;
-        for &b in &self.0[0..(3 + length)] {
-            calculated_checksum ^= b;
-        }
-
+        let calculated_checksum = calculate_checksum(&self.0[0..(3 + length)]);
         Some(calculated_checksum == checksum)
+    }
+
+    /// Convert data payload to boxed slice. Returns None if frame is incomplete.
+    pub fn data_as_boxed(&self) -> Option<Box<[u8]>> {
+        Some(self.data()?.to_vec().into_boxed_slice())
     }
 
     /// Check if the frame is complete.
@@ -90,6 +86,12 @@ impl SerialFrame<'_> {
 impl<'a> From<&'a [u8]> for SerialFrame<'a> {
     fn from(slice: &'a [u8]) -> Self {
         SerialFrame(slice)
+    }
+}
+
+impl Default for SerialFrame<'_> {
+    fn default() -> Self {
+        SerialFrame(&[])
     }
 }
 
@@ -122,4 +124,14 @@ impl<'a> From<&'a [u8]> for FrameStream<'a> {
     fn from(slice: &'a [u8]) -> Self {
         FrameStream(slice)
     }
+}
+
+/// Calculate checksum for given data slice (xor of all bytes).
+pub fn calculate_checksum(data: &[u8]) -> u8 {
+    let mut checksum: u8 = 0;
+    for &b in data {
+        checksum ^= b;
+    }
+
+    checksum
 }
