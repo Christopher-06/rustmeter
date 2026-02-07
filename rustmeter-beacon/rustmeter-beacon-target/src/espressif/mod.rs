@@ -6,6 +6,7 @@ mod framing;
 mod local_critical_section;
 mod printing;
 mod tracing_esp;
+mod panic_handler;
 
 #[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32p4"))]
 pub const NUM_CORES: usize = 2;

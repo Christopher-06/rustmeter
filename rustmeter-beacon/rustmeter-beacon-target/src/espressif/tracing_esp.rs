@@ -37,7 +37,7 @@ static NEW_DATA_SIGNAL: embassy_sync::signal::Signal<CriticalSectionRawMutex, ()
     embassy_sync::signal::Signal::new();
 
 // static mut okay because accessed in critical section
-static mut DROPPED_EVENTS_COUNTER: [u32; 2] = [0, 0];
+pub static mut DROPPED_EVENTS_COUNTER: [u32; 2] = [0, 0];
 
 pub fn get_tracing_buffers_and_signaller() -> (
     &'static [PerCoreSync<AtomicRingBuffer<BUFFER_SIZE>>; NUM_CORES],
