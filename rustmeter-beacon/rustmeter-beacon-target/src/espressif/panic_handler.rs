@@ -1,5 +1,4 @@
 #![allow(static_mut_refs)]
-use esp_hal::peripherals::{UART0, USB_DEVICE};
 use rustmeter_beacon_core::{
     buffer::{ChunkedBufferWriter, SimpleBufferWriter},
     protocol::{CustomPanicInfo, EventPayload},
@@ -9,7 +8,7 @@ use rustmeter_beacon_core::{
 use crate::{
     core_id::get_current_core_id,
     espressif::{
-        framing::{FrameMode, create_dataframe, create_dataframe_raw},
+        framing::{create_dataframe, create_dataframe_raw, FrameMode},
         tracing_esp::{self, DROPPED_EVENTS_COUNTER},
     },
     timing::get_system_time_us,
@@ -30,6 +29,7 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
 
     // Reset UART0 FIFOs
     unsafe {
+        use esp_hal::peripherals::UART0;
         let uart0 = &*UART0::PTR;
 
         // Set reset bit
@@ -46,7 +46,9 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     }
 
     // USB Serial JTAG Flushing
+    #[cfg(any(feature = "esp32c3", feature = "esp32c6", feature = "esp32h2", feature = "esp32s3"))]
     unsafe {
+        use esp_hal::peripherals::USB_DEVICE;
         let usb = &*USB_DEVICE::PTR;
         usb.ep1_conf().modify(|_, w| w.wr_done().set_bit());
         delay_cycles(1000);
