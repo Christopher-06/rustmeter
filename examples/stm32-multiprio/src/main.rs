@@ -1,8 +1,6 @@
 #![no_std]
 #![no_main]
 
-use panic_probe as _;
-
 use cortex_m_rt::entry;
 use defmt::info;
 use embassy_executor::{Executor, InterruptExecutor};

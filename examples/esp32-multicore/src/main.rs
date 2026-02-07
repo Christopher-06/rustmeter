@@ -9,7 +9,6 @@
 use defmt::*;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
-use esp_backtrace as _;
 use esp_hal::clock::{Clock, CpuClock};
 use esp_hal::gpio;
 use esp_hal::interrupt::software::SoftwareInterruptControl;

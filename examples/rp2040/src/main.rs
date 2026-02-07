@@ -15,7 +15,6 @@ use embassy_rp::{
     multicore::{Stack, spawn_core1},
 };
 use embassy_time::Timer;
-use panic_probe as _;
 use rustmeter_beacon::*;
 use static_cell::StaticCell;
 
