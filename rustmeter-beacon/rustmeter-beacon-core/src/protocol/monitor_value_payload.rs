@@ -29,7 +29,7 @@ impl MonitorValuePayload {
     /// Write the payload data into the provided buffer.
     /// Returns the number of data bytes written into the provided buffer. Assumes the buffer is large enough.
     #[inline(always)]
-    pub(crate) fn write_bytes(&self, buffer: &mut BufferWriter) {
+    pub(crate) fn write_bytes<T : BufferWriter>(&self, buffer: &mut T) {
         match self {
             MonitorValuePayload::Unsigned(v) => {
                 buffer.write_varint(*v);

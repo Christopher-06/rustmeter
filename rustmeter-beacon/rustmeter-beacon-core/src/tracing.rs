@@ -1,7 +1,7 @@
 use critical_section::Mutex;
 
 use crate::{
-    buffer::{BufferReader, BufferWriter},
+    buffer::{BufferReader, SimpleBufferWriter},
     protocol::EventPayload,
     time_delta::TimeDelta,
 };
@@ -14,6 +14,7 @@ unsafe extern "Rust" {
 static TRACE_WRITING: Mutex<()> = Mutex::new(());
 
 /// Serializes and writes a tracing event with timestamp to the tracing channel
+/// Use only small events here, as the data is written into a fixed-size buffer. Larger events may be truncated or cause issues.
 pub fn write_tracing_event(event: EventPayload) {
     // Ensure only one tracing event is written at a time
     critical_section::with(|cs| {
@@ -22,7 +23,7 @@ pub fn write_tracing_event(event: EventPayload) {
         let timestamp = TimeDelta::from_now();
 
         // Write event data
-        let mut buffer = BufferWriter::new();
+        let mut buffer = SimpleBufferWriter::new();
         event.write_bytes(&mut buffer);
         timestamp.write_bytes(&mut buffer);
 
@@ -49,7 +50,9 @@ impl From<core::str::Utf8Error> for ReadTracingError {
 }
 
 /// Reads a tracing event with timestamp from the provided buffer
-pub fn read_tracing_event(buffer: &mut BufferReader) -> Result<(TimeDelta, EventPayload), ReadTracingError> {
+pub fn read_tracing_event(
+    buffer: &mut BufferReader,
+) -> Result<(TimeDelta, EventPayload), ReadTracingError> {
     let event_type = buffer.read_byte()?;
     let event = EventPayload::from_bytes(event_type, buffer)?;
     let timestamp = TimeDelta::read_bytes(buffer)?;

@@ -1,6 +1,6 @@
 use crossbeam::channel::{Receiver, Sender};
 use espflash::connection::Connection;
-use rustmeter_beacon_core::{buffer::BufferWriter, protocol::Request};
+use rustmeter_beacon_core::{buffer::SimpleBufferWriter, protocol::Request};
 
 use std::{
     io::{ErrorKind, Read, Write},
@@ -59,7 +59,7 @@ fn serial_reader_thread(
     loop {
         // Check for requests one at a time
         if let Ok(request) = req_recver.try_recv() {
-            let mut writer = BufferWriter::new();
+            let mut writer = SimpleBufferWriter::new();
             request.write_bytes(&mut writer);
 
             if let Err(e) = serial_port.write_all(writer.as_slice()) {

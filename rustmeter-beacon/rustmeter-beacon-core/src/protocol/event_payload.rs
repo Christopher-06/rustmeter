@@ -120,7 +120,7 @@ impl EventPayload {
         None
     }
 
-    pub fn write_bytes(&self, writer: &mut BufferWriter) {
+    pub fn write_bytes<T : BufferWriter>(&self, writer: &mut T) {
         // Write the event ID (5 bits) and sub event id (3 bits) as a single byte
         let sub_id = self.get_sub_id().unwrap_or(u3::new(0));
         let event_type = u8::from(self.event_id()) << 3 | sub_id.as_u8();

@@ -6,6 +6,7 @@ use core::panic::{Location, PanicInfo};
 #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub struct CustomPanicInfo {
     core_id: u8,
+    panic_sys_time: u64,
     // Message Info
     msg_length: u16,
     #[cfg(not(feature = "std"))]
@@ -24,7 +25,7 @@ pub struct CustomPanicInfo {
 impl CustomPanicInfo {
     /// Create a CustomPanicInfo from a core::panic::PanicInfo
     #[cfg(not(feature = "std"))]
-    pub fn from_panic(panic_info: &PanicInfo<'_>, core_id: u8) -> Self {
+    pub fn from_panic(panic_info: &PanicInfo<'_>, core_id: u8, panic_sys_time : u64) -> Self {
         let (message, msg_length) = match panic_info.message().as_str() {
             Some(msg) => (Some(msg.as_ptr()), msg.len() as u16),
             None => (None, 0),
@@ -43,6 +44,7 @@ impl CustomPanicInfo {
 
         CustomPanicInfo {
             core_id,
+            panic_sys_time,
             msg_length,
             message,
             line,
@@ -53,9 +55,10 @@ impl CustomPanicInfo {
 
     /// Write the CustomPanicInfo to a BufferWriter
     #[cfg(not(feature = "std"))]
-    pub fn write_bytes(&self, writer: &mut BufferWriter) {
+    pub fn write_bytes<T : BufferWriter>(&self, writer: &mut T) {
         writer.write_byte(self.core_id);
-
+        writer.write_u64(self.panic_sys_time);
+        
         // Write message
         writer.write_u16(self.msg_length);
         if let Some(msg) = self.message {
@@ -79,6 +82,7 @@ impl CustomPanicInfo {
         reader: &mut crate::buffer::BufferReader,
     ) -> Result<Self, crate::tracing::ReadTracingError> {
         let core_id = reader.read_byte()?;
+        let panic_sys_time = reader.read_u64()?;
 
         // Read message
         let msg_length = reader.read_u16()?;
@@ -109,6 +113,7 @@ impl CustomPanicInfo {
 
         Ok(CustomPanicInfo {
             core_id,
+            panic_sys_time,
             msg_length,
             message,
             line,
@@ -134,6 +139,10 @@ impl CustomPanicInfo {
 
     pub fn filename(&self) -> Option<&str> {
         self.filename.as_deref()
+    }
+
+    pub fn sys_time(&self) -> u64 {
+        self.panic_sys_time
     }
 }
 

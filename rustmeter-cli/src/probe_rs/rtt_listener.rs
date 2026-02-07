@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crossbeam::channel::{Receiver, Sender};
 use probe_rs::rtt::Rtt;
-use rustmeter_beacon_core::{buffer::BufferWriter, protocol::Request};
+use rustmeter_beacon_core::{buffer::SimpleBufferWriter, protocol::Request};
 
 use crate::{
     commands::flash_and_monitor::ChipMonitoringTool,
@@ -114,7 +114,7 @@ fn rtt_reader_thread(
 
 fn send_request(req: Request, rtt: &mut Rtt, session: &AtomicSession) -> anyhow::Result<()> {
     // Serialize
-    let mut writer = BufferWriter::new();
+    let mut writer = SimpleBufferWriter::new();
     req.write_bytes(&mut writer);
 
     // Get first downchannel

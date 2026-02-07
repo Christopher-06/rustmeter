@@ -80,7 +80,7 @@ impl TypeDefinitionPayload {
         }
     }
 
-    pub(crate) fn write_bytes(&self, writer: &mut BufferWriter) {
+    pub(crate) fn write_bytes<T: BufferWriter>(&self, writer: &mut T) {
         // Write the type definition ID as first byte
         writer.write_byte(self.type_id());
 
