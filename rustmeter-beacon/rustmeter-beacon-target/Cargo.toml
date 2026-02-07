@@ -43,3 +43,6 @@ rp2040 = [ "dep:embassy-rp", "embassy-rp/rp2040", "portable-atomic/critical-sect
 rp235xa = ["dep:embassy-rp", "embassy-rp/rp235xa", "portable-atomic/critical-section", "rustmeter-beacon-core/multicore"]
 rp235xb = ["dep:embassy-rp", "embassy-rp/rp235xb", "portable-atomic/critical-section", "rustmeter-beacon-core/multicore"]
 esp-sync = ["dep:esp-sync"]
+
+panic-pre-hook = []
+panic-custom-halt = []

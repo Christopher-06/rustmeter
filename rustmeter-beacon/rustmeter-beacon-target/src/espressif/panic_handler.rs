@@ -8,9 +8,10 @@ use rustmeter_beacon_core::{
 use crate::{
     core_id::get_current_core_id,
     espressif::{
-        framing::{create_dataframe, create_dataframe_raw, FrameMode},
+        framing::{FrameMode, create_dataframe, create_dataframe_raw},
         tracing_esp::{self, DROPPED_EVENTS_COUNTER},
     },
+    panic_custom_halt, panic_pre_hook,
     timing::get_system_time_us,
 };
 
@@ -25,7 +26,11 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     // Take time and block other core / interrupts
     let panic_sys_time = get_system_time_us();
     let mut panic_time_delta = TimeDelta::from_now();
-    let _ = unsafe { critical_section::acquire() };
+    let rs = unsafe { critical_section::acquire() };
+
+    unsafe {
+        panic_pre_hook(info);
+    }
 
     // Reset UART0 FIFOs
     unsafe {
@@ -46,7 +51,12 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     }
 
     // USB Serial JTAG Flushing
-    #[cfg(any(feature = "esp32c3", feature = "esp32c6", feature = "esp32h2", feature = "esp32s3"))]
+    #[cfg(any(
+        feature = "esp32c3",
+        feature = "esp32c6",
+        feature = "esp32h2",
+        feature = "esp32s3"
+    ))]
     unsafe {
         use esp_hal::peripherals::USB_DEVICE;
         let usb = &*USB_DEVICE::PTR;
@@ -152,5 +162,7 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     esp_println::println!("{info}\n\r\n\r\n\r");
 
     // Halt the core
-    loop {}
+    unsafe {
+        panic_custom_halt(rs);
+    }
 }

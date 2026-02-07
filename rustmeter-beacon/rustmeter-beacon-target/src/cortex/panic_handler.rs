@@ -8,6 +8,7 @@ use rustmeter_beacon_core::{
 use crate::{
     core_id::get_current_core_id,
     cortex::{rtt_minimal::rtt_write_core, tracing_rtt::DROPPED_EVENTS_COUNTER},
+    panic_custom_halt, panic_pre_hook,
     timing::get_system_time_us,
 };
 
@@ -17,7 +18,11 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     let panic_sys_time = get_system_time_us();
     let mut panic_time_delta = TimeDelta::from_now();
 
-    let _ = unsafe { critical_section::acquire() }; // ensure nothing else is running while we log the panic
+    let rs = unsafe { critical_section::acquire() }; // ensure nothing else is running while we log the panic
+
+    unsafe {
+        panic_pre_hook(info);
+    }
 
     // Check for dropped frames
     for (core_id, drop_count) in unsafe { DROPPED_EVENTS_COUNTER.iter().enumerate() } {
@@ -57,6 +62,8 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     panic_time_delta.write_bytes(&mut buffer);
     buffer.flush();
 
-    // halt
-    loop {}
+    // Halt the core
+    unsafe {
+        panic_custom_halt(rs);
+    }
 }

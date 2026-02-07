@@ -31,3 +31,6 @@ esp32s2 = ["rustmeter-beacon-target/esp32s2"]
 esp32s3 = ["rustmeter-beacon-target/esp32s3"]
 rp2040 = ["rustmeter-beacon-target/rp2040"]
 defmt = ["dep:defmt", "rustmeter-beacon-target/defmt"]
+
+panic-pre-hook = ["rustmeter-beacon-target/panic-pre-hook"]
+panic-custom-halt = ["rustmeter-beacon-target/panic-custom-halt"]
