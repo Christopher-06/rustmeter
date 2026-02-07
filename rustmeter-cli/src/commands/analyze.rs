@@ -12,7 +12,10 @@ use anyhow::Context;
 use arbitrary_int::traits::Integer;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use polars::prelude::*;
-use rustmeter_beacon_core::{compressed_task_id, protocol::TypeDefinitionPayload};
+use rustmeter_beacon_core::{
+    compressed_task_id,
+    protocol::{CustomPanicInfo, TypeDefinitionPayload},
+};
 
 use crate::{
     analyze::{
@@ -91,8 +94,9 @@ pub fn do_analyze_command(args: &AnalyzeArgs, exit_flag: Arc<AtomicBool>) -> any
         }
     }
 
-    // create summary metadata
+    // enrich metadata and panic info
     let metadata_df = summary_metadata(&summary).context("Error while gathering metadata")?;
+    let panic_infos_df = add_panic_infos(&summary).context("Error while gathering panic infos")?;
 
     // TODO: Write partioned per stream-id, save metadata once and then create Perfetto JSON writer
     // with all files manually?
@@ -106,7 +110,7 @@ pub fn do_analyze_command(args: &AnalyzeArgs, exit_flag: Arc<AtomicBool>) -> any
     let inputs = tracedata_lfs
         .into_iter()
         .chain(defmt_lfs)
-        .chain(vec![metadata_df.lazy()])
+        .chain(vec![metadata_df.lazy(), panic_infos_df.lazy()])
         .collect::<Vec<LazyFrame>>();
     let finished_df = concat(inputs, args).context("Error while concatenating final outputs")?;
 
@@ -196,30 +200,6 @@ fn process_traces_stream_id(
         .context("Error while preparing monitor values")?;
     let prepared_lf = prepare_code_monitors(prepared_lf, summary)
         .context("Error while preparing code monitors")?;
-
-    // set panic event as marker
-    let prepared_lf = if let Some(info) = summary.panic_info() {
-        prepared_lf.with_columns([
-            when(col("event").eq(lit("PanicEvent")))
-                .then(lit("I"))
-                .otherwise(col("ph"))
-                .alias("ph"),
-            when(col("event").eq(lit("PanicEvent")))
-                .then(lit(format!("{info}")))
-                .otherwise(col("name"))
-                .alias("name"),
-            when(col("event").eq(lit("PanicEvent")))
-                .then(lit("panic"))
-                .otherwise(col("cat"))
-                .alias("cat"),
-            when(col("event").eq(lit("PanicEvent")))
-                .then(lit("g")) // global scope for panic event
-                .otherwise(col("s"))
-                .alias("s"),
-        ])
-    } else {
-        prepared_lf
-    };
 
     #[cfg(debug_assertions)]
     {
@@ -380,6 +360,31 @@ fn summary_metadata(summary: &TracingSummary) -> anyhow::Result<DataFrame> {
     ])
     .collect()
     .context("Failed to collect metadata frame")?;
+
+    Ok(df)
+}
+
+/// Create DataFrame for all panic infos in summary. If no panic infos, return empty DataFrame.
+fn add_panic_infos(summary: &TracingSummary) -> anyhow::Result<DataFrame> {
+    // Gather all panic infos
+    let panic_infos = summary
+        .list_stream_ids()
+        .filter_map(|stream_id| summary.panic_info(*stream_id))
+        .collect::<Vec<&CustomPanicInfo>>();
+
+    if panic_infos.is_empty() {
+        return Ok(DataFrame::default());
+    }
+
+    // Write as df
+    let df = df! {
+        "ph" => panic_infos.iter().map(|_| "I").collect::<Vec<&str>>(),
+        "name" => panic_infos.iter().map(|info| format!("{info}")).collect::<Vec<String>>(),
+        "cat" => panic_infos.iter().map(|_| "panic").collect::<Vec<&str>>(),
+        "s" => panic_infos.iter().map(|_| "g").collect::<Vec<&str>>(), // global scope for panic event
+        "ts" => panic_infos.iter().map(|info| info.sys_time() as f64).collect::<Vec<f64>>(),
+    }
+    .context("Failed to create Panic Info DF")?;
 
     Ok(df)
 }

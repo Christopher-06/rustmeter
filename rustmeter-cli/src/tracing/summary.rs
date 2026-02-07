@@ -21,6 +21,8 @@ pub struct StreamContainer {
     pub clock_refs: Vec<ClockReference>,
     /// Error message if any error occurred during tracing this stream
     pub error: Option<String>,
+    /// Panic info if any panic occurred during tracing this stream
+    pub panic: Option<CustomPanicInfo>,
 }
 
 impl StreamContainer {
@@ -30,6 +32,7 @@ impl StreamContainer {
             typedefs: Vec::new(),
             clock_refs: Vec::new(),
             error: None,
+            panic: None,
         }
     }
 }
@@ -42,8 +45,6 @@ pub struct TracingSummary {
     stream_data: HashMap<u32, StreamContainer>,
     /// Mapping from firmware addresses to symbol names
     fw_addr_map: FirmwareAddressMap,
-    /// Panic info if any panic occurred during tracing
-    panic_info: Option<CustomPanicInfo>,
     /// Chip name used during tracing
     chip: String,
     /// Indicates whether the firmware is a release build
@@ -67,7 +68,6 @@ impl TracingSummary {
             start_datetime,
             end_datetime: None,
             stream_data: HashMap::new(),
-            panic_info: None,
             updated: true,
             fw_addr_map,
             chip: args.chip.clone(),
@@ -88,8 +88,10 @@ impl TracingSummary {
     }
 
     /// Get the panic info if any panic occurred during tracing
-    pub fn panic_info(&self) -> Option<&CustomPanicInfo> {
-        self.panic_info.as_ref()
+    pub fn panic_info(&self, stream_id: u32) -> Option<&CustomPanicInfo> {
+        self.stream_data
+            .get(&stream_id)
+            .and_then(|container| container.panic.as_ref())
     }
 
     /// Get the symbol name for a given firmware address
@@ -129,16 +131,26 @@ impl TracingSummary {
     }
 
     /// Set the panic info if a panic occurred during tracing. This can only be set once during a tracing session.
-    pub fn set_panic_info(&mut self, info: CustomPanicInfo) -> Result<(), TracingDecodeError> {
+    pub fn set_panic_info(
+        &mut self,
+        stream_id: u32,
+        info: CustomPanicInfo,
+    ) -> Result<(), TracingDecodeError> {
         self.updated = true;
-        match &self.panic_info {
-            Some(existing) => Err(TracingDecodeError::Unknown(anyhow::anyhow!(
-                "Panic info has already been set (existing: {existing} vs new: {info})",
-            ))),
-            None => {
-                self.panic_info = Some(info);
-                Ok(())
+        if let Some(container) = self.stream_data.get_mut(&stream_id) {
+            match &container.panic {
+                Some(existing) => Err(TracingDecodeError::Unknown(anyhow::anyhow!(
+                    "Panic info has already been set (existing: {existing} vs new: {info})",
+                ))),
+                None => {
+                    container.panic = Some(info);
+                    Ok(())
+                }
             }
+        } else {
+            Err(TracingDecodeError::Unknown(anyhow::anyhow!(
+                "Stream ID {stream_id} not found when setting panic info"
+            )))
         }
     }
 

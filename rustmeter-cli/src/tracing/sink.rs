@@ -136,7 +136,8 @@ impl TracingSink {
                 println!("\n--- PANIC DETECTED ---");
                 println!("{:.6} {}", item.pc_timestamp().as_secs_f32(), info);
 
-                self.summary.set_panic_info(info.clone())?;
+                self.summary
+                    .set_panic_info(self.current_stream_id, info.clone())?;
                 stop.store(true, Ordering::Relaxed);
             }
 
