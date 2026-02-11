@@ -5,6 +5,7 @@ pub mod protocol;
 pub mod time_delta;
 pub mod tracing;
 pub mod varint;
+pub mod code_monitor;
 
 #[cfg(test)]
 pub mod mocks;
