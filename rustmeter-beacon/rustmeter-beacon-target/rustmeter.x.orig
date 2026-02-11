@@ -1,0 +1,17 @@
+SECTIONS
+{
+  /* Only function metadata (the address will also be the monitor id!!!) */
+  .rustmeter_fn_metadata 0 (INFO) :
+  {
+    . = 1;
+    KEEP(*(.rustmeter_fn_metadata .rustmeter_fn_metadata.*));
+  }
+
+  /* general rustmeter data */
+  .rustmeter_data 0 (INFO) :
+  {
+    . = 1;
+    KEEP(*(.rustmeter_data .rustmeter_data.*));
+  }
+}
+INSERT AFTER .text;
