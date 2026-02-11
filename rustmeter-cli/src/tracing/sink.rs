@@ -7,13 +7,14 @@ use std::{
     time::{Duration, Instant},
 };
 
+use anyhow::Context;
 use crossbeam::channel::{Receiver, Sender};
 use rustmeter_beacon_core::protocol::{EventPayload, Request};
 use time::OffsetDateTime;
 
 use crate::{
     CoreInfo,
-    cargo::elf_file::FirmwareAddressMap,
+    cargo::elf_file::FirmwareInfo,
     cli::RunArgs,
     tracing::{
         CoreTracingData, TracingDecodeError, buffered_writer::BufferedWriter,
@@ -39,15 +40,15 @@ pub struct TracingSink {
 impl TracingSink {
     pub fn new(
         folder: PathBuf,
-        elf_path: &PathBuf,
+        fw_info: &FirmwareInfo,
         tracing_bytes_recver: Receiver<Result<CoreTracingData, TracingDecodeError>>,
         req_sender: Sender<Request>,
         args: &RunArgs,
     ) -> anyhow::Result<Self> {
         let start = Instant::now();
 
-        let fw_addr_map = FirmwareAddressMap::new_from_elf_path(elf_path)?;
-        let mut summary = TracingSummary::new(OffsetDateTime::now_utc(), fw_addr_map, args);
+        let mut summary = TracingSummary::new(OffsetDateTime::now_utc(), fw_info, args)
+            .context("Failed to create TracingSummary.")?;
         let current_stream_id = summary.register_new_stream();
 
         Ok(Self {
@@ -71,8 +72,8 @@ impl TracingSink {
                 TraceDataDecoder::new(CoreInfo::Core1, start),
             ],
             defmt_decoder: [
-                DefmtDecoder::new(CoreInfo::Core0, elf_path, start)?,
-                DefmtDecoder::new(CoreInfo::Core1, elf_path, start)?,
+                DefmtDecoder::new(CoreInfo::Core0, fw_info.path(), start)?,
+                DefmtDecoder::new(CoreInfo::Core1, fw_info.path(), start)?,
             ],
         })
     }

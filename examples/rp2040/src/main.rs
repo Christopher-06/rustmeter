@@ -67,9 +67,9 @@ fn main() -> ! {
 async fn spamming_task() {
     loop {
         let start = embassy_time::Instant::now();
-        while embassy_time::Instant::now() - start < embassy_time::Duration::from_micros(1500) {}
+        while embassy_time::Instant::now() - start < embassy_time::Duration::from_micros(150000) {}
 
-        Timer::after(embassy_time::Duration::from_micros(15000)).await;
+        Timer::after(embassy_time::Duration::from_micros(150000)).await;
     }
 }
 
@@ -85,7 +85,7 @@ async fn long_computation_task() {
 #[monitor_fn]
 #[inline(never)]
 fn do_long_computation() {
-    for _ in 0..1_000 {
+    for _ in 0..100_000 {
         asm::nop();
     }
 }

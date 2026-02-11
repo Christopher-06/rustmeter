@@ -1,12 +1,16 @@
 #![allow(dead_code)]
 use std::collections::HashMap;
 
-use rustmeter_beacon_core::protocol::{CustomPanicInfo, TypeDefinitionPayload};
+use anyhow::Context;
+use rustmeter_beacon_core::{
+    code_monitor::FunctionMetadata,
+    protocol::{CustomPanicInfo, TypeDefinitionPayload},
+};
 use time::OffsetDateTime;
 
 use crate::{
     analyze::clocks::{ClockReference, GlobalClockDefinition},
-    cargo::elf_file::FirmwareAddressMap,
+    cargo::elf_file::{FirmwareAddressMap, FirmwareInfo},
     cli::RunArgs,
     tracing::TracingDecodeError,
 };
@@ -43,8 +47,10 @@ pub struct TracingSummary {
     end_datetime: Option<OffsetDateTime>,
     /// Mapping from stream ID to StreamContainer
     stream_data: HashMap<u32, StreamContainer>,
-    /// Mapping from firmware addresses to symbol names
+    /// Mapping from firmware addresses to symbol names (all)
     fw_addr_map: FirmwareAddressMap,
+    /// Mapping from code monitor id to fn metadata from firmware section ".rustmeter_fn_metadata"
+    fn_metadata: HashMap<u32, FunctionMetadata>,
     /// Chip name used during tracing
     chip: String,
     /// Indicates whether the firmware is a release build
@@ -61,20 +67,21 @@ pub struct TracingSummary {
 impl TracingSummary {
     pub fn new(
         start_datetime: OffsetDateTime,
-        fw_addr_map: FirmwareAddressMap,
+        fw_info: &FirmwareInfo,
         args: &RunArgs,
-    ) -> Self {
-        Self {
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
             start_datetime,
             end_datetime: None,
             stream_data: HashMap::new(),
             updated: true,
-            fw_addr_map,
+            fw_addr_map: fw_info.addr_symbol_map(),
+            fn_metadata: extract_fn_metadata(fw_info)?,
             chip: args.chip.clone(),
             release: args.release,
             second_core_startup: None,
             global_clock_def: None,
-        }
+        })
     }
 
     /// Get the chip name used during tracing
@@ -96,7 +103,7 @@ impl TracingSummary {
 
     /// Get the symbol name for a given firmware address
     pub fn get_fw_symbol_name(&self, addr: u64) -> Option<String> {
-        self.fw_addr_map.get_symbol_name(addr)
+        self.fw_addr_map.get(&addr).cloned()
     }
 
     /// Set the end datetime of the tracing session
@@ -109,6 +116,11 @@ impl TracingSummary {
     pub fn get_tracing_duration(&self) -> Option<time::Duration> {
         self.end_datetime
             .and_then(|end| Some(end - self.start_datetime))
+    }
+
+    /// Get the entire mapping of code monitor ID to function metadata
+    pub fn get_all_fn_metadata(&self) -> &HashMap<u32, FunctionMetadata> {
+        &self.fn_metadata
     }
 
     /// Register a new stream and return its assigned ID
@@ -236,4 +248,28 @@ impl TracingSummary {
         }
         Ok(())
     }
+}
+
+/// Extract function metadata from the firmware info.
+/// This looks for symbols in the ".rustmeter_fn_metadata" section of the firmware and deserializes
+/// their string values into FunctionMetadata structs.
+/// The resulting mapping is from code monitor ID to FunctionMetadata.
+fn extract_fn_metadata(fw_info: &FirmwareInfo) -> anyhow::Result<HashMap<u32, FunctionMetadata>> {
+    let symbols = fw_info
+        .get_symbols_of_secetion(".rustmeter_fn_metadata")
+        .context("Could not get symbols of section .rustmeter_fn_metadata")?;
+
+    // Deserialize metadata and create mapping from monitor ID to metadata
+    let mut fn_metadata_map = HashMap::new();
+    for (monitor_id, metadata_str) in symbols {
+        // zero is nullpointer in legacy systems
+        if monitor_id > 0 {
+            let metadata: FunctionMetadata = serde_json::from_str(&metadata_str).context(
+                format!("Failed to parse function metadata for monitor ID {monitor_id}"),
+            )?;
+            fn_metadata_map.insert(monitor_id as u32, metadata);
+        }
+    }
+
+    Ok(fn_metadata_map)
 }

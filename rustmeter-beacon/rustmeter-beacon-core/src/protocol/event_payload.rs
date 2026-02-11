@@ -34,14 +34,14 @@ pub enum EventPayload {
     EmbassyExecutorIdle {
         executor_id: u3,
     },
-    /// Function or Scope Monitor started
-    /// MonitorID identifies the monitor instance (was assigned via previous TypeDefinition event).
-    MonitorStart {
-        monitor_id: u8,
+    /// Code Monitor scope started. MonitorID identifies the monitor instance (address of metadata in section!)
+    /// StateID is a sequentially incrementing ID to differentiate multiple fn states in the same monitor.
+    CodeMonitorStart {
+        monitor_idx: u16,
+        state_idx: u16,
     },
-    /// Function or Scope Monitor ended
-    /// MonitorID are not included here because they can be inferred from the corresponding MonitorStart event
-    MonitorEnd,
+    // No data, just indicates the end of a code monitor scope (core is known, so can be correlated with start)
+    CodeMonitorEnd,
     /// Value Monitor reported a value
     /// ValueID identifies the monitor instance (was assigned via previous TypeDefinition event).
     /// Value is the reported value payload.
@@ -74,8 +74,8 @@ impl EventPayload {
             EventPayload::EmbassyTaskExecEnd { .. } => EMBASSY_TASK_EXEC_END,
             EventPayload::EmbassyExecutorPollStart { .. } => EMBASSY_EXECUTOR_POLL_START,
             EventPayload::EmbassyExecutorIdle { .. } => EMBASSY_EXECUTOR_IDLE,
-            EventPayload::MonitorStart { .. } => MONITOR_START,
-            EventPayload::MonitorEnd => MONITOR_END,
+            EventPayload::CodeMonitorStart { .. } => CODE_MONITOR_START,
+            EventPayload::CodeMonitorEnd => CODE_MONITOR_END,
             EventPayload::MonitorValue { .. } => MONITOR_VALUE,
             EventPayload::TypeDefinition(_) => TYPE_DEFINITION,
             EventPayload::DataLossEvent { .. } => DATA_LOSS_EVENT,
@@ -106,6 +106,17 @@ impl EventPayload {
         }
     }
 
+    /// Returns the MonitorID and StateID if the event is a CodeMonitorStart event
+    pub const fn get_code_monitor_info(&self) -> Option<(u16, u16)> {
+        match self {
+            EventPayload::CodeMonitorStart {
+                monitor_idx,
+                state_idx,
+            } => Some((*monitor_idx, *state_idx)),
+            _ => None,
+        }
+    }
+
     /// Returns the sub ID (executor ID or MonitorValue type ID) if applicable
     pub const fn get_sub_id(&self) -> Option<u3> {
         // Check for executor ID
@@ -116,11 +127,21 @@ impl EventPayload {
         if let Some(type_id) = self.get_monitor_value_type_id() {
             return Some(type_id);
         }
+        // Check for CodeMonitorStart state index
+        if let Some((_, state_idx)) = self.get_code_monitor_info() {
+            // If state_idx is less than 7, we can encode it in the sub_id
+            if state_idx < 7 {
+                return Some(u3::new(state_idx as u8));
+            } else {
+                // Otherwise, we will include it in the payload and set sub_id to 111
+                return Some(u3::new(0b111));
+            }
+        }
 
         None
     }
 
-    pub fn write_bytes<T : BufferWriter>(&self, writer: &mut T) {
+    pub fn write_bytes<T: BufferWriter>(&self, writer: &mut T) {
         // Write the event ID (5 bits) and sub event id (3 bits) as a single byte
         let sub_id = self.get_sub_id().unwrap_or(u3::new(0));
         let event_type = u8::from(self.event_id()) << 3 | sub_id.as_u8();
@@ -143,10 +164,18 @@ impl EventPayload {
             EventPayload::EmbassyTaskExecEnd { executor_id: _ } => {}
             EventPayload::EmbassyExecutorPollStart { executor_id: _ } => {}
             EventPayload::EmbassyExecutorIdle { executor_id: _ } => {}
-            EventPayload::MonitorStart { monitor_id } => {
-                writer.write_byte(*monitor_id);
+            EventPayload::CodeMonitorStart {
+                monitor_idx,
+                state_idx,
+            } => {
+                // When state_idx is >= 7 (!!!), then include in payload. Else it is in the sub_id
+                if *state_idx >= 7 {
+                    writer.write_varint(*state_idx);
+                }
+
+                writer.write_varint(*monitor_idx);
             }
-            EventPayload::MonitorEnd => {}
+            EventPayload::CodeMonitorEnd => {}
             EventPayload::MonitorValue { value_id, value } => {
                 writer.write_byte(*value_id);
                 value.write_bytes(writer);
@@ -218,13 +247,23 @@ impl EventPayload {
             EMBASSY_EXECUTOR_IDLE => Ok(EventPayload::EmbassyExecutorIdle {
                 executor_id: sub_id,
             }),
-            // MonitorStart
-            MONITOR_START => {
-                let monitor_id = buffer.read_byte()?;
-                Ok(EventPayload::MonitorStart { monitor_id })
+            // CodeMonitorStart
+            CODE_MONITOR_START => {
+                // Read state idx
+                let state_idx = if sub_id.as_u8() == 0b111 {
+                    buffer.read_varint()? as u16
+                } else {
+                    sub_id.as_u8() as u16
+                };
+
+                let monitor_idx = buffer.read_varint()? as u16;
+                Ok(EventPayload::CodeMonitorStart {
+                    monitor_idx,
+                    state_idx,
+                })
             }
             // MonitorEnd
-            MONITOR_END => Ok(EventPayload::MonitorEnd),
+            CODE_MONITOR_END => Ok(EventPayload::CodeMonitorEnd),
             // MonitorValue
             MONITOR_VALUE => {
                 let value_id = buffer.read_byte()?;

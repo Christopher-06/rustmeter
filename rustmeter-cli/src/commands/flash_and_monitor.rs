@@ -1,7 +1,7 @@
 use std::{path::PathBuf, time::Duration};
 
 use crate::{
-    cargo::elf_file::FirmwareAddressMap,
+    cargo::elf_file::FirmwareInfo,
     cli::FlashingTool,
     espflash::{flashing::flash_esp, get_espflash_connection, serial_listener},
     probe_rs::{
@@ -15,15 +15,16 @@ pub trait ChipMonitoringTool {
     fn get_tracing_bytes_recver(
         &self,
     ) -> crossbeam::channel::Receiver<Result<CoreTracingData, TracingDecodeError>>;
-    fn get_request_sender(&self)
-    -> crossbeam::channel::Sender<rustmeter_beacon_core::protocol::Request>;
+    fn get_request_sender(
+        &self,
+    ) -> crossbeam::channel::Sender<rustmeter_beacon_core::protocol::Request>;
 }
 
 pub fn flash_and_monitor_chip(
     chip: &str,
     tool: FlashingTool,
     elf_path: &PathBuf,
-    fw_addr_map: &FirmwareAddressMap,
+    fw_addr_map: &FirmwareInfo,
 ) -> anyhow::Result<Box<dyn ChipMonitoringTool>> {
     match tool {
         FlashingTool::Espflash => {
