@@ -1,6 +1,5 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-use proc_macro2::Span;
 use quote::ToTokens;
 use syn::{
     ItemFn, LitStr, Result, Token,
@@ -63,12 +62,6 @@ pub fn scoped_disambiguator(input: &ScopedMonitorInput) -> u64 {
     input.name.value().hash(&mut hasher);
     input.block.to_token_stream().to_string().hash(&mut hasher);
 
-    // use filename, line and column
-    let source = Span::call_site().unwrap().source();
-    source.file().hash(&mut hasher);
-    source.line().hash(&mut hasher);
-    source.column().hash(&mut hasher);
-
     hasher.finish()
 }
 
@@ -78,12 +71,6 @@ pub fn fn_disambiguator(input: &ItemFn) -> u64 {
     // use fn name + body
     input.sig.ident.to_string().hash(&mut hasher);
     input.block.to_token_stream().to_string().hash(&mut hasher);
-
-    // use filename, line and column
-    let source = Span::call_site().unwrap().source();
-    source.file().hash(&mut hasher);
-    source.line().hash(&mut hasher);
-    source.column().hash(&mut hasher);
 
     hasher.finish()
 }

@@ -1,5 +1,3 @@
-#![feature(proc_macro_span)]
-
 mod code_monitor;
 
 use proc_macro::TokenStream;
