@@ -91,13 +91,18 @@ fn busy_loop_simulation(ms: u64) {
     }
 }
 
-#[monitor_fn(name = "complex_computation")]
-fn complex_computation() {
+#[monitor_fn]
+async fn complex_calc() {
     // Simulate some complex computation
     let start = embassy_time::Instant::now();
+    step!("busy looping 15ms");
     busy_loop_simulation(15);
+    step!("busy looping 20ms");
     busy_loop_simulation(10);
-    busy_loop_simulation(5);
+    busy_loop_simulation(10);
+
+    Timer::after_millis(25).await;
+    step!("after 25ms timer");
 
     let time_took = ((embassy_time::Instant::now() - start).as_micros() % 10) as u32;
     monitor_value!("complex_comp_done", time_took);
@@ -109,7 +114,7 @@ async fn hello_world_task() {
     loop {
         info!("Hello, world!");
         Timer::after(Duration::from_secs(1)).await;
-        complex_computation();
+        complex_calc().await;
     }
 }
 
@@ -146,21 +151,6 @@ async fn blink_led_task(led: peripherals::GPIO48<'static>, rmt: peripherals::RMT
     }
 }
 
-/// Create a task busy looping in a 10ms cycle
-#[embassy_executor::task()]
-async fn busy_loop_task() {
-    loop {
-        Timer::after(Duration::from_millis(5)).await;
-
-        monitor_scoped!("BusyLoopScoped", {
-            let start = embassy_time::Instant::now();
-            while (embassy_time::Instant::now() - start).as_millis() < 5 {
-                // do nothing
-            }
-        });
-    }
-}
-
 /// Create a second task busy looping in a 10ms cycle
 #[embassy_executor::task]
 async fn busy_loop_task_second() {
@@ -171,5 +161,24 @@ async fn busy_loop_task_second() {
         while (embassy_time::Instant::now() - start).as_micros() < 5000 {
             // do nothing
         }
+    }
+}
+
+/// Create a task busy looping in a 10ms cycle
+#[embassy_executor::task()]
+async fn busy_loop_task() {
+    loop {
+        Timer::after(Duration::from_millis(5)).await;
+
+        // wait for 5ms while busy looping, simulating a blocking operation
+        let start = embassy_time::Instant::now();
+        let x = monitor_scoped!("BusyLoopScoped", {
+            while (embassy_time::Instant::now() - start).as_millis() < 5 {
+                // do nothing
+            }
+
+            5
+        });
+        assert!(x == 5);
     }
 }
