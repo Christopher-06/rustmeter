@@ -43,12 +43,12 @@ pub fn init_rustmeter_beacon(
     config: RustmeterConfig,
     spawner: &embassy_executor::Spawner,
 ) -> Result<(), InitializationError> {
-    #[cfg(any(feature = "rp2040", feature = "rp235xa", feature = "rp235xb"))]
-    spawner.spawn(connector(config).map_err(InitializationError::TaskSpawnError)?);
-    #[cfg(any(feature = "stm32"))]
-    spawner.spawn(connector(config)).map_err(InitializationError::TaskSpawnError)?;
-
-
+    // embassy-executor 0.10: `#[task]` functions return
+    // `Result<SpawnToken<_>, SpawnError>`, and `Spawner::spawn()` takes the
+    // unwrapped `SpawnToken` and returns `()`.
+    let token =
+        connector(config).map_err(InitializationError::TaskSpawnError)?;
+    spawner.spawn(token);
     Ok(())
 }
 
