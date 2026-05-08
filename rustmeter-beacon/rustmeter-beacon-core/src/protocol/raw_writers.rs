@@ -23,7 +23,7 @@ pub fn write_embassy_task_ready(task_id: u16, executor_id: u3) {
     buffer[1..3].copy_from_slice(&task_id.to_le_bytes());
 
     // Write to global buffer
-    let timestamp = TimeDelta::from_now();
+    let timestamp = critical_section::with(|cs| TimeDelta::from_now(cs));
     let pos = timestamp.write_bytes_mut(&mut buffer[3..]);
     unsafe { write_tracing_data(&buffer[..3 + pos]) };
 }
@@ -36,7 +36,7 @@ pub fn write_embassy_task_exec_begin(task_id: u16, executor_id: u3) {
     buffer[1..3].copy_from_slice(&task_id.to_le_bytes());
 
     // Write to global buffer
-    let timestamp = TimeDelta::from_now();
+    let timestamp = critical_section::with(|cs| TimeDelta::from_now(cs));
     let pos = timestamp.write_bytes_mut(&mut buffer[3..]);
     unsafe { write_tracing_data(&buffer[..3 + pos]) };
 }
@@ -48,7 +48,7 @@ pub fn write_embassy_task_exec_end(executor_id: u3) {
     buffer[0] = (event_ids::EMBASSY_TASK_EXEC_END << 3) | executor_id.as_u8();
 
     // Write to global buffer
-    let timestamp = TimeDelta::from_now();
+    let timestamp = critical_section::with(|cs| TimeDelta::from_now(cs));
     let pos = timestamp.write_bytes_mut(&mut buffer[1..]);
     unsafe { write_tracing_data(&buffer[..1 + pos]) };
 }
@@ -60,7 +60,7 @@ pub fn write_embassy_executor_poll_start(executor_id: u3) {
     buffer[0] = (event_ids::EMBASSY_EXECUTOR_POLL_START << 3) | executor_id.as_u8();
 
     // Write to global buffer
-    let timestamp = TimeDelta::from_now();
+    let timestamp = critical_section::with(|cs| TimeDelta::from_now(cs));
     let pos = timestamp.write_bytes_mut(&mut buffer[1..]);
     unsafe { write_tracing_data(&buffer[..1 + pos]) };
 }
@@ -72,7 +72,7 @@ pub fn write_embassy_executor_idle(executor_id: u3) {
     buffer[0] = (event_ids::EMBASSY_EXECUTOR_IDLE << 3) | executor_id.as_u8();
 
     // Write to global buffer
-    let timestamp = TimeDelta::from_now();
+    let timestamp = critical_section::with(|cs| TimeDelta::from_now(cs));
     let pos = timestamp.write_bytes_mut(&mut buffer[1..]);
     unsafe { write_tracing_data(&buffer[..1 + pos]) };
 }
@@ -85,7 +85,7 @@ pub fn write_monitor_start(monitor_id: u8) {
     buffer[1] = monitor_id;
 
     // Write to global buffer
-    let timestamp = TimeDelta::from_now();
+    let timestamp = critical_section::with(|cs| TimeDelta::from_now(cs));
     let pos = timestamp.write_bytes_mut(&mut buffer[2..]);
     unsafe { write_tracing_data(&buffer[..2 + pos]) };
 }
@@ -97,7 +97,7 @@ pub fn write_monitor_end() {
     buffer[0] = event_ids::MONITOR_END << 3;
 
     // Write to global buffer
-    let timestamp = TimeDelta::from_now();
+    let timestamp = critical_section::with(|cs| TimeDelta::from_now(cs));
     let pos = timestamp.write_bytes_mut(&mut buffer[1..]);
     unsafe { write_tracing_data(&buffer[..1 + pos]) };
 }
@@ -120,7 +120,7 @@ pub fn write_defmt_data(data: &[u8]) {
         let next_pos = 2 + chunk_size;
 
         // Write to global buffer with timestamp
-        let timestamp = TimeDelta::from_now();
+        let timestamp = critical_section::with(|cs| TimeDelta::from_now(cs));
         let pos = timestamp.write_bytes_mut(&mut buffer[next_pos..]);
         unsafe { write_tracing_data(&buffer[..next_pos + pos]) };
 
