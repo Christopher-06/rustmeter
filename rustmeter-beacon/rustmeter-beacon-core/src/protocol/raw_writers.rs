@@ -105,8 +105,11 @@ pub fn write_monitor_end() {
 #[inline(always)]
 pub fn write_defmt_data(data: &[u8]) {
     // TODO: Create chunked writes if data is too large
-    // Create header
-    let mut buffer = [0u8; 20]; // 2 header + 2 timestamp + 16 data
+    // Create header. Buffer must accommodate the worst-case 4-byte extended
+    // timestamp (when delta >= 2^15 ticks); a 20-byte buffer (2+16+2) panics
+    // on extended encoding because the trailing 2-byte slice can't hold 4
+    // bytes. 22 bytes covers the extended case.
+    let mut buffer = [0u8; 22]; // 2 header + 16 data + up to 4 timestamp
     buffer[0] = event_ids::DEFMT_DATA_EVENT << 3;
 
     // Send in chunks

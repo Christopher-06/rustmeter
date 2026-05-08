@@ -69,7 +69,8 @@ macro_rules! monitor_value {
             core::assert!($name.len() <= 20, "Name of value to be monitored must be 20 characters or less");
         };
 
-        use crate::monitors::{CODE_MONITOR_REGISTRY, VALUE_MONITOR_REGISTRY};
+        use rustmeter_beacon::monitors::{CODE_MONITOR_REGISTRY, VALUE_MONITOR_REGISTRY};
+        use rustmeter_beacon::get_static_id_by_registry;
         use rustmeter_beacon::protocol::MonitorValuePayload;
 
         let (local_id, registered_newly) = get_static_id_by_registry!(VALUE_MONITOR_REGISTRY);
