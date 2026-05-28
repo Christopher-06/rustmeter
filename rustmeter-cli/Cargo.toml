@@ -32,4 +32,4 @@ arbitrary-int = "2.0.0"
 espflash = { version = "4.3.0", default-features = false, features = ["serialport"] }
 serialport = { version = "4.7.0", features = ["usbportinfo-interface"] }
 polars = { version = "0.51.0", features = ["lazy", "dtype-categorical", "sql", "parquet", "describe", "moment", "csv", "serde", "serde-lazy", "json"] }
-time = { version = "0.3.45", features = ["serde"] }
+time = { version = "0.3.47", features = ["serde"] }
