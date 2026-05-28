@@ -1,55 +1,72 @@
-# Logging with defmt
+# Logging with `defmt`
 
-Correlating log messages with runtime events is a cornerstone of effective debugging. RustMeter seamlessly integrates with the `defmt` logging framework to display your logs directly on the Perfetto timeline, perfectly synchronized with all other trace data.
+Tracing asynchronous execution traces reveals a tremendous amount of data visually, yet standard text-based logging often supplies critical human context impossible to gauge through strict time graphs alone. 
 
-### What is the `defmt` Integration for?
+By brilliantly capturing and routing `defmt` standard logs securely across the very same channel driving trace captures, RustMeter successfully aligns those precious diagnostic context prints precisely against native event timelines reliably inside Perfetto!
 
-This feature allows you to see exactly *when* a log message was emitted in relation to your task's execution state, function calls, and tracked values. It helps answer questions like:
+### The Reason Behind the Correlation
 
--   Did this error message occur while Task A was running or Task B?
--   How long after a function started did it log a specific warning?
--   What was the value of my sensor right before a critical log message was printed?
+Unifying your framework logs right onto a singular timeline acts as an exceptional force multiplier for resolving logic issues rapidly! Unlocking log correlation confidently allows you to answer exceptionally obscure situational questions immediately:
 
-### How to Use It
+- Does this specific `ERROR` printout actually crop up while my networking component is currently holding the CPU, or was my sensor task unfortunately running completely parallel just beforehand?
+- How much microscopic delay occurs sitting rigidly between beginning mathematical evaluation sequences sequentially verses when the underlying algorithm ultimately finishes emitting passing warning statuses accurately?
+- Exactly what did my tracked board voltage counter visually display squarely before my critical system safety component actively fired panic messages directly into standard logs? 
 
--   **It's Automatic!** There is no special configuration required to enable this feature, besides using `defmt` in your project and having `rustmeter-beacon` initialized.
+### ℹ️ Note: Enable the `defmt` Feature in rustmeter-beacon
 
--   **Prerequisites:**
-    1.  Your project must be set up to use `defmt` for logging.
-    2.  You must initialize `rustmeter-beacon::init()` in your application.
+To ensure your log messages are captured and transmitted correctly, make sure you enable the `defmt` feature in your `rustmeter-beacon` dependency in your `Cargo.toml`:
 
--   **Example:**
-    Simply use the `defmt` logging macros as you normally would.
+```toml
+[dependencies]
+rustmeter-beacon = { version = "...", features = ["defmt", /* your chip */] }
+```
 
-    ```rust
-    #[embassy_executor::task]
-    async fn my_task() {
-        loop {
-            defmt::info!("Starting a new cycle.");
-            
-            monitor_scoped!("Work", {
-                // ... do some work ...
-            });
+This is required for RustMeter to hook into your logging macros and forward them to the host.
 
-            if some_condition_is_bad() {
-                defmt::warn!("A bad condition was detected!");
-            }
+### Operating Your Logs Normally
 
-            Timer::after(Duration::from_secs(1)).await;
+Surprisingly enough, the largest technical hurdle behind integrating log visualization directly via RustMeter consists simply of maintaining your exact typical coding style continuously! 
+
+Apart from importing the standard `defmt` toolsuite natively mapping beside successfully triggering `rustmeter_beacon::init_rustmeter_beacon()`, practically zero explicit framework configuration applies.
+
+```rust
+use rustmeter_beacon::monitor_scoped;
+use embassy_time::{Duration, Timer};
+
+#[embassy_executor::task]
+async fn tracking_my_application() {
+    loop {
+        // Log exactly as you comfortably do typically!
+        defmt::info!("Beginning a fresh polling cycle.");
+        
+        monitor_scoped!("Critical_Networking_Work", {
+            // Intensive logic processing sequences live comfortably here
+        });
+
+        if external_safety_alert_triggered() {
+            // Warning prompts slip seamlessly onto timeline alignments!
+            defmt::warn!("Emergency safety anomaly detected over local threshold!");
         }
+
+        Timer::after(Duration::from_secs(1)).await;
     }
-    ```
+}
+```
 
-### What You Get in Perfetto
+### Viewing Log Assertions in Perfetto
 
--   Each log message is shown as an **instant event** (a marker) on the core timeline, aligned with the exact timestamp when it was emitted.
--   The log level (e.g., `INFO`, `WARN`, `ERROR`).
--   The full content of the log message.
+Rather than endless monochrome text scrolling viciously through a chaotic terminal, every parsed message is intelligently plotted as beautifully defined **instant events** (precise pinpoint markers) situated meticulously onto specific event sequences. These labels retain the original exact chronological timestamp captured explicitly from the CPU dynamically!
 
-This provides a powerful, unified view of your system's behavior.
+Selecting a pin gracefully visualizes corresponding data tags explicitly detailing matching logging severity classes perfectly (like natively resolving `INFO`, `WARN`, or catastrophic `ERROR` categorizations) alongside providing exactly unaltered formatted descriptions cleanly. 
 
-### What to Pay Attention To
+### ⚠️ Crucial Warning: Remove Other Transports
 
--   **No `defmt` Timestamps Required:** A major advantage of this integration is that **you do not need to enable `defmt`'s built-in timestamping feature**. RustMeter provides its own high-precision timestamps for all events, including logs. This simplifies your project setup.
+Before diving into the code, it is critical to understand one major constraint: **You must not use `defmt-rtt`, `rtt-target`, or `esp-println` anywhere in your project.**
 
--   **Avoid Conflicting Loggers:** RustMeter's CLI tool (`rustmeter run`) listens for data on a specific communication channel. If you use other logging crates that also try to take exclusive control of that channel (like using `rtt-target` directly or `esp-println`), they will interfere with RustMeter. When tracing with RustMeter, you should rely solely on `defmt` for your logging output.
+Because RustMeter automatically takes complete control of the primary data channel (such as RTT or your Serial connection) to quickly stream trace data, including other transport crates will cause them to fight over the exact same connection. This reliably leads to corrupted traces, unreadable logs, or absolute system crashes. 
+
+You should rely *only* on the base `defmt` crate to provide your logging macros. RustMeter will automatically handle the heavy lifting of transporting those logs to your PC!
+
+### Best Practices & Pitfalls to Avoid
+
+- **Bypass Internal Defmt Timestamping Entirely!** Historically, generating hardware-timed timestamp features leveraging `defmt` requires annoying custom configurations alongside timer peripherals carefully orchestrated across embedded boundaries. With RustMeter handling unified time constraints completely transparently, absolutely zero manual `defmt` timestamp logic requires instancing! Lean directly backwards atop our synchronized execution timestamps gracefully.

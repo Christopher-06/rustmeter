@@ -1,100 +1,104 @@
 # Monitoring Functions and Scopes
 
-While automatic task tracing is powerful, you often need more granular control to identify performance bottlenecks. RustMeter provides several macros to manually instrument your code.
+While letting the automatic task tracing engine handle background embassy events is marvelously powerful, you frequently will encounter scenarios where you demand granular, laser-focused control to isolate very specific bottlenecks buried deep within your logic. 
+
+To easily accommodate this, RustMeter graciously ships several easy-to-use macros that allow you to manually segment, tag, and measure exact snippets of computational work. 
 
 ### `#[monitor_fn]`: Monitoring Entire Functions
 
-This attribute macro wraps an entire function, measuring its total execution time from start to finish.
+The `#[monitor_fn]` attribute securely attaches to any function definition. Once applied, it automatically times the length of processing starting the exact moment you enter the function extending precisely until it reaches the exiting return.
 
--   **How to Use:** Add `#[monitor_fn]` directly above a function definition.
+For standard synchronous software architecture (`fn`), it works wonderfully straightforward. It maps the overall time spent strictly inside that dedicated block spanning end-to-end within Perfetto:
 
--   **Synchronous Functions:** For regular `fn`, it measures the time from function entry to exit.
+```rust
+use rustmeter_beacon::monitor_fn;
 
-    ```rust
-    #[monitor_fn]
-    fn my_blocking_calculation() {
-        // some heavy work
-        // The entire duration of this function will be a single block in Perfetto
-    }
-    ```
+#[monitor_fn]
+fn my_heavy_blocking_calculation() {
+    // An intensive calculation lives here.
+    // RustMeter will illustrate the full duration effectively as one massive block.
+}
+```
 
--   **Asynchronous Functions:** For `async fn`, it gets more interesting. The macro automatically breaks down the function's execution into distinct phases based on `.await` points.
-    -   Each segment of code between `.await` calls is shown as a separate `Running` block in Perfetto. See the step! macro for custom naming below your steps!
-    -   This allows you to see not just the total time, but which parts of your async function are taking the longest.
-    - The idle state will in the future get annoted with the .await point that caused it, so you can easily correlate waiting times with the specific async operations that are causing them!
+Interestingly, things become profoundly dynamic once you attach it to an `async fn`. RustMeter ingeniously breaks apart the life of an asynchronous function actively according to the location of its `.await` points!
 
-    ```rust
-    #[monitor_fn]
-    async fn my_async_operation() {
-        // This part is the first execution block
-        let data = fetch_data().await; 
+Every fragment of executing code situated neatly between individual `.await` interruptions is treated dynamically as a separate `Running` event inside the timeline. For instance, rather than showing a long two-minute pause, you accurately witness exactly which phase required computing and identifying just how massive a time window was spent effectively waiting. 
 
-        // This part is the second execution block
-        process_data(data).await;
+```rust
+use rustmeter_beacon::monitor_fn;
 
-        // This is the third
-    }
-    ```
+#[monitor_fn]
+async fn my_async_operation() {
+    // This top portion triggers the first visible execution block.
+    let data = fetch_data().await; 
 
--   **Custom Naming:** By default, the trace uses the function's name. You can provide a custom name for the trace.
+    // Once woken up, this chunk creates the second execution block.
+    process_data(data).await;
 
-    ```rust
-    #[monitor_fn(name = "MyCustomName")]
-    fn my_real_function_name() {
-        // ...
-    }
-    ```
+    // Finally, closing instructions log the third block seamlessly.
+}
+```
+
+By default, RustMeter beautifully mirrors the exact rust function name you assigned the routine. Nevertheless, should you prefer a specialized explicit label visually, you can easily append a custom name parameter directly onto the macro mapping itself!
+
+```rust
+#[monitor_fn(name = "MyAwesomeCustomName")]
+fn internal_utility_function() {
+    // The timeline track shows "MyAwesomeCustomName" directly.
+}
+```
 
 ### `step!`: Marking Points in Async Functions
 
-Inside an `async` function marked with `#[monitor_fn]`, the `step!` macro allows you to create named markers on the timeline. This is extremely useful for understanding the flow of a complex async function.
+Within those complex async routines wrapped carefully inside `#[monitor_fn]`, it can sometimes become rather tedious tracking which `.await` phase you are looking at spanning alongside massive traces. The helpful `step!` macro allows you to drop descriptive checkpoints across these segments freely. 
 
--   **How to Use:** Call `step!("your_step_name");` at any point within an `async fn` that is also decorated with `#[monitor_fn]`.
+Simply call `step!("your explicit step name")` and watch the label beautifully manifest against subsequent `Running` execution tracks inside Perfetto!
 
--   **Example:**
-    ```rust
-    #[monitor_fn]
-    async fn complex_async_task() {
-        step!("Starting phase 1");
-        /* Some code for phase 1 */
-        do_part_one().await;
+```rust
+use rustmeter_beacon::{monitor_fn, step};
 
-        step!("Starting phase 2");
-        /* Some code for phase 2 */
-        do_part_two().await;
+#[monitor_fn]
+async fn massive_configuration_task() {
+    step!("Starting the network phase");
+    // Work done here will inherit the updated label inside Perfetto.
+    connect_to_wifi().await;
 
-        step!("Finishing up");
-        /* Final code */
-    }
-    ```
-    In Perfetto, this will label "Running (Starting phase 1)", "Running (Starting phase 2)", etc., on the timeline for this function, perfectly aligned with its execution blocks.
+    step!("Downloading configuration payload");
+    // Work done here appropriately updates and registers against this new label.
+    pull_http_payload().await;
+    
+    step!("Processing constraints locally");
+    // Followed by closing logic.
+}
+```
 
-- INFO: Be aware of your execution model of the function because a step! in a for loop for example will create a step since it get's called but after exiting the loop, the step will still be opened!
+*Word of Caution:* Keep your broader executing model in mind. Dropping a `step!` call casually situated inside an aggressively looping `for` iteration forces the step label openly against subsequent `.await` phases outside the scope if unchallenged directly.
 
 ### `monitor_scoped!`: Profiling Arbitrary Code Blocks
 
-Sometimes you don't want to monitor a whole function, but just a specific section of code. `monitor_scoped!` is perfect for this.
+Routinely, you don't actually intend tracking entirely massive functions top-to-bottom. Sometimes you simply want to analyze an obscure calculation hidden squarely inside a larger functional machine. This is perfectly where `monitor_scoped!` shines!
 
--   **How to Use:** Wrap any block of code with `monitor_scoped!("my_scope_name", { ... });`.
+Take any bracket of routine code lines and comfortably embrace them together utilizing `monitor_scoped!("my_special_scope_name", { ... });`. 
 
--   **Use Cases:**
-    -   Measuring the time of a specific loop.
-    -   Profiling a calculation within a larger function.
-    -   Understanding the performance of a section of code that isn't neatly encapsulated in its own function.
+This shines particularly bright when you aim to dissect the length of looping arrays or profiling an edge-case calculation embedded inside standard algorithms:
 
--   **Example:**
-    ```rust
-    fn some_bigger_function() {
-        // ... some code ...
+```rust
+use rustmeter_beacon::monitor_scoped;
 
-        monitor_scoped!("CriticalLoop", {
-            for i in 0..1000 {
-                // do something important
-            }
-        });
+fn generic_system_controller() {
+    // Surrounding business logic occurs securely.
 
-        // ... more code ...
-    }
-    ```
+    monitor_scoped!("CriticalSensorLoop", {
+        for _ in 0..10_000 {
+            // Intensive isolated processing sits comfortably here...
+        }
+    });
 
--   **`step!` in `monitor_scoped!`?** **No.** The `step!` macro is designed to work with the state machine of an `async fn` and is only effective inside a function decorated with `#[monitor_fn]`. It will not have any effect inside a `monitor_scoped!` block. Use `monitor_scoped!` for synchronous blocks or for measuring the total time of an async block without breaking it down. But you can use a monitor_scoped! block inside an (async) function that is decorated with #[monitor_fn], and it will nest correctly in the timeline, showing the total time of the block as well as the steps inside it!
+    // Remainder of your system flows freely...
+}
+```
+
+**Can I run `step!` inside `monitor_scoped!`?** 
+Actually, no. The elegant `step!` macro is architectured expressly to integrate securely with the native state machine found natively on an authentic `async fn` labeled forcefully by `#[monitor_fn]`. It won't yield meaningful visual markers placed aimlessly inside a `monitor_scoped!` section. 
+
+However, you can brilliantly nest a `monitor_scoped!` segment firmly *inside* an `async fn` properly decorated with `#[monitor_fn]`! The timeline actively builds a stunning hierarchy showing exactly your custom scope duration alongside stepping phases seamlessly!

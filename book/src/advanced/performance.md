@@ -1,41 +1,44 @@
 # Performance & Overhead
 
-While RustMeter is designed to be as lightweight as possible, it's crucial to understand that any form of instrumentation introduces a performance overhead. This chapter explains what that overhead is, where it comes from, and how to interpret your results with it in mind.
+As embedded engineers, you likely understand a fundamental, unyielding law of computing software realistically: measuring things requires processing labor. 
+
+It is critically essential mapping precisely what overhead translates explicitly within RustMeter natively! Grasping precisely exactly where footprint costs aggressively manifest empowers engineering decisions confidently determining simply when deploying deep macro constraints stays highly appropriate—versus scaling observability appropriately against bare-metal processor limits cleanly.
 
 ### The Heisenberg Principle of Profiling
 
-You can't observe a system without affecting it. Every time a `rustmeter-beacon` macro is called (`#[monitor_fn]`, `monitor_scoped!`, `monitor_value!`, `step!`, or even an automatic `embassy` event), your program executes a few extra instructions to record that event.
+In physics, you cannot accurately observe an isolated quantum system effectively without directly altering its native underlying state slightly. Computing behaves identically! 
 
-This means that the execution times you see in Perfetto are the **real execution time of your code PLUS the time it took to record the event**.
+Inherently, every occasion a single macro executes gracefully (`#[monitor_fn]`, `monitor_scoped!`, `monitor_value!`, `step!`, or background internal `embassy` framework task hooks natively), executing applications actively demand calculating additional clock sequences storing those pinpoint event snapshots carefully. 
 
-### Measured Overhead
+Therefore, recognizing duration labels accurately dictates acknowledging these lengths fundamentally illustrate absolute execution timelines strictly combined tightly integrating those tiny macro metric captures synchronously natively alongside!
 
-The overhead varies depending on the target architecture, its clock speed, and memory access times. Here are the current benchmarked values:
+### Measured Constraints
 
--   **Espressif MCUs (e.g., ESP32, ESP32-S3):**
-    -   **Overhead per event: ~0.4 µs to 1.2 µs**
-    -   These chips benefit from faster clock speeds, instruction caches, and optimized atomic operations, resulting in a very low overhead.
+Architectural clock capacities fiercely determine tracing latency lengths. The faster integer mathematics perform, the shorter those events constrain you. 
 
--   **Cortex-M MCUs (e.g., STM32, RP2040):**
-    -   **Overhead per event: ~1 µs to 8 µs**
-    -   The overhead is currently higher on these targets due to generally lower clock frequencies and the lack of certain hardware-accelerated features. Future optimizations aim to reduce this significantly.
+Based on aggressive field benchmarks natively captured locally targeting supported constraints realistically:
 
-### Where Does the Overhead Come From?
+- **Espressif Targets (ex. ESP32, ESP32-S3):** 
+  - **Overhead Cost:** Ranges merely **0.4 µs to roughly 1.2 µs per generated instruction**.
+  - Advanced clock speeds alongside hyper-accelerated integer optimizations easily provide Espressif chips phenomenal macro handling cleanly dropping overheads incredibly slim.
+  
+- **Cortex-M MCUs (ex. STM32 Series, RP2040):**
+  - **Overhead Cost:** Expands toward **1 µs scaling roughly around 8 µs per trace**. 
+  - Since Cortex hardware strictly runs frequently below higher clock capacities (frequently missing specialized atomic caching pathways easily accessible natively against Xtensa counterparts originally), this unfortunately implies marginally higher execution demands cleanly parsing instructions immediately. Future optimizations aim sharply aimed pushing these tighter down!
 
-RustMeter's design minimizes the time your application is blocked. When an event occurs:
+### Tracing the Root Source
 
-1.  The event data (a timestamp and a few bytes of data) is generated.
-2.  This data is written into a **lock-free per-core ring buffer** (`ring-buffer`). This is a highly efficient, wait-free data structure that allows the application to "fire and forget" the event data very quickly. This is where the overhead mentioned above is incurred.
-3.  A separate, lower-priority background task is responsible for reading data from this buffer and sending it to the host PC via RTT or Serial. Because this runs in the background, it doesn't block your main application logic. But if this task get's blocked, it can cause the buffer to fill up, which could lead to dropped events if the application generates events faster than they can be sent out. Or Deadlock Situations. FOr this, we try to implement a blocking feature to allow any event to directly write to the output channel. Normally this would be more expensive per call (more Overhead) but it would guarantee that no events get lost in such situations like Bufferoverlow or Deadlocking. This is currently not implemented, but it's on the roadmap.
+RustMeter effectively reduces macro blockages incredibly significantly! Our underlying system elegantly adopts extremely optimized approaches gracefully sidestepping halting conditions whenever events actually trigger actively. 
 
-The key is that your application only has to wait for the very fast write to the ring buffer.
+When your application correctly triggers an instrumented trace correctly:
+1. It smoothly generates absolute byte identifiers accurately containing localized timestamps efficiently.
+2. It quickly delegates and fires this generated data slice dynamically into a highly optimized, fully **lock-free per-core ring buffer** seamlessly! No locking mechanics are engaged natively blocking your primary active sequence loops waiting defensively. You suffer exactly precisely this quick push latency and no longer!
+3. Quietly existing far inside background application environments independently, low-priority worker tasks routinely digest loaded buffer contents actively shuttling memory dumps out of your MCU steadily. This never artificially blocks active foreground paths securely! 
+   
+*Warning Note:* Should your aggressive primary application rapidly overwhelm this transmitting background agent fiercely logging millions of traces sequentially natively, the underlying internal buffers may tragically hit max capacities silently overflowing effectively! In those rare scenarios, events currently mysteriously simply drop directly avoiding application deadlocks aggressively blocking natively. Designing explicit forced stalling logic blocking overflowing tasks directly sending remains hotly heavily planned roadmapped specifically preventing dropped observations explicitly soon. 
 
-### How to Interpret Your Traces
+### Effectively Processing Visualizations
 
--   **Focus on Relative, Not Absolute Times:** If function `A` takes 50 µs and function `B` takes 200 µs in your trace, the key insight is that `B` is four times slower than `A`. The exact absolute values (e.g., 50 µs) are slightly inflated by the overhead, but the *ratio* between them is accurate.
-
--   **Be Mindful of High-Frequency Events:** If you are monitoring a function that runs in just a few microseconds, the relative overhead will be high. For a function that takes 5 µs to run on an STM32, an overhead of 2-3 µs is significant. For a function that takes 500 µs, the same overhead is negligible.
-
--   **Use Instrumentation Judiciously:** Don't wrap every single line in a `monitor_scoped!`. Start by monitoring larger functions (`#[monitor_fn]`) and then add more granular scopes only where you need to dig deeper. This helps keep the overall overhead low and your traces clean.
-
-For most applications, the insights gained from seeing the interactions between tasks and functions far outweigh the small cost of the instrumentation.
+- **Concentrate on Relative Proportions:** Focus on analyzing visual blocks conceptually. If function `A` clearly requires 50 µs while `B` spans aggressively over 200 µs locally, the major insight demands noting that `B` scales fiercely reaching functionally four magnitudes lengthier! Absolute values certainly drift minimally longer accommodating metric gathering artificially natively; however, the mapped ratios correctly dictate precisely exactly targeting performance bottlenecks!
+- **Evaluate Tiny Code Execution Loops:** Wrapping trace tags blindly around loops requiring solely microscopic fractional microseconds to process computationally actively doubles relative performance execution costs completely disrupting native behavioral properties noticeably. Be exceptionally extremely cautious mapping 2µs blocks natively generating matching 2µs profiling tags overhead wildly destroying analytical values functionally!
+- **Begin Broader Specifically:** We consistently strongly recommend simply wrapping massively lengthy macro traits heavily across outer functions broadly initially determining problem systems locally before digging exceptionally granularly placing `monitor_scoped!` statements exclusively targeting tighter troublesome segments properly isolated subsequently!

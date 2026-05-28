@@ -1,20 +1,22 @@
 # User Guide
 
-This guide will walk you through the core features of RustMeter. You'll learn how to use the provided macros and features to gain deep insights into your application's behavior.
+This comprehensive User Guide is designed to carefully walk you through the core, powerful features of RustMeter. Along the way, we will show you exactly how to utilize the library's provided macros, ensuring you gain deep, unparalleled insights into your embedded application's inner mechanisms. 
 
-We will cover:
+Whether you're struggling to understand exactly what your asynchronous workloads are doing or you just want to track a crucial voltage sensor seamlessly, this guide covers the solutions.
 
--   **Automatic Embassy Task Tracing:** See how RustMeter visualizes the lifecycle of your `embassy` tasks without any manual instrumentation.
--   **Manual Instrumentation:** Learn how to use the `#[monitor_fn]`, `monitor_scoped!`, and `monitor_value!` macros to measure function execution times, profile specific code blocks, and track variable values over time.
--   **Log Correlation:** Understand how `defmt` log messages are automatically integrated into your trace timeline.
--   **Multicore Tracing:** See how to handle and visualize traces from systems with multiple processor cores.
+In this section, we will cover:
+
+- **Automatic Embassy Task Tracing:** Discover how RustMeter visualizes the entire lifecycle of your `embassy` tasks perfectly out-of-the-box, without requiring you to manually instrument them. 
+- **Manual Instrumentation:** While automatic tracing is incredible, sometimes you need to dig deeper. Learn how to explicitly use the `#[monitor_fn]`, `monitor_scoped!`, and `monitor_value!` macros to analyze exact function execution times, profile custom code blocks, and graph variable behavior over time.
+- **Log Correlation:** Say goodbye to endless scrolling purely to align terminal printouts. See how `defmt` log messages are naturally injected directly into your visual trace timeline.
+- **Multicore Tracing:** Expand your boundaries further by seeing how to intelligently trace, handle, and visualize performance spanning across systems carrying multiple processor cores dynamically.
 
 ---
 
 ### A Note on Performance Overhead
 
-It's important to remember that any form of monitoring or tracing introduces a small amount of overhead. Each time an event is generated (e.g., a function is entered, a value is logged), it takes a tiny amount of time for the `rustmeter-beacon` to record it.
+When stepping into profiling, it is crucial to understand that any form of software observation inherently introduces a very slight performance overhead. Quite simply, every time an event occurs (like jumping into a monitored function or saving a trackable value), the `rustmeter-beacon` takes a microscopic amount of time to actively write it down.
 
-While RustMeter is designed to be extremely lightweight, this overhead can add up if you are monitoring very short, high-frequency events. This means the measurements you see in Perfetto will always include this small instrumentation cost.
+We spent tremendous effort engineering RustMeter to be exceptionally lightweight so you barely feel a difference. However, this small amount of overhead gradually adds up if you try observing hundreds of extremely short, high-frequency routines simultaneously. Ultimately, this means the execution blocks rendered inside Perfetto are guaranteed to include this tiny instrumentation footprint. 
 
-For a detailed analysis of this overhead and strategies to minimize its impact, please refer to the [**Performance & Overhead**](../advanced/performance.md) chapter in the Advanced Topics section.
+For an extensive, detailed analysis on overhead metrics and proven strategies applied by experts to minimize it, please feel completely free to jump over to the [Performance & Overhead](./advanced/performance.md) chapter within our Advanced Topics.
