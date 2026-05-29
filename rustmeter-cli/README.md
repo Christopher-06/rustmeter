@@ -2,6 +2,25 @@
 
 **The host-side companion for the RustMeter embedded profiling system.**
 
-[**RustMeter**](https://github.com/Christopher-06/rustmeter) is a comprehensive profiling, tracing, and monitoring system designed specifically for **Embedded Rust** applications. It is highly integrated with the [Embassy](https://github.com/embassy-rs/embassy) async framework and [defmt](https://github.com/knurling-rs/defmt) logging system. The collected data is converted into a format that can be directly visualized in the [Perfetto UI](https://ui.perfetto.dev/), providing detailed insights into runtime behavior, task scheduling, and firmware performance. Have a look at the main [RustMeter README](https://github.com/Christopher-06/rustmeter) for more details!
+[**RustMeter**](https://christopher-06.github.io/rustmeter/) is a comprehensive profiling, tracing, and monitoring toolkit designed specifically for **Embedded Rust** applications. It visualizes the execution of your microcontroller in the [Perfetto UI](https://ui.perfetto.dev/), providing deep insights into task scheduling and firmware performance.
 
-![Perfetto UI Screenshot](https://raw.githubusercontent.com/Christopher-06/rustmeter/refs/heads/main/ressources/perfetto-ui-esp32-multicore.png)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Christopher-06/rustmeter/refs/heads/main/ressources/perfetto-ui-esp32-multicore.png" alt="Perfetto UI Screenshot" />
+</p>
+
+## ✨ What does the CLI do?
+
+The `rustmeter-cli` runs on your developer PC. Its job is to capture the highly-compressed raw data stream originating from your microcontroller (sent over RTT or UART by `rustmeter-beacon`). 
+
+The CLI tool:
+- Coordinates the flash & run process via tools like `probe-rs` or `espflash`.
+- Records incoming trace bytes on the fly.
+- Decodes the raw binary data using metadata extracted directly from your compiled ELF firmware.
+- Generates standardized JSON trace files ready for drag-and-drop into Perfetto.
+
+## 📖 Get Started
+
+We keep installation and setup instructions out of the README so they never fall out of sync. For a full guide on installing the CLI and configuring your project runners, please read the official documentation:
+
+👉 **[RustMeter Book: Getting Started](https://christopher-06.github.io/rustmeter/)**
+

@@ -1,7 +1,9 @@
 # RustMeter Beacon Core
 
-**Core library for the RustMeter Beacon Crate**
+**Internal core library for [RustMeter Beacon](https://crates.io/crates/rustmeter-beacon).**
 
-[**RustMeter**](https://github.com/Christopher-06/rustmeter) is a comprehensive profiling, tracing, and monitoring system designed specifically for **Embedded Rust** applications. It is highly integrated with the [Embassy](https://github.com/embassy-rs/embassy) async framework and [defmt](https://github.com/knurling-rs/defmt) logging system. The collected data is converted into a format that can be directly visualized in the [Perfetto UI](https://ui.perfetto.dev/), providing detailed insights into runtime behavior, task scheduling, and firmware performance. Have a look at the main [RustMeter README](https://github.com/Christopher-06/rustmeter) for more details!
+This crate houses the foundational types, data structures, and logic for RustMeter's embedded instrumentation. **It is not meant to be used directly by end-users.** 
 
-![Perfetto UI Screenshot](https://raw.githubusercontent.com/Christopher-06/rustmeter/refs/heads/main/ressources/perfetto-ui-esp32-multicore.png)
+Please use the main `rustmeter-beacon` crate to instrument your applications.
+
+👉 **[Learn more in the RustMeter Book](https://christopher-06.github.io/rustmeter/)**
