@@ -11,26 +11,26 @@ use defmt::info;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_hal::{
-    clock::{Clock, CpuClock},
+    clock::CpuClock,
     interrupt::software::SoftwareInterruptControl,
     peripherals,
     rmt::Rmt,
     time::Rate,
 };
-use esp_hal_smartled::{SmartLedsAdapter, smart_led_buffer};
+// use esp_hal_smartled::{SmartLedsAdapter, smart_led_buffer};
 use rustmeter_beacon::*;
-use smart_leds::{
-    SmartLedsWrite as _, brightness,
-    colors::{BLACK, BLUE, GREEN, RED, VIOLET},
-};
+// use smart_leds::{
+//     SmartLedsWrite as _, brightness,
+//     colors::{BLACK, BLUE, GREEN, RED, VIOLET},
+// };
 use static_cell::StaticCell;
 
 // This creates a default app-descriptor required by the esp-idf bootloader.
 // For more information see: <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/app_image_format.html#application-description>
 esp_bootloader_esp_idf::esp_app_desc!();
 
-static EXECUTOR_CORE_1: static_cell::StaticCell<esp_rtos::embassy::Executor> =
-    static_cell::StaticCell::new();
+static EXECUTOR_CORE_1: StaticCell<esp_rtos::embassy::Executor> =
+    StaticCell::new();
 
 #[esp_rtos::main]
 async fn main(spawner: Spawner) {
@@ -40,12 +40,12 @@ async fn main(spawner: Spawner) {
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
     let timg0 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     // Initialize Rustmeter Beacon
     init_rustmeter_beacon(
-        RustmeterConfig::new(config.cpu_clock().frequency()),
-        &spawner,
+        RustmeterConfig::new(Rate::from_mhz(CpuClock::max() as u32)),
+        &spawner
     )
     .unwrap();
     info!("Rustmeter Beacon initialized!");
@@ -58,24 +58,22 @@ async fn main(spawner: Spawner) {
     let app_core_stack = APP_CORE_STACK.init(esp_hal::system::Stack::new());
     esp_rtos::start_second_core(
         peripherals.CPU_CTRL,
-        sw_int.software_interrupt0,
         sw_int.software_interrupt1,
         app_core_stack,
         move || {
             let executor = EXECUTOR_CORE_1.init(esp_rtos::embassy::Executor::new());
             executor.run(|spawner| {
-                spawner
-                    .spawn(blink_led_task(peripherals.GPIO48, peripherals.RMT))
-                    .unwrap();
-                spawner.spawn(hello_world_task()).unwrap();
-                spawner.spawn(busy_loop_task_second()).unwrap();
+                // spawner
+                //     .spawn(blink_led_task(peripherals.GPIO48, peripherals.RMT).unwrap());
+                spawner.spawn(hello_world_task().unwrap());
+                spawner.spawn(busy_loop_task_second().unwrap());
             });
         },
     );
     info!("Second Core Executor started!");
 
     // Spawn tasks on core 0
-    spawner.spawn(busy_loop_task()).unwrap();
+    spawner.spawn(busy_loop_task().unwrap());
 
     loop {
         // main task does nothing
@@ -119,37 +117,38 @@ async fn hello_world_task() {
 }
 
 /// Create a task that blinks an LED every 500ms
-#[embassy_executor::task]
-async fn blink_led_task(led: peripherals::GPIO48<'static>, rmt: peripherals::RMT<'static>) {
-    let rmt = Rmt::new(rmt, Rate::from_mhz(80)).expect("Failed to initialize RMT");
+// TODO: Currently waits for esp-hal-smartled crate to accept esp-hal 1.1.1, then re-add smart-leds to Cargo.toml and uncomment this task
+// #[embassy_executor::task]
+// async fn blink_led_task(led: peripherals::GPIO48<'static>, rmt: peripherals::RMT<'static>) {
+//     let rmt = Rmt::new(rmt, Rate::from_mhz(80)).expect("Failed to initialize RMT");
 
-    let rmt_channel = rmt.channel0;
-    let mut rmt_buffer = smart_led_buffer!(1);
+//     let rmt_channel = rmt.channel0;
+//     let mut rmt_buffer = smart_led_buffer!(1);
 
-    let mut led = SmartLedsAdapter::new(rmt_channel, led, &mut rmt_buffer);
+//     let mut led = SmartLedsAdapter::new(rmt_channel, led, &mut rmt_buffer);
 
-    for _ in 0..3 {
-        led.write(brightness([VIOLET].into_iter(), 10)).unwrap();
-        Timer::after(Duration::from_millis(500)).await;
-        led.write(brightness([BLACK].into_iter(), 10)).unwrap();
-        Timer::after(Duration::from_millis(500)).await;
-    }
+//     for _ in 0..3 {
+//         led.write(brightness([VIOLET].into_iter(), 10)).unwrap();
+//         Timer::after(Duration::from_millis(500)).await;
+//         led.write(brightness([BLACK].into_iter(), 10)).unwrap();
+//         Timer::after(Duration::from_millis(500)).await;
+//     }
 
-    let mut pixel = RED;
-    loop {
-        led.write(brightness([pixel].into_iter(), 10)).unwrap();
+//     let mut pixel = RED;
+//     loop {
+//         led.write(brightness([pixel].into_iter(), 10)).unwrap();
 
-        // Swithc between RED, Green, BLUE
-        pixel = match pixel {
-            RED => GREEN,
-            GREEN => BLUE,
-            BLUE => RED,
-            _ => RED,
-        };
+//         // Swithc between RED, Green, BLUE
+//         pixel = match pixel {
+//             RED => GREEN,
+//             GREEN => BLUE,
+//             BLUE => RED,
+//             _ => RED,
+//         };
 
-        Timer::after(Duration::from_millis(300)).await;
-    }
-}
+//         Timer::after(Duration::from_millis(300)).await;
+//     }
+// }
 
 /// Create a second task busy looping in a 10ms cycle
 #[embassy_executor::task]
