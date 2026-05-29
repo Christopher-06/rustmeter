@@ -9,8 +9,8 @@
 use defmt::*;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
-use esp_hal::clock::{Clock, CpuClock};
-use esp_hal::gpio;
+use esp_hal::clock::{CpuClock};
+use esp_hal::{gpio, time::Rate};
 use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::timer::timg::TimerGroup;
 use rustmeter_beacon::*;
@@ -38,7 +38,7 @@ async fn main(spawner: Spawner) {
     );
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     info!("Embassy initialized!");
     monitor_value!("system_startup", 3300);
@@ -48,7 +48,6 @@ async fn main(spawner: Spawner) {
     let app_core_stack = APP_CORE_STACK.init(esp_hal::system::Stack::new());
     esp_rtos::start_second_core(
         peripherals.CPU_CTRL,
-        sw_int.software_interrupt0,
         sw_int.software_interrupt1,
         app_core_stack,
         move || {
@@ -56,22 +55,22 @@ async fn main(spawner: Spawner) {
             executor.run(|spawner| {
                 // Initialize Rustmeter Beacon on second core
                 init_rustmeter_beacon(
-                    RustmeterConfig::new(config.cpu_clock().frequency()),
+                    RustmeterConfig::new(Rate::from_mhz(CpuClock::max() as u32)),
                     &spawner,
                 )
                 .unwrap();
                 info!("Rustmeter Beacon initialized!");
 
-                spawner.spawn(busy_loop_task_second()).unwrap();
+                spawner.spawn(busy_loop_task_second().unwrap());
             });
         },
     );
     info!("Second Core Executor started!");
 
     // Spawn tasks on core 0
-    spawner.spawn(hello_world_task()).unwrap();
-    spawner.spawn(blink_led_task(led)).unwrap();
-    spawner.spawn(busy_loop_task()).unwrap();
+    spawner.spawn(hello_world_task().unwrap());
+    spawner.spawn(blink_led_task(led).unwrap());
+    spawner.spawn(busy_loop_task().unwrap());
 
     loop {
         // main task does nothing
