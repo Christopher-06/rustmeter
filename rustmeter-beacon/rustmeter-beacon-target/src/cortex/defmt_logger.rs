@@ -20,11 +20,12 @@ impl Logger {
             // Flush all buffered data
             let mut buffer = [0u8; 32];
             loop {
-                match PER_CORE_BUFFER[core_id].pop_slice(&mut buffer) {
+                match PER_CORE_BUFFER[core_id].peek_slice(&mut buffer) {
                     0 => break,
                     n => {
                         let data = &buffer[..n];
                         write_defmt_data(data);
+                        PER_CORE_BUFFER[core_id].drain(n);
                     }
                 }
             }

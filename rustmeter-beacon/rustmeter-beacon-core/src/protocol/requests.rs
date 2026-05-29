@@ -15,7 +15,7 @@ impl Request {
     }
 
     /// Serialize the Request into bytes
-    pub fn write_bytes(&self, writer: &mut BufferWriter) {
+    pub fn write_bytes<T: BufferWriter>(&self, writer: &mut T) {
         writer.write_byte(self.type_id());
 
         match self {

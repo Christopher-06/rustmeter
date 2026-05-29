@@ -1,7 +1,4 @@
-use std::collections::HashMap;
-
 use polars::prelude::*;
-use rustmeter_beacon_core::protocol::TypeDefinitionPayload;
 
 use crate::tracing::summary::TracingSummary;
 
@@ -38,8 +35,8 @@ pub fn prepare_code_monitors(lf: LazyFrame, summary: &TracingSummary) -> anyhow:
     let monitor_names_lf = get_code_monitor_names_lf(summary)?;
     let lf = lf.join(
         monitor_names_lf,
-        [col("code_monitor_id")],
-        [col("code_monitor_id")],
+        [col("code_monitor_id"), col("code_state_idx")],
+        [col("code_monitor_id"), col("code_state_idx")],
         JoinArgs::new(JoinType::Left),
     );
 
@@ -55,42 +52,40 @@ pub fn prepare_code_monitors(lf: LazyFrame, summary: &TracingSummary) -> anyhow:
 }
 
 fn get_code_monitor_names_lf(summary: &TracingSummary) -> anyhow::Result<LazyFrame> {
-    let monitor_names = get_code_monitor_names(summary)?;
+    let code_monitors = get_code_monitor_state_names(summary);
 
-    let monitor_id_series: Vec<u32> = monitor_names.keys().cloned().collect();
-    let monitor_name_series: Vec<String> = monitor_names.values().cloned().collect();
+    let monitor_id_series: Vec<u32> = code_monitors
+        .iter()
+        .map(|(monitor_id, _, _)| *monitor_id)
+        .collect();
+    let state_idx_series: Vec<u32> = code_monitors
+        .iter()
+        .map(|(_, state_idx, _)| *state_idx)
+        .collect();
+    let state_name_series: Vec<String> = code_monitors
+        .iter()
+        .map(|(_, _, state_name)| state_name.clone())
+        .collect();
 
     let lf = df!(
         "code_monitor_id" => monitor_id_series,
-        "code_monitor_name" => monitor_name_series
+        "code_state_idx" => state_idx_series,
+        "code_monitor_name" => state_name_series
     )?
     .lazy();
 
     Ok(lf)
 }
 
-fn get_code_monitor_names(summary: &TracingSummary) -> anyhow::Result<HashMap<u32, String>> {
-    let mut monitor_names = HashMap::new();
+/// Get a mapping of code monitor and state ID to its name from the tracing summary
+fn get_code_monitor_state_names(summary: &TracingSummary) -> Vec<(u32, u32, String)> {
+    let mut monitor_states = Vec::new();
 
-    summary.get_all_stream_data().for_each(|stream_data| {
-        for typedef in &stream_data.typedefs {
-            match typedef {
-                TypeDefinitionPayload::FunctionMonitor {
-                    monitor_id,
-                    fn_address,
-                } => {
-                    let fn_name = summary
-                        .get_fw_symbol_name(*fn_address as u64)
-                        .unwrap_or_else(|| format!("Function {fn_address:X}"));
-                    monitor_names.insert(*monitor_id as u32, fn_name);
-                }
-                TypeDefinitionPayload::ScopeMonitor { monitor_id, name } => {
-                    monitor_names.insert(*monitor_id as u32, name.clone());
-                }
-                _ => {}
-            }
+    for (monitor_id, metadata) in summary.get_all_fn_metadata() {
+        for (state_idx, state_name) in &metadata.state_names {
+            monitor_states.push((*monitor_id, *state_idx as u32, state_name.clone()));
         }
-    });
-    
-    Ok(monitor_names)
+    }
+
+    monitor_states
 }

@@ -1,7 +1,6 @@
 use crate::numeric_registry::NumericRegistry;
 
 pub static VALUE_MONITOR_REGISTRY: NumericRegistry = NumericRegistry::new();
-pub static CODE_MONITOR_REGISTRY: NumericRegistry = NumericRegistry::new();
 
 #[macro_export]
 macro_rules! get_static_id_by_registry {
@@ -13,7 +12,7 @@ macro_rules! get_static_id_by_registry {
         match LOCAL_MONITOR_VALUE_ID.load(Ordering::Relaxed) {
             0 => {
                 // Allocate new ID
-                let id = VALUE_MONITOR_REGISTRY.allocate_new_id();
+                let id = $registry.allocate_new_id();
                 let res = LOCAL_MONITOR_VALUE_ID.compare_exchange(
                     0,
                     id,
@@ -49,12 +48,12 @@ pub fn defmt_trace_new_monitored_value(name: &str, local_id: usize) {
 
 #[macro_export]
 /// Macro to monitor a numeric value with Rustmeter Beacon.
-/// 
+///
 /// ## Parameters
 /// - $name: A string literal representing the name of the value to be monitored (max 20 characters).
 /// - $val: The numeric value to be monitored. Must be convertible to rustmeter_beacon::protocol::MonitorValue (any primitive).
-/// 
-/// 
+///
+///
 /// # Examples
 /// ```rust,no_run
 /// let temperature: f32 = read_temperature_sensor();
@@ -69,7 +68,7 @@ macro_rules! monitor_value {
             core::assert!($name.len() <= 20, "Name of value to be monitored must be 20 characters or less");
         };
 
-        use rustmeter_beacon::monitors::{CODE_MONITOR_REGISTRY, VALUE_MONITOR_REGISTRY};
+        use rustmeter_beacon::monitors::VALUE_MONITOR_REGISTRY;
         use rustmeter_beacon::get_static_id_by_registry;
         use rustmeter_beacon::protocol::MonitorValuePayload;
 
@@ -92,100 +91,4 @@ macro_rules! monitor_value {
             value: $val.into(),
         });
     };
-}
-
-/// A guard that runs a function when dropped. Used in monitors to catch scope exits via return and other control flow statements.
-pub struct DropGuard<F: FnOnce()> {
-    drop_fn: Option<F>,
-}
-
-impl<F: FnOnce()> DropGuard<F> {
-    pub fn new(drop_fn: F) -> Self {
-        Self {
-            drop_fn: Some(drop_fn),
-        }
-    }
-}
-
-impl<F: FnOnce()> Drop for DropGuard<F> {
-    fn drop(&mut self) {
-        if let Some(f) = self.drop_fn.take() {
-            f();
-        }
-    }
-}
-
-#[allow(unused_variables)]
-pub fn defmt_trace_new_scope(name: &str, local_id: usize) {
-    #[cfg(feature = "defmt")]
-    defmt::trace!(
-        "Registered new scope monitor: {} with id {}",
-        name,
-        local_id
-    );
-}
-
-#[macro_export]
-/// Macro to monitor a code scope with Rustmeter Beacon.
-/// ## Parameters
-/// - $name: A string literal representing the name of the scope to be monitored (max 20 characters).
-/// - $body: A block of code representing the scope to be monitored. Must be synchronous.
-/// 
-/// # Examples
-/// ```rust,no_run
-/// fn matrix_multiply(a: &Matrix, b: &Matrix) -> Matrix {
-///     // prepare or anything
-/// 
-///     let result = monitor_scoped!("matrix_mul", {
-///         a * b
-///     });
-/// 
-///     // finalize or anything
-///     result
-/// }
-macro_rules! monitor_scoped {
-    ($name:literal, $body:block) => {{
-        // Limit name length to 20 characters (BufferWriter is only 32 bytes and we need space for TimeDelta and other fields)
-        const _: () = {
-            core::assert!($name.len() <= 20, "Scope name must be 20 characters or less");
-        };
-
-        use rustmeter_beacon::monitors::{CODE_MONITOR_REGISTRY, VALUE_MONITOR_REGISTRY};
-        use rustmeter_beacon::get_static_id_by_registry;
-        use rustmeter_beacon::tracing::write_tracing_event;
-
-        let (local_id, registered_newly) = get_static_id_by_registry!(CODE_MONITOR_REGISTRY);
-
-        // Send TypeDefinition event if newly registered
-        if registered_newly {
-            let payload = rustmeter_beacon::protocol::TypeDefinitionPayload::ScopeMonitor {
-                monitor_id: local_id as u8,
-                name: $name,
-            };
-            write_tracing_event(rustmeter_beacon::protocol::EventPayload::TypeDefinition(payload));
-
-            rustmeter_beacon::monitors::defmt_trace_new_scope($name, local_id);
-        }
-
-        // Create guard to signal end of scope
-        let _guard = rustmeter_beacon::monitors::DropGuard::new(|| {
-            rustmeter_beacon::protocol::raw_writers::write_monitor_end();
-        });
-
-        // Send MonitorStart event (after guard-created to lower tracing impact on measured scope)
-        rustmeter_beacon::protocol::raw_writers::write_monitor_start(local_id as u8);
-
-        { $body }
-    }};
-}
-
-// Call from proc-macro when a new function monitor is registered
-#[allow(unused_variables)]
-pub fn defmt_trace_new_function_monitor(name: &str, local_id: usize) {
-    #[cfg(feature = "defmt")]
-    defmt::trace!(
-        "Registered new function monitor: {} with id {}",
-        name,
-        local_id
-    );
 }

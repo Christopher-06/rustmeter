@@ -1,4 +1,8 @@
-use crate::{time_delta::TimeDelta, tracing::write_tracing_data};
+use crate::{
+    buffer::{BufferWriter, SimpleBufferWriter},
+    time_delta::TimeDelta,
+    tracing::write_tracing_data,
+};
 use arbitrary_int::{traits::Integer, u3};
 
 pub mod event_ids {
@@ -7,12 +11,13 @@ pub mod event_ids {
     pub const EMBASSY_TASK_EXEC_END: u8 = 3;
     pub const EMBASSY_EXECUTOR_POLL_START: u8 = 4;
     pub const EMBASSY_EXECUTOR_IDLE: u8 = 5;
-    pub const MONITOR_START: u8 = 6;
-    pub const MONITOR_END: u8 = 7;
+    pub const CODE_MONITOR_START: u8 = 6;
+    pub const CODE_MONITOR_END: u8 = 7;
     pub const MONITOR_VALUE: u8 = 8;
     pub const TYPE_DEFINITION: u8 = 9;
     pub const DATA_LOSS_EVENT: u8 = 10;
     pub const DEFMT_DATA_EVENT: u8 = 11;
+    pub const PANIC_EVENT: u8 = 12;
 }
 
 #[inline(always)]
@@ -78,23 +83,37 @@ pub fn write_embassy_executor_idle(executor_id: u3) {
 }
 
 #[inline(always)]
-pub fn write_monitor_start(monitor_id: u8) {
-    // Add payload
-    let mut buffer = [0u8; 8];
-    buffer[0] = event_ids::MONITOR_START << 3;
-    buffer[1] = monitor_id;
+pub fn write_code_monitor_start(monitor_idx: u16, state_idx: u16) {
+    let mut writer = SimpleBufferWriter::new();
+
+    // TODO:: Prepare header and payload and write only timedelta new OR
+    //          use fn level buffer to reduce stack usage
+
+    // Write header (Event ID + state index when < 7)
+    let header = if state_idx < 7 {
+        (event_ids::CODE_MONITOR_START << 3) | (state_idx as u8)
+    } else {
+        event_ids::CODE_MONITOR_START << 3 | 0b111
+    };
+    writer.write_byte(header);
+
+    // Write state index if >= 7
+    if state_idx >= 7 {
+        writer.write_varint(state_idx);
+    }
+    writer.write_varint(monitor_idx);
 
     // Write to global buffer
     let timestamp = critical_section::with(|cs| TimeDelta::from_now(cs));
-    let pos = timestamp.write_bytes_mut(&mut buffer[2..]);
-    unsafe { write_tracing_data(&buffer[..2 + pos]) };
+    timestamp.write_bytes(&mut writer);
+    unsafe { write_tracing_data(writer.as_slice()) };
 }
 
 #[inline(always)]
-pub fn write_monitor_end() {
+pub fn write_code_monitor_end() {
     // Add payload
     let mut buffer = [0u8; 8];
-    buffer[0] = event_ids::MONITOR_END << 3;
+    buffer[0] = event_ids::CODE_MONITOR_END << 3;
 
     // Write to global buffer
     let timestamp = critical_section::with(|cs| TimeDelta::from_now(cs));
@@ -129,17 +148,6 @@ pub fn write_defmt_data(data: &[u8]) {
 
         start += chunk_size;
     }
-
-    // buffer[1] = data.len() as u8;
-
-    // // Copy payload data
-    // buffer[2..2 + data.len()].copy_from_slice(data);
-    // let next_pos = 2 + data.len();
-
-    // // Write to global buffer with timestamp
-    // let timestamp = TimeDelta::from_now();
-    // let pos = timestamp.write_bytes_mut(&mut buffer[next_pos..]);
-    // unsafe { write_tracing_data(&buffer[..next_pos + pos]) };
 }
 
 // TODO: Implement monitor value!

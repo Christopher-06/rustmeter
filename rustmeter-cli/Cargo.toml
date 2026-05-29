@@ -1,6 +1,6 @@
 [package]
 name = "rustmeter"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 license = "MIT"
 authors = ["Christopher Kock"]
@@ -33,3 +33,4 @@ espflash = { version = "4.3.0", default-features = false, features = ["serialpor
 serialport = { version = "4.7.0", features = ["usbportinfo-interface"] }
 polars = { version = "0.51.0", features = ["lazy", "dtype-categorical", "sql", "parquet", "describe", "moment", "csv", "serde", "serde-lazy", "json"] }
 time = { version = "0.3.45", features = ["serde"] }
+self_cell = "1.2.2"

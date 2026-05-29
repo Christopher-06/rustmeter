@@ -1,8 +1,6 @@
 #![no_std]
 #![no_main]
 
-use panic_probe as _;
-
 use cortex_m_rt::entry;
 use defmt::info;
 use embassy_executor::{Executor, InterruptExecutor};
@@ -59,14 +57,14 @@ fn main() -> ! {
     // High-priority executor: UART4, priority level 6
     interrupt::UART4.set_priority(Priority::P6);
     let spawner = EXECUTOR_HIGH.start(interrupt::UART4);
-    spawner.spawn(hello_world_task_high()).unwrap();
-    spawner.spawn(busy_loop_task_high_prio()).unwrap();
+    spawner.spawn(hello_world_task_high().unwrap());
+    spawner.spawn(busy_loop_task_high_prio().unwrap());
 
     // Medium-priority executor: UART5, priority level 7
     interrupt::UART5.set_priority(Priority::P7);
     let spawner = EXECUTOR_MED.start(interrupt::UART5);
-    spawner.spawn(hello_world_task_med()).unwrap();
-    spawner.spawn(busy_loop_task_med_prio()).unwrap();
+    spawner.spawn(hello_world_task_med().unwrap());
+    spawner.spawn(busy_loop_task_med_prio().unwrap());
 
     // Low priority executor: runs in thread mode, using WFE/SEV
     let executor = EXECUTOR_LOW.init(Executor::new());
@@ -75,8 +73,8 @@ fn main() -> ! {
             .unwrap();
         info!("Rustmeter Beacon initialized");
 
-        spawner.spawn(hello_world_task_low()).unwrap();
-        spawner.spawn(busy_loop_task_low_prio()).unwrap();
+        spawner.spawn(hello_world_task_low().unwrap());
+        spawner.spawn(busy_loop_task_low_prio().unwrap());
     });
 }
 

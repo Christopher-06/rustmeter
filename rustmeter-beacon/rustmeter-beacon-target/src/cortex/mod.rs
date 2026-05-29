@@ -7,6 +7,7 @@ mod tracing_rtt;
 #[cfg(feature = "defmt")]
 mod defmt_logger;
 
+mod panic_handler;
 mod cortex_config;
 pub use cortex_config::CortexConfig as RustmeterConfig;
 

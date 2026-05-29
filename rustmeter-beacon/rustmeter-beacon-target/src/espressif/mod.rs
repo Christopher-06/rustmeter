@@ -2,9 +2,11 @@
 mod defmt_logger;
 mod espressif_config;
 pub use espressif_config::{Config as RustmeterConfig, *};
-mod tracing_esp;
+mod framing;
 mod local_critical_section;
 mod printing;
+mod tracing_esp;
+mod panic_handler;
 
 #[cfg(any(feature = "esp32", feature = "esp32s3", feature = "esp32p4"))]
 pub const NUM_CORES: usize = 2;
@@ -30,19 +32,19 @@ pub enum InitializationError {
 /// Example:
 /// ```no_run
 /// use rustmeter_beacon_target::*;
-/// 
+///
 /// fn main() -> ! {
 ///     // Setup e.q.
 ///     let config = esp_hal::Config::default()
 ///                         .with_cpu_clock(CpuClock::max()); // any clock config
 ///     // ...
-/// 
+///
 ///    // Initialize Rustmeter Beacon
 ///    init_rustmeter_beacon(
 ///        RustmeterConfig::new(config.cpu_clock().frequency()),
 ///        &spawner,
 ///    );
-/// 
+///
 ///    // ... rest of your main function
 /// }
 pub fn init_rustmeter_beacon<P: ConfigPrinterBuild>(
@@ -55,9 +57,9 @@ pub fn init_rustmeter_beacon<P: ConfigPrinterBuild>(
         .map_err(InitializationError::UartConfigError)?;
 
     // Spawn printing task
-    spawner
-        .spawn(printing::connector(printer_route, config.cpu_freq))
+    let token = printing::connector(printer_route, config.cpu_freq)
         .map_err(InitializationError::TaskSpawnError)?;
+    spawner.spawn(token);
 
     Ok(())
 }

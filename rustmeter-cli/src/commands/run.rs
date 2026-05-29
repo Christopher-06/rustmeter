@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    cargo::{cargo_child::CargoChildProcess, elf_file::FirmwareAddressMap},
+    cargo::{cargo_child::CargoChildProcess, elf_file::FirmwareInfo},
     cli::RunArgs,
     commands::flash_and_monitor::flash_and_monitor_chip,
     tracing::sink::TracingSink,
@@ -36,10 +36,10 @@ pub fn do_run_command(mut args: RunArgs, exit_flag: Arc<AtomicBool>) -> anyhow::
     };
 
     // Create firmware address map from elf file
-    let fw_addr_map = FirmwareAddressMap::new_from_elf_path(&elf_path)?;
+    let fw_info = FirmwareInfo::new(&elf_path)?;
 
     // flash and start monitoring
-    let monitor = flash_and_monitor_chip(&args.chip, args.tool.clone(), &elf_path, &fw_addr_map)?;
+    let monitor = flash_and_monitor_chip(&args.chip, args.tool.clone(), &elf_path, &fw_info)?;
     let tracing_bytes_recver = monitor.get_tracing_bytes_recver();
     let req_sender = monitor.get_request_sender();
 
@@ -53,7 +53,7 @@ pub fn do_run_command(mut args: RunArgs, exit_flag: Arc<AtomicBool>) -> anyhow::
     // Record tracing data till exit flag is set
     let mut tracing_sink = TracingSink::new(
         tracing_folder.clone(),
-        &elf_path,
+        &fw_info,
         tracing_bytes_recver,
         req_sender,
         &args,

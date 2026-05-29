@@ -3,7 +3,7 @@ use core::sync::atomic::Ordering;
 use rustmeter_beacon_core::{protocol::raw_writers::event_ids, time_delta::TimeDelta};
 
 // static mut okay because accessed in critical section
-static mut DROPPED_EVENTS_COUNTER: [u32; 2] = [0, 0];
+pub static mut DROPPED_EVENTS_COUNTER: [u32; 2] = [0, 0];
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".data")]

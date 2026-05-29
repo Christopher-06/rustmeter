@@ -7,13 +7,14 @@ use std::{
     time::{Duration, Instant},
 };
 
+use anyhow::Context;
 use crossbeam::channel::{Receiver, Sender};
 use rustmeter_beacon_core::protocol::{EventPayload, Request};
 use time::OffsetDateTime;
 
 use crate::{
     CoreInfo,
-    cargo::elf_file::FirmwareAddressMap,
+    cargo::elf_file::FirmwareInfo,
     cli::RunArgs,
     tracing::{
         CoreTracingData, TracingDecodeError, buffered_writer::BufferedWriter,
@@ -39,15 +40,15 @@ pub struct TracingSink {
 impl TracingSink {
     pub fn new(
         folder: PathBuf,
-        elf_path: &PathBuf,
+        fw_info: &FirmwareInfo,
         tracing_bytes_recver: Receiver<Result<CoreTracingData, TracingDecodeError>>,
         req_sender: Sender<Request>,
         args: &RunArgs,
     ) -> anyhow::Result<Self> {
         let start = Instant::now();
 
-        let fw_addr_map = FirmwareAddressMap::new_from_elf_path(elf_path)?;
-        let mut summary = TracingSummary::new(OffsetDateTime::now_utc(), fw_addr_map, args);
+        let mut summary = TracingSummary::new(OffsetDateTime::now_utc(), fw_info, args)
+            .context("Failed to create TracingSummary.")?;
         let current_stream_id = summary.register_new_stream();
 
         Ok(Self {
@@ -71,8 +72,8 @@ impl TracingSink {
                 TraceDataDecoder::new(CoreInfo::Core1, start),
             ],
             defmt_decoder: [
-                DefmtDecoder::new(CoreInfo::Core0, elf_path, start)?,
-                DefmtDecoder::new(CoreInfo::Core1, elf_path, start)?,
+                DefmtDecoder::new(CoreInfo::Core0, fw_info.path(), start)?,
+                DefmtDecoder::new(CoreInfo::Core1, fw_info.path(), start)?,
             ],
         })
     }
@@ -101,7 +102,11 @@ impl TracingSink {
     }
 
     // Handle a single valid tracing item
-    fn handle_tracing_item(&mut self, item: TracingItem) -> Result<(), TracingDecodeError> {
+    fn handle_tracing_item(
+        &mut self,
+        item: TracingItem,
+        stop: Arc<AtomicBool>,
+    ) -> Result<(), TracingDecodeError> {
         self.req_agent
             .handle_tracing_item(&item)
             .map_err(TracingDecodeError::Unknown)?;
@@ -127,6 +132,16 @@ impl TracingSink {
             // Handle dropped events
             Err(TracingDecodeError::DroppedEvents(*dropped_events))
         } else {
+            // Handle panic event
+            if let EventPayload::Panic(info) = payload {
+                println!("\n--- PANIC DETECTED ---");
+                println!("{:.6} {}", item.pc_timestamp().as_secs_f32(), info);
+
+                self.summary
+                    .set_panic_info(self.current_stream_id, info.clone())?;
+                stop.store(true, Ordering::Relaxed);
+            }
+
             // Feed to timeseries writer
             self.timeseries_writer
                 .feed(&item)
@@ -135,7 +150,11 @@ impl TracingSink {
     }
 
     /// Try to decode a single tracing item from given core, returns true if more data could be available
-    fn decode_single_tracing(&mut self, core: CoreInfo) -> Result<bool, TracingDecodeError> {
+    fn decode_single_tracing(
+        &mut self,
+        core: CoreInfo,
+        stop: Arc<AtomicBool>,
+    ) -> Result<bool, TracingDecodeError> {
         let trace_decoder = match core {
             CoreInfo::Core0 => &mut self.trace_decoder[0],
             CoreInfo::Core1 => &mut self.trace_decoder[1],
@@ -143,14 +162,18 @@ impl TracingSink {
 
         match trace_decoder.decode_single()? {
             Some(item) => {
-                self.handle_tracing_item(item)?;
+                self.handle_tracing_item(item, stop)?;
                 Ok(true)
             }
             None => Ok(false), // No more data
         }
     }
 
-    fn handle_new_bytes(&mut self, data: CoreTracingData) -> Result<(), TracingDecodeError> {
+    fn handle_new_bytes(
+        &mut self,
+        data: CoreTracingData,
+        stop: Arc<AtomicBool>,
+    ) -> Result<(), TracingDecodeError> {
         // Feed appropriate trace decoder
         let core = data.core_info();
         {
@@ -162,7 +185,7 @@ impl TracingSink {
         }
 
         // Try to decode all available tracing items
-        while self.decode_single_tracing(core)? {}
+        while self.decode_single_tracing(core, stop.clone())? {}
 
         Ok(())
     }
@@ -222,7 +245,7 @@ impl TracingSink {
             // Handle result
             match trace_data {
                 Ok(data) => {
-                    if let Err(e) = self.handle_new_bytes(data) {
+                    if let Err(e) = self.handle_new_bytes(data, stop.clone()) {
                         println!("Warning: Tracing decode error: {e}");
                         self.handle_error(e)?; // error while handling new bytes
                     }

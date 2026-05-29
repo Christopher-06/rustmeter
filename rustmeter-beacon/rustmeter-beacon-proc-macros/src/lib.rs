@@ -1,57 +1,22 @@
+mod code_monitor;
+
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{
-    Ident, ItemFn, LitStr, Result, Token,
-    parse::{Parse, ParseStream},
-    parse_macro_input,
+use rustmeter_beacon_core::code_monitor::FunctionMetadata;
+use syn::{Error, ItemFn, parse_macro_input, parse_quote, visit_mut::VisitMut};
+
+use crate::code_monitor::{
+    ScopedMonitorInput, contains_await, fn_disambiguator, scoped_disambiguator,
+    transformer::{MonitorTransformer, StepDedupTransformer, StepInsertTransformer},
 };
 
 extern crate proc_macro;
 
-/// Helper struct to parse arguments for the `monitor_fn` attribute macro
-struct MonitorArgs {
-    name: Option<String>,
-}
-
-impl Parse for MonitorArgs {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let mut name = None;
-        if input.is_empty() {
-            return Ok(MonitorArgs { name });
-        }
-
-        // Case 1: #[monitor_fn("Name")]
-        // `lookahead` checks if the next token is a string literal
-        if input.peek(syn::LitStr) {
-            let lit: LitStr = input.parse()?;
-            name = Some(lit.value());
-        }
-        // Case 2: Key-Value Pair: #[monitor_fn(name = "Name")]
-        else if input.peek(syn::Ident) {
-            let key: Ident = input.parse()?;
-            if key == "name" {
-                input.parse::<Token![=]>()?; // Consume the '='
-                let lit: LitStr = input.parse()?;
-                name = Some(lit.value());
-            } else {
-                return Err(syn::Error::new(
-                    key.span(),
-                    "Unknown argument (expected 'name')",
-                ));
-            }
-        }
-
-        // More arguments could be parsed here in the future
-
-        Ok(MonitorArgs { name })
-    }
-}
-
-/// Instruments a function to log execution for rustmeter
+/// Instruments a function to log execution for rustmeter. Can be used on sync or async functions.
+/// Use the step! macro to name individual steps inside. In async functions after each await a new step is
+/// automatically inserted. If you want to name it acordingly, you should use the step! macro right after the await.
 ///
-/// # Examples
-///
-/// Basic usage using the function's name:
+///  # Example
 ///
 /// ```rust
 /// #[monitor_fn]
@@ -61,69 +26,146 @@ impl Parse for MonitorArgs {
 /// ```
 #[proc_macro_attribute]
 pub fn monitor_fn(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(item as ItemFn);
-    let args = parse_macro_input!(attr as MonitorArgs);
+    let mut input = parse_macro_input!(item as ItemFn);
+    let fn_name = input.sig.ident.to_string();
 
-    let fn_name = &input.sig.ident;
-    let vis = &input.vis;
-    let sig = &input.sig;
-    let block = &input.block;
-    let attrs = &input.attrs; // Important: Keep other attributes (e.g., #[inline])
+    // Automatically insert step! after awaits (can create duplicates)
+    let mut transformer = StepInsertTransformer::new(fn_name.clone());
+    transformer.visit_block_mut(&mut input.block);
 
-    let mut output_name = fn_name.to_string();
+    // Dedup multiple step statements
+    let mut transformer = StepDedupTransformer::new();
+    transformer.visit_block_mut(&mut input.block);
 
-    // Handle output name from args (if provided)
-    if let Some(custom_name) = args.name {
-        output_name = custom_name;
+    // Add monitoring instruments
+    let mut transformer = MonitorTransformer::new(fn_name.clone());
+    transformer.visit_block_mut(&mut input.block);
+
+    // Prepare metadata
+    let metadata = FunctionMetadata {
+        fn_name,
+        disambiguator: fn_disambiguator(&input),
+        is_async: input.sig.asyncness.is_some(),
+        state_names: transformer.state_names,
+        state_transition_names: transformer.state_transitions,
+    };
+    let metdata_link_section = format!(".rustmeter_fn_metadata.{}", metadata.disambiguator);
+    let metadata_export_name =
+        serde_json::to_string(&metadata).expect("Failed to serialize function metadata");
+
+    // Inject CodeMonitorGuard and metadata at beginning
+    input.block.stmts.insert(
+        0,
+        parse_quote!(
+            let (__RUSTMETER_FN_MONITOR_ID, mut __CODE_MONITOR_GUARD) = {
+                let code_guard = rustmeter_beacon::code_monitor::CodeMonitorGuard::new();
+
+                // Define metadata
+                #[unsafe(link_section = #metdata_link_section)]
+                #[unsafe(export_name = #metadata_export_name)]
+                static RUSTMETER_FN_METADATA: u8 = 0;
+
+                // use mem address of metadata as monitor id (later it will be used with VARINT)
+                let fn_monitor_id = unsafe { &RUSTMETER_FN_METADATA as *const u8 as u16 };
+
+                (fn_monitor_id, code_guard)
+            };
+        ),
+    );
+
+    quote! {
+        #input
     }
-
-    if input.sig.asyncness.is_some() {
-        // ASYNC FUNCTION not supported yet
-        quote! {
-            compile_error!("`monitor_fn` macro does not support async functions yet.");
-        }
-        .into()
-    } else {
-        // SYNC FUNCTION
-        quote! {
-            #(#attrs)*
-            #vis #sig {
-                {
-                    let core_id = rustmeter_beacon::core_id::get_current_core_id();
-
-                    // Get or register monitor ID
-                    use rustmeter_beacon::monitors::VALUE_MONITOR_REGISTRY;
-                    let (local_id, registered_newly) = rustmeter_beacon::get_static_id_by_registry!(
-                        rustmeter_beacon::monitors::CODE_MONITOR_REGISTRY
-                    );
-
-                    // Send TypeDefinition event if newly registered
-                    if registered_newly {
-                        let fn_addr = #fn_name as usize;
-                        let payload = rustmeter_beacon::protocol::TypeDefinitionPayload::FunctionMonitor {
-                            monitor_id: local_id as u8,
-                            fn_address: fn_addr as u32,
-                        };
-                        rustmeter_beacon::tracing::write_tracing_event(
-                            rustmeter_beacon::protocol::EventPayload::TypeDefinition(payload)
-                        );
-                    
-                        rustmeter_beacon::monitors::defmt_trace_new_function_monitor(#output_name, local_id);
-                    }
-
-                    // Create guard to signal end of scope
-                    let _guard = rustmeter_beacon::monitors::DropGuard::new(|| {
-                        rustmeter_beacon::protocol::raw_writers::write_monitor_end();
-                    });
-
-                    // Send MonitorStart event (after guard-created to lower tracing impact on measured scope)
-                    rustmeter_beacon::protocol::raw_writers::write_monitor_start(local_id as u8);
-                
-
-                    // Execute original function body
-                    { #block }
-                }
-            }           
-        }.into()
-    }
+    .into()
 }
+
+/// Macro to monitor a code scope with Rustmeter Beacon (only synchronous!). Can also be
+/// used with step! macro!
+///
+/// ## Parameters
+/// - $name: A string literal representing the name of the scope to be monitored.
+/// - $body: A block of code representing the scope to be monitored. Must be synchronous.
+///
+/// # Examples
+/// ```rust,no_run
+/// fn matrix_multiply(a: &Matrix, b: &Matrix) -> Matrix {
+///     // prepare or anything
+///
+///     let result = monitor_scoped!("matrix_mul", {
+///         a * b
+///     });
+///
+///     // finalize or anything
+///     result
+/// }
+#[proc_macro]
+pub fn monitor_scoped(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as ScopedMonitorInput);
+    let disambiguator = scoped_disambiguator(&input);
+    let mut block = input.block;
+    let name_val = input.name.value();
+
+    // Check for syncness
+    for stmt in block.stmts.iter() {
+        if contains_await(stmt) {
+            return Error::new_spanned(
+                stmt,
+                "monitor_scoped! does not support async code. Please use monitor_fn for async functions or scopes with awaits.",
+            )
+            .to_compile_error()
+            .into();
+        }
+    }
+
+    // Automatically insert step! after awaits (can create duplicates)
+    let mut transformer = StepInsertTransformer::new(name_val.clone());
+    transformer.visit_block_mut(&mut block);
+
+    // Dedup multiple step statements
+    let mut transformer = StepDedupTransformer::new();
+    transformer.visit_block_mut(&mut block);
+
+    // Add monitoring instruments
+    let mut transformer = MonitorTransformer::new(name_val.clone());
+    transformer.visit_block_mut(&mut block);
+
+    // Prepare metadata
+    let metadata = FunctionMetadata {
+        fn_name: name_val.clone(),
+        disambiguator,
+        is_async: false,
+        state_names: transformer.state_names,
+        state_transition_names: transformer.state_transitions,
+    };
+    let metdata_link_section = format!(".rustmeter_fn_metadata.{}", metadata.disambiguator);
+    let metadata_export_name =
+        serde_json::to_string(&metadata).expect("Failed to serialize function metadata");
+
+    // Inject CodeMonitorGuard and metadata at beginning
+    block.stmts.insert(
+        0,
+        parse_quote!(
+            let (__RUSTMETER_FN_MONITOR_ID, mut __CODE_MONITOR_GUARD) = {
+                let code_guard = rustmeter_beacon::code_monitor::CodeMonitorGuard::new();
+
+                // Define metadata
+                #[unsafe(link_section = #metdata_link_section)]
+                #[unsafe(export_name = #metadata_export_name)]
+                static RUSTMETER_FN_METADATA: u8 = 0;
+
+                // use mem address of metadata as monitor id (later it will be used with VARINT)
+                let fn_monitor_id = unsafe { &RUSTMETER_FN_METADATA as *const u8 as u16 };
+
+                (fn_monitor_id, code_guard)
+            };
+        ),
+    );
+
+    quote! {
+        #block
+    }
+    .into()
+}
+
+#[unsafe(no_mangle)]
+fn write_tracing_data(_data: &[u8]) {}

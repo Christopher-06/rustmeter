@@ -21,10 +21,11 @@ enum TimeSeriesEvent {
     CodeMonitorStart,
     CodeMonitorEnd,
     ValueMonitor,
+    PanicEvent,
 }
 
 impl TimeSeriesEvent {
-    const N_EVENTS: usize = 8;
+    const N_EVENTS: usize = 9;
 
     pub const fn as_str(&self) -> &'static str {
         match self {
@@ -36,6 +37,7 @@ impl TimeSeriesEvent {
             TimeSeriesEvent::CodeMonitorStart => "CodeMonitorStart",
             TimeSeriesEvent::CodeMonitorEnd => "CodeMonitorEnd",
             TimeSeriesEvent::ValueMonitor => "ValueMonitor",
+            TimeSeriesEvent::PanicEvent => "PanicEvent",
         }
     }
 
@@ -70,6 +72,7 @@ pub struct TimeSeriesItemBuffer {
     executor_ids: Vec<Option<u32>>,
     // Code Monitor
     code_monitor_id: Vec<Option<u32>>,
+    code_state_idx: Vec<Option<u32>>,
     // Value Monitor
     value_monitor_id: Vec<Option<u32>>,
     value: Vec<Option<f64>>,
@@ -89,6 +92,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
             task_ids: Vec::with_capacity(MAX_TRACING_ITEMS),
             executor_ids: Vec::with_capacity(MAX_TRACING_ITEMS),
             code_monitor_id: Vec::with_capacity(MAX_TRACING_ITEMS),
+            code_state_idx: Vec::with_capacity(MAX_TRACING_ITEMS),
             value_monitor_id: Vec::with_capacity(MAX_TRACING_ITEMS),
             value: Vec::with_capacity(MAX_TRACING_ITEMS),
         }
@@ -109,6 +113,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                 self.task_ids.push(Some(*task_id as u32));
                 self.executor_ids.push(Some(executor_id.as_u32()));
                 self.code_monitor_id.push(None);
+                self.code_state_idx.push(None);
                 self.value_monitor_id.push(None);
                 self.value.push(None);
             }
@@ -122,6 +127,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                 self.task_ids.push(None);
                 self.executor_ids.push(Some(executor_id.as_u32()));
                 self.code_monitor_id.push(None);
+                self.code_state_idx.push(None);
                 self.value_monitor_id.push(None);
                 self.value.push(None);
             }
@@ -135,6 +141,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                 self.task_ids.push(None);
                 self.executor_ids.push(Some(executor_id.as_u32()));
                 self.code_monitor_id.push(None);
+                self.code_state_idx.push(None);
                 self.value_monitor_id.push(None);
                 self.value.push(None);
             }
@@ -151,6 +158,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                 self.task_ids.push(Some(*task_id as u32));
                 self.executor_ids.push(Some(executor_id.as_u32()));
                 self.code_monitor_id.push(None);
+                self.code_state_idx.push(None);
                 self.value_monitor_id.push(None);
                 self.value.push(None);
             }
@@ -164,10 +172,11 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                 self.task_ids.push(None);
                 self.executor_ids.push(Some(executor_id.as_u32()));
                 self.code_monitor_id.push(None);
+                self.code_state_idx.push(None);
                 self.value_monitor_id.push(None);
                 self.value.push(None);
             }
-            EventPayload::MonitorStart { monitor_id } => {
+            EventPayload::CodeMonitorStart { monitor_idx, state_idx } => {
                 self.core_origin.push(item.core().as_str());
                 self.event_type
                     .push(TimeSeriesEvent::CodeMonitorStart.as_str());
@@ -176,11 +185,12 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                     .push(item.pc_timestamp().as_micros() as u64);
                 self.task_ids.push(None);
                 self.executor_ids.push(None);
-                self.code_monitor_id.push(Some(*monitor_id as u32));
+                self.code_monitor_id.push(Some(*monitor_idx as u32));
+                self.code_state_idx.push(Some(*state_idx as u32));
                 self.value_monitor_id.push(None);
                 self.value.push(None);
             }
-            EventPayload::MonitorEnd => {
+            EventPayload::CodeMonitorEnd => {
                 self.core_origin.push(item.core().as_str());
                 self.event_type
                     .push(TimeSeriesEvent::CodeMonitorEnd.as_str());
@@ -190,6 +200,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                 self.task_ids.push(None);
                 self.executor_ids.push(None);
                 self.code_monitor_id.push(None);
+                self.code_state_idx.push(None);
                 self.value_monitor_id.push(None);
                 self.value.push(None);
             }
@@ -202,8 +213,22 @@ impl WritableBuffer for TimeSeriesItemBuffer {
                 self.task_ids.push(None);
                 self.executor_ids.push(None);
                 self.code_monitor_id.push(None);
+                self.code_state_idx.push(None);
                 self.value_monitor_id.push(Some(*value_id as u32));
                 self.value.push(Some(value.as_f64()));
+            }
+            EventPayload::Panic { .. } => {
+                self.core_origin.push(item.core().as_str());
+                self.event_type.push(TimeSeriesEvent::PanicEvent.as_str());
+                self.uc_timeticks.push(item.uc_timeticks());
+                self.pc_timestamps_us
+                    .push(item.pc_timestamp().as_micros() as u64);
+                self.task_ids.push(None);
+                self.executor_ids.push(None);
+                self.code_monitor_id.push(None);
+                self.code_state_idx.push(None);
+                self.value_monitor_id.push(None);
+                self.value.push(None);
             }
             _ => {
                 // Ignore other events for now
@@ -220,6 +245,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
         debug_assert!(self.task_ids.len() == self.len);
         debug_assert!(self.executor_ids.len() == self.len);
         debug_assert!(self.code_monitor_id.len() == self.len);
+        debug_assert!(self.code_state_idx.len() == self.len);
         debug_assert!(self.value_monitor_id.len() == self.len);
         debug_assert!(self.value.len() == self.len);
         Ok(())
@@ -234,6 +260,7 @@ impl WritableBuffer for TimeSeriesItemBuffer {
             "task_id" => self.task_ids,
             "executor_id" => self.executor_ids,
             "code_monitor_id" => self.code_monitor_id,
+            "code_state_idx" => self.code_state_idx,
             "value_monitor_id" => self.value_monitor_id,
             "value" => self.value,
         )

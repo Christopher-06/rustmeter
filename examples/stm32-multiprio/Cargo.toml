@@ -8,16 +8,15 @@ version = "0.1.0"
 [dependencies]
 cortex-m = { version = "0.7.7", features = ["inline-asm", "critical-section-single-core"] }
 cortex-m-rt = "0.7.5"
-panic-probe = { version = "1.0.0", features = ["print-defmt"] }
 
 defmt = { version = "1.0.1" }
 
-embassy-executor = { version = "0.9.1", features = ["arch-cortex-m", "executor-thread",  "executor-interrupt", "defmt", "trace"] }
+embassy-executor = { version = "0.10.0", features = ["platform-cortex-m", "executor-thread",  "executor-interrupt", "defmt", "trace"] }
 embassy-futures = { version = "0.1.2", features = ["defmt"] }
-embassy-stm32 = { version = "0.4.0", features = ["memory-x", "stm32f446rc", "time-driver-any", "exti", "unstable-pac", "defmt"] }
-embassy-sync = {version = "0.7.2", features = ["defmt"] }
+embassy-stm32 = { version = "0.6.0", features = ["memory-x", "stm32f446rc", "time-driver-any", "exti", "unstable-pac", "defmt"] }
+embassy-sync = {version = "0.8.0", features = ["defmt"] }
 embassy-time = { version = "0.5.0", features = ["tick-hz-32_768", "defmt", "defmt-timestamp-uptime"] }
-rustmeter-beacon = { version = "0.2.0", features = ["stm32", "defmt"] }
+rustmeter-beacon = { version = "0.2.1", features = ["stm32", "defmt"], path = "../../rustmeter-beacon" }
 
 static_cell = "2.1.1"
 
