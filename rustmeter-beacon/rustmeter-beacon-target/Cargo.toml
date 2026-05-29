@@ -37,6 +37,7 @@ esp32c6 = ["dep:esp-hal", "esp-hal/esp32c6", "esp-sync/esp32c6", "esp-println/es
 esp32h2 = ["dep:esp-hal", "esp-hal/esp32h2", "esp-sync/esp32h2", "esp-println/esp32h2"]
 esp32s2 = ["dep:esp-hal", "esp-hal/esp32s2", "esp-sync/esp32s2", "esp-println/esp32s2"]
 esp32s3 = ["dep:esp-hal", "esp-hal/esp32s3", "esp-sync/esp32s3", "esp-println/esp32s3", "rustmeter-beacon-core/multicore"]
+esp32p4 = ["dep:esp-hal", "esp-hal/esp32p4", "esp-sync/esp32p4", "esp-println/esp32p4", "rustmeter-beacon-core/multicore"]
 
 stm32 = []
 rp2040 = [ "dep:embassy-rp", "embassy-rp/rp2040", "portable-atomic/critical-section", "rustmeter-beacon-core/multicore"]
