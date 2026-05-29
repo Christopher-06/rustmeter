@@ -368,27 +368,35 @@ dependencies = [
 
 [[package]]
 name = "embassy-executor"
-version = "0.9.1"
-source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d0d3b15c9d7dc4fec1d8cb77112472fb008b3b28c51ad23838d83587a6d2f1e"
 dependencies = [
  "cordyceps",
  "cortex-m",
  "critical-section",
  "document-features",
  "embassy-executor-macros",
- "embassy-executor-timer-queue",
+ "embassy-executor-timer-queue 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "embassy-executor-macros"
-version = "0.7.0"
-source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d11a246f53de5f97a387f40ac24726817cd0b6f833e7603baac784f29d6ff276"
 dependencies = [
  "darling 0.20.11",
  "proc-macro2",
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "embassy-executor-timer-queue"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fc328bf943af66b80b98755db9106bf7e7471b0cf47dc8559cd9a6be504cc9c"
 
 [[package]]
 name = "embassy-executor-timer-queue"
@@ -509,7 +517,7 @@ name = "embassy-time-queue-utils"
 version = "0.3.0"
 source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
 dependencies = [
- "embassy-executor-timer-queue",
+ "embassy-executor-timer-queue 0.1.0 (git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f)",
  "heapless",
 ]
 
@@ -1655,3 +1663,8 @@ name = "zmij"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4de98dfa5d5b7fef4ee834d0073d560c9ca7b6c46a71d058c48db7960f8cfaf7"
+
+[[patch.unused]]
+name = "embassy-executor"
+version = "0.9.1"
+source = "git+https://github.com/embassy-rs/embassy.git?rev=d41b6b00d00cf13b4fa9b5923ac445e33cc7607f#d41b6b00d00cf13b4fa9b5923ac445e33cc7607f"
