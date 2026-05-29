@@ -1,0 +1,803 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>RustMeter Usage &amp; Documentation</title>
+        <meta name="robots" content="noindex">
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="getting_started.html"><strong aria-hidden="true">2.</strong> Getting Started</a></li><li class="chapter-item expanded "><a href="user_guide.html"><strong aria-hidden="true">3.</strong> User Guide</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="user_guide/tracing_embassy_tasks.html"><strong aria-hidden="true">3.1.</strong> Tracing Embassy Tasks</a></li><li class="chapter-item expanded "><a href="user_guide/monitoring_functions.html"><strong aria-hidden="true">3.2.</strong> Monitoring Functions and Scopes</a></li><li class="chapter-item expanded "><a href="user_guide/tracking_values.html"><strong aria-hidden="true">3.3.</strong> Tracking Values</a></li><li class="chapter-item expanded "><a href="user_guide/logging_with_defmt.html"><strong aria-hidden="true">3.4.</strong> Logging with defmt</a></li></ol></li><li class="chapter-item expanded "><a href="cli.html"><strong aria-hidden="true">4.</strong> The rustmeter-cli</a></li><li class="chapter-item expanded "><a href="advanced.html"><strong aria-hidden="true">5.</strong> Advanced Topics</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="advanced/performance.html"><strong aria-hidden="true">5.1.</strong> Performance & Overhead</a></li><li class="chapter-item expanded "><a href="advanced/troubleshooting.html"><strong aria-hidden="true">5.2.</strong> Troubleshooting</a></li></ol></li><li class="chapter-item expanded "><a href="api_reference.html"><strong aria-hidden="true">6.</strong> API Reference</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">RustMeter Usage &amp; Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
+<p>RustMeter is a comprehensive profiling, tracing, and monitoring toolkit designed exclusively for Embedded Rust applications. It integrates seamlessly with the <code>embassy</code> asynchronous framework and the popular <code>defmt</code> logging ecosystem.</p>
+<p>In the challenging world of embedded systems, it can feel like your software is trapped inside a "black box" once it's flashed to the target microcontroller. We built RustMeter to tear that box open. With RustMeter, you can visually trace exactly how your code takes shape over time, helping you uncover performance bottlenecks, identify scheduling bugs, and correlate obscure sensor anomalies at a glance.</p>
+<h3 id="why-do-i-need-it"><a class="header" href="#why-do-i-need-it">Why Do I Need It?</a></h3>
+<p>When developing deeply embedded firmware—especially complex asynchronous systems—you run into several specific challenges that RustMeter addresses directly:</p>
+<ul>
+<li><strong>Lack of Visibility:</strong> It's notoriously hard to trace execution flows inside microcontrollers without massive debug probing overhead. RustMeter provides a clean, visual representation of what's currently executing.</li>
+<li><strong>Performance Bottlenecks:</strong> It helps you clearly spot which exact functions or async tasks consume an unusual amount of processor execution time, slowing everything else down.</li>
+<li><strong>Task Scheduling Issues:</strong> Are tasks taking too long to yield? Are they starving each other, or perhaps mysteriously stuck waiting in queues without executing? RustMeter visualizes precisely how the <code>embassy</code> scheduler routes priority.</li>
+<li><strong>Correlation of Events:</strong> Have you ever wondered what the exact state of a system was right before a <code>defmt</code> fault logged on your screen? RustMeter places those log messages natively on exactly the same timeline as everything else.</li>
+<li><strong>Resource Monitoring:</strong> Whether it’s observing raw free heap memory, capturing active sensor readings over I2C, or plotting power consumption metrics, RustMeter graphs your custom dynamic properties securely across time.</li>
+</ul>
+<h3 id="core-concepts"><a class="header" href="#core-concepts">Core Concepts</a></h3>
+<p>RustMeter adopts an extremely effective dual-component structure to keep the embedded overhead safely bounded while providing enormous power on the host side:</p>
+<ol>
+<li>
+<p><strong><code>rustmeter-beacon</code> (The Embedded Side):</strong> This is a lightweight Rust library crated designed to inhabit your embedded application. It packs handy macros such as <code>#[monitor_fn]</code>, <code>monitor_scoped!</code>, and <code>monitor_value!</code> so that you can easily tag the logic you want to observe. It also hooks cleanly into the internal logic of the <code>embassy</code> executor.
+When your application runs, this beacon accumulates trace events into extremely fast, lock-free ring buffers (isolated per core!). A dedicated low-priority background task gracefully empties this buffer and squirts the data packet over a channel like RTT or Serial to your host.</p>
+</li>
+<li>
+<p><strong><code>rustmeter-cli</code> (The Host Side):</strong> This is the command line application residing on your development machine. The tool effortlessly connects to your target (by proxying tools such as <code>probe-rs</code> or <code>espflash</code>), seamlessly catching the data arriving from your <code>rustmeter-beacon</code>.
+Using metadata uniquely baked into your firmware's ELF binary, it decodes this byte stream into a human-readable, perfectly formatted <code>Perfetto</code> JSON trace.</p>
+</li>
+</ol>
+<h3 id="the-data-journey"><a class="header" href="#the-data-journey">The Data Journey</a></h3>
+<p>If you’re wondering how this all connects chronologically, here's the typical lifecycle of trace data:</p>
+<p>First, your firmware runs your specialized functions augmented with our macros. These embedded routines then generate continuous timestamped events. Behind the scenes, we quickly dispatch these raw data slices directly into a lock-free internal ring buffer, making absolutely sure we don't interfere with or block your critical paths.
+A low priority backend thread eventually transmits this buffer out of the system. Waiting on your PC, the <code>rustmeter-cli</code> receives it, decodes it referencing local metadata, and outputs a standard JSON file.
+Finally, all that's left to do is upload that JSON visually to the beautiful <a href="https://ui.perfetto.dev/">Perfetto UI</a> timeline viewer exactly as they use for large-scale Chromium traces!</p>
+<p>We proudly enforce a <strong>Core Principle of Low Overhead</strong>. By intelligently exploiting lock-free asynchronous buffers, the delay we impart onto your active logic is breathtakingly tiny. This ensures that profiling with RustMeter doesn't mask the very time-critical performance quirks you strictly aim to uncover!</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h1>
+<p>Let’s walk through the steps to set up this powerful tool in your embedded Rust project. We will guide you over installing the host tools, configuring your embedded application, and viewing your first trace. Don't worry—the setup is designed to be straightforward.</p>
+<h2 id="installation"><a class="header" href="#installation">Installation</a></h2>
+<p>Before you begin, make sure your embedded Rust development environment is ready. You will need <code>rustup</code>, <code>cargo</code>, and the appropriate compilation target for your microcontroller (for example, <code>thumbv7em-none-eabi</code>). Additionally, you should have a debug probe set up with <code>probe-rs</code> or an active USB connection for Espressif chips.</p>
+<h3 id="step-1-install-rustmeter-cli-on-your-host-pc"><a class="header" href="#step-1-install-rustmeter-cli-on-your-host-pc">Step 1: Install <code>rustmeter-cli</code> on Your Host PC</a></h3>
+<p>The <code>rustmeter-cli</code> is the command-line tool that acts as your command center. It builds and flashes your project, listens for incoming trace data, and prepares it for visualization in Perfetto.</p>
+<p>Open your terminal and run the following command to install it globally:</p>
+<pre><code class="language-shell">cargo install rustmeter-cli
+</code></pre>
+<p>Once the installation finishes, you can verify that it is available on your system by checking the version:</p>
+<pre><code class="language-shell">rustmeter --version
+</code></pre>
+<h3 id="step-2-add-rustmeter-beacon-to-your-embedded-project"><a class="header" href="#step-2-add-rustmeter-beacon-to-your-embedded-project">Step 2: Add <code>rustmeter-beacon</code> to Your Embedded Project</a></h3>
+<p>Next, you need to add the <code>rustmeter-beacon</code> library to your embedded firmware. This library handles all the data collection and transmission on the microcontroller side.</p>
+<p>Open your project's <code>Cargo.toml</code> file and add the following line to your <code>[dependencies]</code> section. Make sure to choose the correct chip-specific feature that matches your board!</p>
+<pre><code class="language-toml">[dependencies]
+rustmeter-beacon = { version = "*", features = ["YOUR_CHIP_HERE", "defmt"] }
+</code></pre>
+<p>You can replace <code>"YOUR_CHIP_HERE"</code> with the feature flag corresponding to your microcontroller. The currently supported chip features are:</p>
+<ul>
+<li><code>stm32</code></li>
+<li><code>esp32</code></li>
+<li><code>esp32c2</code></li>
+<li><code>esp32c3</code></li>
+<li><code>esp32c6</code></li>
+<li><code>esp32h2</code></li>
+<li><code>esp32s2</code></li>
+<li><code>esp32s3</code></li>
+<li><code>rp2040</code></li>
+</ul>
+<p><strong>Crucial for Embassy Users:</strong> If you want RustMeter to automatically trace your asynchronous task lifecycles, you also need to enable the <code>trace</code> feature for the <code>embassy-executor</code> crate in your <code>Cargo.toml</code>.</p>
+<pre><code class="language-toml">embassy-executor = { version = "*", features = [ /* ... */, "trace"] }
+</code></pre>
+<h3 id="step-3-configure-the-linker-script"><a class="header" href="#step-3-configure-the-linker-script">Step 3: Configure the Linker Script</a></h3>
+<p>RustMeter optimizes performance by using a custom linker script. Instead of continuously sending the names of your functions and tasks over the wire (which wastes bandwidth and memory), it stores them directly in the final ELF file on your PC.</p>
+<p>To instruct <code>cargo</code> to use this script, you must add it to your build configuration. If you don't already have a <code>build.rs</code> file in your project's root directory, create one now and add the following lines:</p>
+<pre><pre class="playground"><code class="language-rust">fn main() {
+    // Add the RustMeter linker script
+    println!("cargo:rustc-link-arg=-Trustmeter.x");
+}</code></pre></pre>
+<p>If your project uses other linker scripts (such as <code>defmt.x</code> or <code>memory.x</code>), make sure <code>rustmeter.x</code> is included alongside them. The order of linker scripts generally matters, so adding it alongside your existing <code>println!</code> statements is typically a safe approach.</p>
+<h2 id="your-first-trace"><a class="header" href="#your-first-trace">Your First Trace</a></h2>
+<p>Now that everything is installed and configured, let's actually trace something!</p>
+<h3 id="step-1-initialize-the-beacon-in-your-firmware"><a class="header" href="#step-1-initialize-the-beacon-in-your-firmware">Step 1: Initialize the Beacon in Your Firmware</a></h3>
+<p>In your <code>main.rs</code>, you need to initialize the beacon. This starts the background process that transmits trace data to your host PC. Because <code>rustmeter-beacon</code> requires accurate timekeeping, you must provide your system's clock frequency in Hertz.</p>
+<p>Here is a minimal example using <code>embassy</code>:</p>
+<pre><pre class="playground"><code class="language-rust">use rustmeter_beacon::{init_rustmeter_beacon, RustmeterConfig, get_system_freq};
+use embassy_executor::Spawner;
+
+#[embassy_executor::main]
+async fn main(spawner: Spawner) {
+    // ... initialize your hal and clock ...
+
+    // Initialize RustMeter beacon with the correct clock frequency
+    let config = RustmeterConfig::new(get_system_freq!());
+    init_rustmeter_beacon(config, &amp;spawner).expect("Failed to initialize RustMeter");
+
+    // ... continue with your main application logic
+}</code></pre></pre>
+<h3 id="step-2-instrument-your-code"><a class="header" href="#step-2-instrument-your-code">Step 2: Instrument Your Code</a></h3>
+<p>To see activity on your timeline, tell RustMeter what you want to measure. The easiest way to do this is by adding the <code>#[monitor_fn]</code> attribute to a function.</p>
+<p>Note: Embassy Tasks will be automatically traced if you enabled the <code>trace</code> feature for <code>embassy-executor</code>, so you don't need to add any manual instrumentation to them. However, for other functions or specific code blocks, you can use the provided macros later in the guide.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rustmeter_beacon::monitor_fn;
+use embassy_time::{Duration, Timer};
+
+#[monitor_fn]
+async fn my_monitored_time_spending() {
+    // The total time spent in this function will be recorded
+    Timer::after(Duration::from_millis(100)).await;
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="step-3-run-the-application-with-rustmeter-cli"><a class="header" href="#step-3-run-the-application-with-rustmeter-cli">Step 3: Run the Application with <code>rustmeter-cli</code></a></h3>
+<p>Instead of typing <code>cargo run</code>, you will now launch your application through <code>rustmeter run</code>. The CLI needs to know which chip you are targeting so it can invoke the proper flashing routine.</p>
+<p>Open your terminal and execute the following command, ensuring you replace <code>&lt;YOUR_CHIP&gt;</code> with your specific model (e.g., <code>RP2040</code> or <code>ESP32-S3</code>):</p>
+<pre><code class="language-shell">rustmeter run --chip &lt;YOUR_CHIP&gt; --release
+</code></pre>
+<p>The CLI will build your code, flash your microcontroller, run the application, and start listening for the incoming data stream automatically.</p>
+<h3 id="step-4-stop-tracing-and-view-the-results"><a class="header" href="#step-4-stop-tracing-and-view-the-results">Step 4: Stop Tracing and View the Results</a></h3>
+<p>Let your application run for a few seconds so it can gather some events. Once you forms are done, gently press <code>Ctrl+C</code> in your terminal to stop the process.</p>
+<p>RustMeter will finalize the capture and generate a JSON file in your project folder. You can drag and drop this file right into the <a href="https://ui.perfetto.dev/">Perfetto UI</a> to interactively explore your very first system trace!</p>
+<ul>
+<li>The CLI will stop the trace and save the output to a file named <code>rustmeter-perfetto.json</code>.</li>
+<li>Go to <a href="https://ui.perfetto.dev/">ui.perfetto.dev</a>.</li>
+<li>Click on "Open trace file" and select the <code>rustmeter-perfetto.json</code> file generated in your project's root directory.</li>
+<li>You should now see a timeline visualizing the execution of <code>my_monitored_time_spending</code>!</li>
+</ul>
+<h3 id="recommended-workflow-using-the-cargo-runner"><a class="header" href="#recommended-workflow-using-the-cargo-runner">Recommended Workflow: Using the Cargo Runner</a></h3>
+<p>While calling <code>rustmeter run</code> directly works well, the recommended approach is to integrate it into your standard <code>cargo run</code> workflow. This is more convenient and feels more natural.</p>
+<ul>
+<li>
+<p><strong>How:</strong> Create a <code>.cargo/config.toml</code> file in your project's root directory.</p>
+</li>
+<li>
+<p><strong>What to add:</strong> Configure <code>rustmeter run</code> as the "runner" for your specific target.</p>
+<pre><code class="language-toml"># in .cargo/config.toml
+
+[target.thumbv7em-none-eabihf] # &lt;-- IMPORTANT: Change this to your actual target triple
+runner = "rustmeter run --chip STM32F446RE" # &lt;-- IMPORTANT: Change this to your chip
+
+# Optional, but recommended:
+[build]
+target = "thumbv7em-none-eabihf" # &lt;-- Also change this to your target
+</code></pre>
+</li>
+<li>
+<p><strong>The Benefit:</strong> Now, you can simply run <code>cargo run</code> and Cargo will automatically use <code>rustmeter</code> to flash and trace your application.</p>
+</li>
+</ul>
+<h3 id="always-use---release-for-profiling"><a class="header" href="#always-use---release-for-profiling">Always Use <code>--release</code> for Profiling!</a></h3>
+<p>When you are measuring performance, it is crucial to build your code in <strong>release mode</strong>. Debug builds are not optimized and contain extra checks, which makes any timing measurements inaccurate.</p>
+<ul>
+<li>
+<p><strong>With <code>rustmeter run</code>:</strong></p>
+<pre><code class="language-shell">rustmeter run --chip &lt;YOUR_CHIP&gt; --release
+</code></pre>
+</li>
+<li>
+<p><strong>With the Cargo runner workflow:</strong></p>
+<pre><code class="language-shell">cargo run --release
+</code></pre>
+</li>
+</ul>
+<p>This ensures that you are profiling the optimized version of your code, giving you a true picture of your application's performance. This is also the default mode for embedded development, so it's generally best practice to always use release mode when running on actual hardware.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="user-guide"><a class="header" href="#user-guide">User Guide</a></h1>
+<p>This comprehensive User Guide is designed to carefully walk you through the core, powerful features of RustMeter. Along the way, we will show you exactly how to utilize the library's provided macros, ensuring you gain deep, unparalleled insights into your embedded application's inner mechanisms.</p>
+<p>Whether you're struggling to understand exactly what your asynchronous workloads are doing or you just want to track a crucial voltage sensor seamlessly, this guide covers the solutions.</p>
+<p>In this section, we will cover:</p>
+<ul>
+<li><strong>Automatic Embassy Task Tracing:</strong> Discover how RustMeter visualizes the entire lifecycle of your <code>embassy</code> tasks perfectly out-of-the-box, without requiring you to manually instrument them.</li>
+<li><strong>Manual Instrumentation:</strong> While automatic tracing is incredible, sometimes you need to dig deeper. Learn how to explicitly use the <code>#[monitor_fn]</code>, <code>monitor_scoped!</code>, and <code>monitor_value!</code> macros to analyze exact function execution times, profile custom code blocks, and graph variable behavior over time.</li>
+<li><strong>Log Correlation:</strong> Say goodbye to endless scrolling purely to align terminal printouts. See how <code>defmt</code> log messages are naturally injected directly into your visual trace timeline.</li>
+<li><strong>Multicore Tracing:</strong> Expand your boundaries further by seeing how to intelligently trace, handle, and visualize performance spanning across systems carrying multiple processor cores dynamically.</li>
+</ul>
+<hr />
+<h3 id="a-note-on-performance-overhead"><a class="header" href="#a-note-on-performance-overhead">A Note on Performance Overhead</a></h3>
+<p>When stepping into profiling, it is crucial to understand that any form of software observation inherently introduces a very slight performance overhead. Quite simply, every time an event occurs (like jumping into a monitored function or saving a trackable value), the <code>rustmeter-beacon</code> takes a microscopic amount of time to actively write it down.</p>
+<p>We spent tremendous effort engineering RustMeter to be exceptionally lightweight so you barely feel a difference. However, this small amount of overhead gradually adds up if you try observing hundreds of extremely short, high-frequency routines simultaneously. Ultimately, this means the execution blocks rendered inside Perfetto are guaranteed to include this tiny instrumentation footprint.</p>
+<p>For an extensive, detailed analysis on overhead metrics and proven strategies applied by experts to minimize it, please feel completely free to jump over to the <a href="./advanced/performance.html">Performance &amp; Overhead</a> chapter within our Advanced Topics.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="tracing-embassy-tasks"><a class="header" href="#tracing-embassy-tasks">Tracing Embassy Tasks</a></h1>
+<p>One of RustMeter's most attractive highlights is its deep, transparent integration with the <code>embassy</code> framework. By turning on a single feature, RustMeter <strong>automatically</strong> begins tracing the lifecycle of your asynchronous tasks without forcing you to litter your elegant code with manual instrumentation.</p>
+<p>This means you can instantly observe when tasks start, when they wake up, when they pause, and crucially, when they find themselves hopelessly waiting.</p>
+<h3 id="how-to-enable-task-tracing"><a class="header" href="#how-to-enable-task-tracing">How to Enable Task Tracing</a></h3>
+<p>Enabling this feature acts as a massive quality-of-life boost for async engineers.</p>
+<p>To activate it, you merely need to expose the <code>trace</code> feature flag provided universally down inside the <code>embassy-executor</code> dependency itself. Within your <code>Cargo.toml</code>, ensure that your dependencies block resembles the example below:</p>
+<pre><code class="language-toml">[dependencies]
+embassy-executor = { 
+    version = "0.5.0", 
+    features = [
+        # ... other features you might use like "executor-thread" etc.
+        "trace" 
+    ] 
+}
+</code></pre>
+<p>Beyond that flag, you absolutely still must initialize the <code>rustmeter-beacon</code> instance during your program's earliest startup routine (usually early inside <code>main</code>), exactly as you would have done while reading the Getting Started guide. No extra magical lines are needed per task.</p>
+<pre><pre class="playground"><code class="language-rust">// In your main.rs, ensure you load your settings.
+use rustmeter_beacon::{init_rustmeter_beacon, RustmeterConfig};
+use embassy_executor::Spawner;
+
+#[embassy_executor::main]
+async fn main(spawner: Spawner) {
+    // Determine your system frequency
+    let config = RustmeterConfig::new(120_000_000); 
+
+    // This single robust line unlocks all automatic framework tracing!
+    init_rustmeter_beacon(config, &amp;spawner).unwrap();
+
+    // From here, peacefully just spawn your normal tasks
+    spawner.spawn(task_one()).unwrap();
+    spawner.spawn(task_two()).unwrap();
+}</code></pre></pre>
+<h3 id="unveiling-the-task-lifecycle"><a class="header" href="#unveiling-the-task-lifecycle">Unveiling The Task Lifecycle</a></h3>
+<p>The moment you run your connected chip via <code>rustmeter run</code> and load the produced file into Perfetto, you will delightfully be presented with a beautifully organized, dedicated timeline track representing each distinct task spawned.</p>
+<p>RustMeter intrinsically captures the following dynamic statuses across the lifetime of these tasks:</p>
+<ul>
+<li><strong>Spawned</strong>: At this instantaneous fraction of time, the task was just cleanly created. It signifies the task is completely ready to run, but merely waiting for the CPU to actually get around to executing it.</li>
+<li><strong><code>Running</code></strong>: Simply put, the task currently owns your CPU. Code is successfully calculating.</li>
+<li><strong><code>Idle</code></strong>: Often the most frequent and healthy async state, this simply denotes that your task has suspended execution awaiting a real-life event, such as an upcoming <code>Timer</code>, an ongoing sensor DMA reading, or a filled data channel.</li>
+<li><strong><code>Ready</code></strong>: The task successfully received its event and is completely ready to run—but sadly, it sits stuck waiting because your executor chose to process a different active task first. Frequent blocks of <code>Ready</code> vividly highlight when your CPU simply has too much to do, pointing directly to potential real-time starvation.</li>
+<li><strong><code>End</code></strong>: Peace at last. The task naturally completed computing to the full end and has been peacefully laid to rest.</li>
+</ul>
+<p>Suddenly, grasping your software’s concurrency becomes incredibly accessible. You can instantly spot misbehaving routines monopolizing processor time, visibly check if tasks take an unusual duration to resume after waking up, and cleanly prove exactly which task executes at every specific millisecond!</p>
+<h3 id="visualizing-the-executor-state"><a class="header" href="#visualizing-the-executor-state">Visualizing The Executor State</a></h3>
+<p>Additionally, RustMeter goes a step further and traces the overarching state of the <code>embassy-executor</code> machine itself.</p>
+<p>By observing the timeline track named typically as <code>embassy-executor</code>, you gain a profound bird’s-eye perspective depicting when your entire central processor activates versus when it falls comfortably asleep:</p>
+<ul>
+<li><strong><code>Running</code></strong>: The broader executor is explicitly running an active task process. You usually even get the visual identifier showcasing strictly which task identifier it is managing.</li>
+<li><strong><code>POLLING</code></strong>: The engine is furiously looping through its internal checklists to figure out which waiting routines have recently became ready. This transition logically occurs right after an event executes, or before scheduling kicks off.</li>
+<li><strong><code>Idle</code></strong>: Complete silence. No tasks are asking to be run. Embassy seizes this magnificent opportunity to command the whole MCU core to fall right into deep low-power sleep modes, drastically saving your battery capacity dynamically.</li>
+</ul>
+<h3 id="what-to-pay-attention-to"><a class="header" href="#what-to-pay-attention-to">What to Pay Attention To</a></h3>
+<ul>
+<li><strong>Naming Tasks Automatically:</strong> RustMeter dynamically snags the exact name of the function you wrap and spawn to label the timeline block comfortably. So whenever you call <code>spawner.spawn(my_cool_task())</code>, you will see a track confidently labeled <code>my_cool_task</code>. It makes navigating chaotic logs visually intuitive.</li>
+<li><strong>A Missing <code>trace</code> Feature:</strong> Should your Perfetto timeline seem oddly devoid of any task event state, the overwhelming reason typically stems from simply forgetting to append that subtle <code>"trace"</code> flag onto the <code>embassy-executor</code> list within <code>Cargo.toml</code>.</li>
+<li><strong>Free of Manual Macros:</strong> Keep closely in mind you absolutely do <strong>not</strong> need to artificially place the <code>#[monitor_fn]</code> macro above your background tasks sequentially just to view this behavior. Everything here is wonderfully autonomous. The only reason to deploy <code>#[monitor_fn]</code> over an overarching task is purely if you aim to map its unified total calculation length spanning as a single massive timeline block apart from observing its detailed sleep cycles.</li>
+<li><strong>Future Multi-Priority Support:</strong> In the future, as we expand to support multi-priority executors in analysis, you may see additional states like <code>Preempted</code> in the executor track. For now, you can identify preemption on multi-core systems by correlating if multiple executors are running on the same core simultaneously.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="monitoring-functions-and-scopes"><a class="header" href="#monitoring-functions-and-scopes">Monitoring Functions and Scopes</a></h1>
+<p>While letting the automatic task tracing engine handle background embassy events is marvelously powerful, you frequently will encounter scenarios where you demand granular, laser-focused control to isolate very specific bottlenecks buried deep within your logic.</p>
+<p>To easily accommodate this, RustMeter graciously ships several easy-to-use macros that allow you to manually segment, tag, and measure exact snippets of computational work.</p>
+<h3 id="monitor_fn-monitoring-entire-functions"><a class="header" href="#monitor_fn-monitoring-entire-functions"><code>#[monitor_fn]</code>: Monitoring Entire Functions</a></h3>
+<p>The <code>#[monitor_fn]</code> attribute securely attaches to any function definition. Once applied, it automatically times the length of processing starting the exact moment you enter the function extending precisely until it reaches the exiting return.</p>
+<p>For standard synchronous software architecture (<code>fn</code>), it works wonderfully straightforward. It maps the overall time spent strictly inside that dedicated block spanning end-to-end within Perfetto:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rustmeter_beacon::monitor_fn;
+
+#[monitor_fn]
+fn my_heavy_blocking_calculation() {
+    // An intensive calculation lives here.
+    // RustMeter will illustrate the full duration effectively as one massive block.
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Interestingly, things become profoundly dynamic once you attach it to an <code>async fn</code>. RustMeter ingeniously breaks apart the life of an asynchronous function actively according to the location of its <code>.await</code> points!</p>
+<p>Every fragment of executing code situated neatly between individual <code>.await</code> interruptions is treated dynamically as a separate <code>Running</code> event inside the timeline. For instance, rather than showing a long two-minute pause, you accurately witness exactly which phase required computing and identifying just how massive a time window was spent effectively waiting.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rustmeter_beacon::monitor_fn;
+
+#[monitor_fn]
+async fn my_async_operation() {
+    // This top portion triggers the first visible execution block.
+    let data = fetch_data().await; 
+
+    // Once woken up, this chunk creates the second execution block.
+    process_data(data).await;
+
+    // Finally, closing instructions log the third block seamlessly.
+}
+<span class="boring">}</span></code></pre></pre>
+<p>By default, RustMeter beautifully mirrors the exact rust function name you assigned the routine. Nevertheless, should you prefer a specialized explicit label visually, you can easily append a custom name parameter directly onto the macro mapping itself!</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[monitor_fn(name = "MyAwesomeCustomName")]
+fn internal_utility_function() {
+    // The timeline track shows "MyAwesomeCustomName" directly.
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="step-marking-points-in-async-functions"><a class="header" href="#step-marking-points-in-async-functions"><code>step!</code>: Marking Points in Async Functions</a></h3>
+<p>Within those complex async routines wrapped carefully inside <code>#[monitor_fn]</code>, it can sometimes become rather tedious tracking which <code>.await</code> phase you are looking at spanning alongside massive traces. The helpful <code>step!</code> macro allows you to drop descriptive checkpoints across these segments freely.</p>
+<p>Simply call <code>step!("your explicit step name")</code> and watch the label beautifully manifest against subsequent <code>Running</code> execution tracks inside Perfetto!</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rustmeter_beacon::{monitor_fn, step};
+
+#[monitor_fn]
+async fn massive_configuration_task() {
+    step!("Starting the network phase");
+    // Work done here will inherit the updated label inside Perfetto.
+    connect_to_wifi().await;
+
+    step!("Downloading configuration payload");
+    // Work done here appropriately updates and registers against this new label.
+    pull_http_payload().await;
+    
+    step!("Processing constraints locally");
+    // Followed by closing logic.
+}
+<span class="boring">}</span></code></pre></pre>
+<p><em>Word of Caution:</em> Keep your broader executing model in mind. Dropping a <code>step!</code> call casually situated inside an aggressively looping <code>for</code> iteration forces the step label openly against subsequent <code>.await</code> phases outside the scope if unchallenged directly.</p>
+<h3 id="monitor_scoped-profiling-arbitrary-code-blocks"><a class="header" href="#monitor_scoped-profiling-arbitrary-code-blocks"><code>monitor_scoped!</code>: Profiling Arbitrary Code Blocks</a></h3>
+<p>Routinely, you don't actually intend tracking entirely massive functions top-to-bottom. Sometimes you simply want to analyze an obscure calculation hidden squarely inside a larger functional machine. This is perfectly where <code>monitor_scoped!</code> shines!</p>
+<p>Take any bracket of routine code lines and comfortably embrace them together utilizing <code>monitor_scoped!("my_special_scope_name", { ... });</code>.</p>
+<p>This shines particularly bright when you aim to dissect the length of looping arrays or profiling an edge-case calculation embedded inside standard algorithms:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rustmeter_beacon::monitor_scoped;
+
+fn generic_system_controller() {
+    // Surrounding business logic occurs securely.
+
+    monitor_scoped!("CriticalSensorLoop", {
+        for _ in 0..10_000 {
+            // Intensive isolated processing sits comfortably here...
+        }
+    });
+
+    // Remainder of your system flows freely...
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Can I run <code>step!</code> inside <code>monitor_scoped!</code>?</strong>
+Actually, no. The elegant <code>step!</code> macro is architectured expressly to integrate securely with the native state machine found natively on an authentic <code>async fn</code> labeled forcefully by <code>#[monitor_fn]</code>. It won't yield meaningful visual markers placed aimlessly inside a <code>monitor_scoped!</code> section.</p>
+<p>However, you can brilliantly nest a <code>monitor_scoped!</code> segment firmly <em>inside</em> an <code>async fn</code> properly decorated with <code>#[monitor_fn]</code>! The timeline actively builds a stunning hierarchy showing exactly your custom scope duration alongside stepping phases seamlessly!</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="tracking-values"><a class="header" href="#tracking-values">Tracking Values</a></h1>
+<p>Besides strictly capturing timing events, developing a thorough understanding of an embedded system regularly requires visualizing exactly how specific system values wildly fluctuate over your run intervals. The <code>monitor_value!</code> macro was deliberately built for precisely this scenario, natively bridging variable tracking efficiently onto your main visual map.</p>
+<h3 id="why-target-value-tracking"><a class="header" href="#why-target-value-tracking">Why Target Value Tracking?</a></h3>
+<p>Graphing runtime fluctuations proves incredibly rewarding for uncovering oddities visually. Use it whenever you depend on understanding dynamically altering metrics across your product:</p>
+<ul>
+<li><strong>Sensor Data Analytics:</strong> Graph live temperature dips, pressure thresholds, damp accelerometers responses, or I2C sensor swings correctly aligned against your execution steps.</li>
+<li><strong>Underlying System State:</strong> Watch your available free memory drain consistently, monitor volatile battery lines under active loads, or pinpoint exactly when computational thresholds peak.</li>
+<li><strong>Application Level Tracking:</strong> Effortlessly graph your message queue lengths filling up across peaks, record exactly how many dropped packages accumulate visually, or just cleanly observe loop iterations natively.</li>
+</ul>
+<p>When generated, Perfetto eagerly translates these numeric snapshots elegantly into <strong>Counter Tracks</strong>. These manifest as gorgeous continuous graphs mapping tracked values tightly along the vertical Y-axis plotted directly against your timeline’s exact chronological X-axis!</p>
+<h3 id="applying-the-macro-practically"><a class="header" href="#applying-the-macro-practically">Applying the Macro Practically</a></h3>
+<p>Utilizing the macro sits elegantly along the natural feel of Rust logging. Pass it two clear arguments: simply a string-literal specifying your chosen metric name, immediately followed closely by the explicit numeric value you aim to register at that specific passing moment.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rustmeter_beacon::monitor_value;
+
+// Recording a raw literal integer against a specific visual track!
+monitor_value!("metric_board_voltage", 3300);
+<span class="boring">}</span></code></pre></pre>
+<p>The system beautifully supports mapping classic <code>u32</code>, <code>i32</code>, <code>u64</code>, <code>i64</code>, and natively plots decimal floating points securely utilizing <code>f32</code> and <code>f64</code> values safely.</p>
+<p><strong>Example: Plotting Active Memory</strong></p>
+<p>Suppose you actively wield a local function measuring your board's remaining available bytes <code>get_free_heap_size()</code>. Constructing a simple background task querying this consistently crafts a perfect memory graph perfectly:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rustmeter_beacon::monitor_value;
+use embassy_time::{Duration, Timer};
+
+#[embassy_executor::task]
+async fn memory_monitor_task() {
+    loop {
+        // Collect local state from your application
+        let free_memory = get_free_heap_size(); 
+        
+        // Push the recorded value directly up into the timeline
+        monitor_value!("free_heap", free_memory as u32);
+        
+        // Wait gently beforehand polling the system again.
+        Timer::after(Duration::from_secs(1)).await;
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>By safely running <code>spawner.spawn(memory_monitor_task())</code> directly alongside your main firmware loops, a crisp graph clearly named <code>free_heap</code> manifests completely visually isolating memory leak behaviors precisely!</p>
+<h3 id="important-usage-tips"><a class="header" href="#important-usage-tips">Important Usage Tips</a></h3>
+<ul>
+<li>
+<p><strong>Naming Enforces Unification:</strong> Perfetto associates graph paths utilizing matching string-literal titles. If you systematically submit values marked constantly as <code>"free_heap"</code>, RustMeter plots those updates smoothly plotting adjacent segments on the <em>same exact</em> graph layer line. If you strictly need separating elements natively, simply deploy notably disparate identifying titles!</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Generates explicitly disconnected counter graphs alongside your timeline naturally.
+monitor_value!("temperature", 25.5);
+monitor_value!("humidity", 45.2); 
+<span class="boring">}</span></code></pre></pre>
+</li>
+<li>
+<p><strong>Consistent Types Matter:</strong> While RustMeter politely accepts varied numeric primitive types against a single timeline cleanly, heavily altering types passed into a matching metric name can skew visual scaling uncomfortably within Perfetto. Standardize a single type when continually reporting targeting identical named metrics!</p>
+</li>
+<li>
+<p><strong>Slight Overhead Cautions:</strong> As similarly documented spanning measuring traits, forcefully logging dynamic integers triggers microscopic processing footprint constraints dynamically. Be somewhat careful repeatedly triggering tracking loops hundreds of thousands of times within performance-critical interrupts specifically. Focus your tracks natively where metric updates logically alter substantially.</p>
+</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="logging-with-defmt"><a class="header" href="#logging-with-defmt">Logging with <code>defmt</code></a></h1>
+<p>Tracing asynchronous execution traces reveals a tremendous amount of data visually, yet standard text-based logging often supplies critical human context impossible to gauge through strict time graphs alone.</p>
+<p>By brilliantly capturing and routing <code>defmt</code> standard logs securely across the very same channel driving trace captures, RustMeter successfully aligns those precious diagnostic context prints precisely against native event timelines reliably inside Perfetto!</p>
+<h3 id="the-reason-behind-the-correlation"><a class="header" href="#the-reason-behind-the-correlation">The Reason Behind the Correlation</a></h3>
+<p>Unifying your framework logs right onto a singular timeline acts as an exceptional force multiplier for resolving logic issues rapidly! Unlocking log correlation confidently allows you to answer exceptionally obscure situational questions immediately:</p>
+<ul>
+<li>Does this specific <code>ERROR</code> printout actually crop up while my networking component is currently holding the CPU, or was my sensor task unfortunately running completely parallel just beforehand?</li>
+<li>How much microscopic delay occurs sitting rigidly between beginning mathematical evaluation sequences sequentially verses when the underlying algorithm ultimately finishes emitting passing warning statuses accurately?</li>
+<li>Exactly what did my tracked board voltage counter visually display squarely before my critical system safety component actively fired panic messages directly into standard logs?</li>
+</ul>
+<h3 id="ℹ-note-enable-the-defmt-feature-in-rustmeter-beacon"><a class="header" href="#ℹ-note-enable-the-defmt-feature-in-rustmeter-beacon">ℹ️ Note: Enable the <code>defmt</code> Feature in rustmeter-beacon</a></h3>
+<p>To ensure your log messages are captured and transmitted correctly, make sure you enable the <code>defmt</code> feature in your <code>rustmeter-beacon</code> dependency in your <code>Cargo.toml</code>:</p>
+<pre><code class="language-toml">[dependencies]
+rustmeter-beacon = { version = "...", features = ["defmt", /* your chip */] }
+</code></pre>
+<p>This is required for RustMeter to hook into your logging macros and forward them to the host.</p>
+<h3 id="operating-your-logs-normally"><a class="header" href="#operating-your-logs-normally">Operating Your Logs Normally</a></h3>
+<p>Surprisingly enough, the largest technical hurdle behind integrating log visualization directly via RustMeter consists simply of maintaining your exact typical coding style continuously!</p>
+<p>Apart from importing the standard <code>defmt</code> toolsuite natively mapping beside successfully triggering <code>rustmeter_beacon::init_rustmeter_beacon()</code>, practically zero explicit framework configuration applies.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rustmeter_beacon::monitor_scoped;
+use embassy_time::{Duration, Timer};
+
+#[embassy_executor::task]
+async fn tracking_my_application() {
+    loop {
+        // Log exactly as you comfortably do typically!
+        defmt::info!("Beginning a fresh polling cycle.");
+        
+        monitor_scoped!("Critical_Networking_Work", {
+            // Intensive logic processing sequences live comfortably here
+        });
+
+        if external_safety_alert_triggered() {
+            // Warning prompts slip seamlessly onto timeline alignments!
+            defmt::warn!("Emergency safety anomaly detected over local threshold!");
+        }
+
+        Timer::after(Duration::from_secs(1)).await;
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="viewing-log-assertions-in-perfetto"><a class="header" href="#viewing-log-assertions-in-perfetto">Viewing Log Assertions in Perfetto</a></h3>
+<p>Rather than endless monochrome text scrolling viciously through a chaotic terminal, every parsed message is intelligently plotted as beautifully defined <strong>instant events</strong> (precise pinpoint markers) situated meticulously onto specific event sequences. These labels retain the original exact chronological timestamp captured explicitly from the CPU dynamically!</p>
+<p>Selecting a pin gracefully visualizes corresponding data tags explicitly detailing matching logging severity classes perfectly (like natively resolving <code>INFO</code>, <code>WARN</code>, or catastrophic <code>ERROR</code> categorizations) alongside providing exactly unaltered formatted descriptions cleanly.</p>
+<h3 id="-crucial-warning-remove-other-transports"><a class="header" href="#-crucial-warning-remove-other-transports">⚠️ Crucial Warning: Remove Other Transports</a></h3>
+<p>Before diving into the code, it is critical to understand one major constraint: <strong>You must not use <code>defmt-rtt</code>, <code>rtt-target</code>, or <code>esp-println</code> anywhere in your project.</strong></p>
+<p>Because RustMeter automatically takes complete control of the primary data channel (such as RTT or your Serial connection) to quickly stream trace data, including other transport crates will cause them to fight over the exact same connection. This reliably leads to corrupted traces, unreadable logs, or absolute system crashes.</p>
+<p>You should rely <em>only</em> on the base <code>defmt</code> crate to provide your logging macros. RustMeter will automatically handle the heavy lifting of transporting those logs to your PC!</p>
+<h3 id="best-practices--pitfalls-to-avoid"><a class="header" href="#best-practices--pitfalls-to-avoid">Best Practices &amp; Pitfalls to Avoid</a></h3>
+<ul>
+<li><strong>Bypass Internal Defmt Timestamping Entirely!</strong> Historically, generating hardware-timed timestamp features leveraging <code>defmt</code> requires annoying custom configurations alongside timer peripherals carefully orchestrated across embedded boundaries. With RustMeter handling unified time constraints completely transparently, absolutely zero manual <code>defmt</code> timestamp logic requires instancing! Lean directly backwards atop our synchronized execution timestamps gracefully.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="the-rustmeter-cli"><a class="header" href="#the-rustmeter-cli">The <code>rustmeter-cli</code></a></h1>
+<p>The <code>rustmeter-cli</code> is the command-line tool installed on your host PC, and it orchestrates the entire tracing process. You can think of it as a powerful wrapper that takes care of compiling your project, flashing your microcontroller, capturing the outgoing data stream via RTT or a serial port, and finally transforming it all into the standardized format that the Perfetto UI understands.</p>
+<p>In this chapter, we will explain the core commands you use to interact with the CLI and showcase common workflows.</p>
+<h3 id="commands"><a class="header" href="#commands">Commands</a></h3>
+<p>The CLI primarily operates using two subcommands: <code>run</code> and <code>analyze</code>.</p>
+<h4 id="rustmeter-run-the-default-workflow"><a class="header" href="#rustmeter-run-the-default-workflow"><code>rustmeter run</code> (The Default Workflow)</a></h4>
+<p>This is the command you will use most often. It takes care of the entire end-to-end continuous loop from code to trace visualizer:</p>
+<ol>
+<li><strong>Builds your firmware</strong>: First, it invokes <code>cargo build</code> on your embedded project.</li>
+<li><strong>Flashes the device</strong>: Next, it utilizes tools like <code>probe-rs</code> or <code>espflash</code> to write the newly compiled ELF binary onto your target.</li>
+<li><strong>Captures trace data</strong>: Once the device starts running, it persistently listens for the event stream sent by the <code>rustmeter-beacon</code> running on your chip.</li>
+<li><strong>Analyzes the data</strong>: The moment you end the session by pressing <code>Ctrl+C</code>, the CLI processes the raw incoming data. It efficiently references your local ELF file and ultimately saves the result as <code>rustmeter-perfetto.json</code>.</li>
+</ol>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-shell">rustmeter run [OPTIONS] [EXECUTABLE]
+</code></pre>
+<p><strong>Options for <code>run</code>:</strong></p>
+<ul>
+<li><code>--chip &lt;CHIP_NAME&gt;</code>: <strong>(Required)</strong> This tells the CLI which specific microcontroller model you are aiming to trace. The flasher needs this accurate name to establish a connection. Examples include <code>--chip RP2040</code> or <code>--chip ESP32-S3</code>.</li>
+<li><code>--release</code>: This tells the tool to compile the project in release mode (<code>cargo build --release</code>). We highly recommend doing this since optimizations make performance measurements much more reliable and representative of your real-world application.</li>
+<li><code>--project &lt;PATH&gt;</code>: With this option, you can specify exactly where your embedded project's root folder is located. By default, it operates in the current directory (<code>.</code>).</li>
+<li><code>--tool &lt;TOOL_NAME&gt;</code>: By default, RustMeter tries to guess the flashing tool. However, you can manually dictate which tool handles flashing and monitoring:
+<ul>
+<li><code>probe-rs</code>: Use <code>probe-rs</code>, which uses RTT for communication and is the standard for non-Espressif controllers.</li>
+<li><code>espflash</code>: The default standard for Espressif chips that heavily use serial port communication.</li>
+<li><code>auto</code>: (Default) Let RustMeter use heuristics based on your <code>--chip</code> setting to pick the correct background tool.</li>
+</ul>
+</li>
+</ul>
+<p>Sometimes you don't even want to rebuild from scratch but start right from a pre-compiled <code>.elf</code> executable. You can provide its path directly as the final argument (e.g. <code>rustmeter run --chip RP2040 ./target/thumbv.../release/my_binary</code>). <strong>Please note</strong>: Giving an <code>&lt;EXECUTABLE&gt;</code> conflicts directly with <code>--release</code> and <code>--project</code>, making them unavailable for that launch.</p>
+<h4 id="rustmeter-analyze"><a class="header" href="#rustmeter-analyze"><code>rustmeter analyze</code></a></h4>
+<p>If you ever wish to skip the compiling and flashing stages entirely—perhaps to rerun an analysis step on historical trace files—you can reach for the <code>analyze</code> subcommand.</p>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-shell">rustmeter analyze [PATH_TO_TRACING_FOLDER]
+</code></pre>
+<ul>
+<li><strong>Why use this?</strong> Every time you utilize <code>rustmeter run</code>, the underlying raw raw trace streams are preserved quietly inside your build folder (typically somewhere like <code>target/rustmeter/tracing/&lt;timestamp&gt;</code>). Should you wish to re-evaluate those traces (for instance, to experiment with a newer analyzer algorithm), you can command the <code>analyze</code> action directly to interpret that particular folder. If you omit the folder path, it defaults to the current working directory <code>.</code>.</li>
+</ul>
+<h3 id="common-workflows--questions"><a class="header" href="#common-workflows--questions">Common Workflows &amp; Questions</a></h3>
+<p><strong>How do I run my project for tracing normally?</strong></p>
+<p>The clearest approach involves opening a terminal in your project's root folder and launching:</p>
+<pre><code class="language-shell">rustmeter run --chip &lt;YOUR_CHIP&gt; --release
+</code></pre>
+<p><strong>Can I still use <code>cargo run</code>?</strong></p>
+<p>Absolutely! Integrating <code>rustmeter</code> to impersonate your default cargo runner is delightfully convenient. In your project, locate or create a <code>.cargo/config.toml</code> file at the root, and configure it similarly to the snippet below. Be sure to substitute your correct target architecture and chip:</p>
+<pre><code class="language-toml">[target.thumbv7em-none-eabihf] # &lt;-- Substitute your specific build target
+runner = "rustmeter run --chip STM32F746ZGT6" # &lt;-- Make sure to declare your exact chip
+
+[build]
+target = "thumbv7em-none-eabihf" # &lt;-- Similarly, specify your target here
+</code></pre>
+<p>Now, every time you execute <code>cargo run --release</code>, Cargo natively delegates the final step directly to <code>rustmeter</code>, which gracefully compiles, flashes, and jumps into trace-listening mode.</p>
+<p><strong>Where is the output file stored?</strong></p>
+<p>You will find the generated timeline trace file, <code>rustmeter-perfetto.json</code>, happily sitting in the directory from which you invoked the command.</p>
+<p><strong>What does the CLI do with the ELF file?</strong></p>
+<p>The host PC's locally stored ELF file serves a profound purpose. The <code>rustmeter-beacon</code> running on your device strictly sends over lightweight numerical IDs, saving precious network bandwidth entirely by skipping raw string text. It is the job of the <code>rustmeter-cli</code> analyzer to meticulously map these numerical IDs back into their original, human-readable function and log names found hidden inside the ELF file. This maps cleanly into Perfetto, making custom linker script integration deeply essential.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="advanced-topics"><a class="header" href="#advanced-topics">Advanced Topics</a></h1>
+<p>Now that you have a firm grasp underneath the basics of RustMeter, it is time to plunge a bit deeper.</p>
+<p>In this Advanced Topics section, we peel back the layers to discuss underlying system characteristics that typically emerge as you start tracing heavier, more complex implementations.</p>
+<p>We will talk thoroughly about the unavoidable reality of profiling overhead, demonstrating exactly why certain things behave the way they do on physical chips, and layout strategies on minimizing your impact on target algorithms.</p>
+<p>Furthermore, we offer an extensive Troubleshooting hub designed to smoothly assist you past unexpected hurdles or complicated deadlock anomalies that can occasionally surface securely within Embedded Rust environments.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="performance--overhead"><a class="header" href="#performance--overhead">Performance &amp; Overhead</a></h1>
+<p>As embedded engineers, you likely understand a fundamental, unyielding law of computing software realistically: measuring things requires processing labor.</p>
+<p>It is critically essential mapping precisely what overhead translates explicitly within RustMeter natively! Grasping precisely exactly where footprint costs aggressively manifest empowers engineering decisions confidently determining simply when deploying deep macro constraints stays highly appropriate—versus scaling observability appropriately against bare-metal processor limits cleanly.</p>
+<h3 id="the-heisenberg-principle-of-profiling"><a class="header" href="#the-heisenberg-principle-of-profiling">The Heisenberg Principle of Profiling</a></h3>
+<p>In physics, you cannot accurately observe an isolated quantum system effectively without directly altering its native underlying state slightly. Computing behaves identically!</p>
+<p>Inherently, every occasion a single macro executes gracefully (<code>#[monitor_fn]</code>, <code>monitor_scoped!</code>, <code>monitor_value!</code>, <code>step!</code>, or background internal <code>embassy</code> framework task hooks natively), executing applications actively demand calculating additional clock sequences storing those pinpoint event snapshots carefully.</p>
+<p>Therefore, recognizing duration labels accurately dictates acknowledging these lengths fundamentally illustrate absolute execution timelines strictly combined tightly integrating those tiny macro metric captures synchronously natively alongside!</p>
+<h3 id="measured-constraints"><a class="header" href="#measured-constraints">Measured Constraints</a></h3>
+<p>Architectural clock capacities fiercely determine tracing latency lengths. The faster integer mathematics perform, the shorter those events constrain you.</p>
+<p>Based on aggressive field benchmarks natively captured locally targeting supported constraints realistically:</p>
+<ul>
+<li>
+<p><strong>Espressif Targets (ex. ESP32, ESP32-S3):</strong></p>
+<ul>
+<li><strong>Overhead Cost:</strong> Ranges merely <strong>0.4 µs to roughly 1.2 µs per generated instruction</strong>.</li>
+<li>Advanced clock speeds alongside hyper-accelerated integer optimizations easily provide Espressif chips phenomenal macro handling cleanly dropping overheads incredibly slim.</li>
+</ul>
+</li>
+<li>
+<p><strong>Cortex-M MCUs (ex. STM32 Series, RP2040):</strong></p>
+<ul>
+<li><strong>Overhead Cost:</strong> Expands toward <strong>1 µs scaling roughly around 8 µs per trace</strong>.</li>
+<li>Since Cortex hardware strictly runs frequently below higher clock capacities (frequently missing specialized atomic caching pathways easily accessible natively against Xtensa counterparts originally), this unfortunately implies marginally higher execution demands cleanly parsing instructions immediately. Future optimizations aim sharply aimed pushing these tighter down!</li>
+</ul>
+</li>
+</ul>
+<h3 id="tracing-the-root-source"><a class="header" href="#tracing-the-root-source">Tracing the Root Source</a></h3>
+<p>RustMeter effectively reduces macro blockages incredibly significantly! Our underlying system elegantly adopts extremely optimized approaches gracefully sidestepping halting conditions whenever events actually trigger actively.</p>
+<p>When your application correctly triggers an instrumented trace correctly:</p>
+<ol>
+<li>It smoothly generates absolute byte identifiers accurately containing localized timestamps efficiently.</li>
+<li>It quickly delegates and fires this generated data slice dynamically into a highly optimized, fully <strong>lock-free per-core ring buffer</strong> seamlessly! No locking mechanics are engaged natively blocking your primary active sequence loops waiting defensively. You suffer exactly precisely this quick push latency and no longer!</li>
+<li>Quietly existing far inside background application environments independently, low-priority worker tasks routinely digest loaded buffer contents actively shuttling memory dumps out of your MCU steadily. This never artificially blocks active foreground paths securely!</li>
+</ol>
+<p><em>Warning Note:</em> Should your aggressive primary application rapidly overwhelm this transmitting background agent fiercely logging millions of traces sequentially natively, the underlying internal buffers may tragically hit max capacities silently overflowing effectively! In those rare scenarios, events currently mysteriously simply drop directly avoiding application deadlocks aggressively blocking natively. Designing explicit forced stalling logic blocking overflowing tasks directly sending remains hotly heavily planned roadmapped specifically preventing dropped observations explicitly soon.</p>
+<h3 id="effectively-processing-visualizations"><a class="header" href="#effectively-processing-visualizations">Effectively Processing Visualizations</a></h3>
+<ul>
+<li><strong>Concentrate on Relative Proportions:</strong> Focus on analyzing visual blocks conceptually. If function <code>A</code> clearly requires 50 µs while <code>B</code> spans aggressively over 200 µs locally, the major insight demands noting that <code>B</code> scales fiercely reaching functionally four magnitudes lengthier! Absolute values certainly drift minimally longer accommodating metric gathering artificially natively; however, the mapped ratios correctly dictate precisely exactly targeting performance bottlenecks!</li>
+<li><strong>Evaluate Tiny Code Execution Loops:</strong> Wrapping trace tags blindly around loops requiring solely microscopic fractional microseconds to process computationally actively doubles relative performance execution costs completely disrupting native behavioral properties noticeably. Be exceptionally extremely cautious mapping 2µs blocks natively generating matching 2µs profiling tags overhead wildly destroying analytical values functionally!</li>
+<li><strong>Begin Broader Specifically:</strong> We consistently strongly recommend simply wrapping massively lengthy macro traits heavily across outer functions broadly initially determining problem systems locally before digging exceptionally granularly placing <code>monitor_scoped!</code> statements exclusively targeting tighter troublesome segments properly isolated subsequently!</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h1>
+<p>Developing inherently embedded systems strictly brings incredibly complex runtime puzzles properly challenging engineering intuition! When tracing setups confidently mysteriously fail compiling flawlessly, missing timeline metadata drastically confuses users actively attempting profiling natively.</p>
+<p>Thankfully we confidently collected several fundamental problem configurations encountered practically identifying troubleshooting resolutions explicitly securely addressing those exact situations consistently below.</p>
+<h3 id="basic-system-misbehaviors"><a class="header" href="#basic-system-misbehaviors">Basic System Misbehaviors</a></h3>
+<p><strong>My Perfetto graph remains totally blank and trace files generate empty.</strong></p>
+<ul>
+<li><strong>Flashing Integrity:</strong> Is the <code>rustmeter run</code> flash sequence actually correctly rebooting your hardware completely? Read command-line CLI outputs analyzing warning messages blocking active software deployment successfully prior.</li>
+<li><strong>Initialization Overlooked:</strong> Confirm heavily that calling <code>rustmeter_beacon::init_rustmeter_beacon(config, &amp;spawner)</code> actually triggers sequentially firmly during beginning execution scopes inside <code>main</code> typically properly bootstrapping background workers effectively.</li>
+<li><strong>Rogue Logger Competition:</strong> Frameworks frequently fight natively demanding pure control explicitly! Packages strongly utilizing unmanaged <code>rtt-target</code> components natively, or aggressive <code>esp-println</code> deployments easily crash internal serial buffering severely causing silent RustMeter faults. When strictly executing RustMeter analysis properly, force logging configurations solely relying heavily via strict standard <code>defmt</code> architectures.</li>
+<li><strong>No Manual Or Automatic Observables Tagged:</strong> Did you previously completely deactivate <code>embassy-executor</code> <code>"trace"</code> feature compilation while mistakenly avoiding declaring standalone <code>#[monitor_fn]</code> labels throughout active logic branches completely? Blank timeline recordings technically genuinely remain accurate representations assuming algorithms execute fundamentally blindly entirely! Attempt mapping simple explicit monitor statements confirming broad architectural functionally safely.</li>
+</ul>
+<p><strong>Flushing my MCU suddenly results triggering system crashes or deadlocks directly.</strong></p>
+<ul>
+<li><strong>Stack Constraints Breaking:</strong> Actively wrapping processing blocks forcefully introduces slightly additional local stack consumption across nested memory pools dynamically! Memory overloads strictly crashing controllers frequently dictates manually elevating active task stack limits explicitly throughout <code>embassy-executor</code> parameters securely or modifying underlying general hardware linker configuration limits slightly addressing these new functional requirements correctly.</li>
+<li><strong>Prioritization Blocking Analytics:</strong> The fundamental internal RustMeter background transmit task legitimately requires execution bandwidth dynamically sending data. Should your active project eagerly maintain dominating high-priority while-loops absolutely starving lower level agents mercilessly, the ring buffers natively silently pack rapidly full crashing eventually! Consistently implement gentle cooperative scheduling utilizing active <code>.await</code> timers efficiently passing logic flows reasonably yielding appropriately.</li>
+</ul>
+<h3 id="timeline--ui-difficulties"><a class="header" href="#timeline--ui-difficulties">Timeline &amp; UI Difficulties</a></h3>
+<p><strong>Embassy task state flows (<code>Running</code>, <code>Ready</code>) mysteriously vanish outright entirely.</strong></p>
+<ul>
+<li>Ensure securely you explicitly correctly appended that subtle <code>trace</code> compilation flag completely accurately addressing the <code>embassy-executor</code> parameter block inside your <code>Cargo.toml</code>.</li>
+</ul>
+<p><strong>My custom function variables and <code>defmt</code> messages generate appearing simply as raw confusing numbers instead!</strong></p>
+<ul>
+<li><strong>Missing Linker Configuration Logic:</strong> Numerical mappings uniquely symbolize the CLI failing utterly finding associated textual map dictionaries firmly seated internally within compiled <code>.elf</code> execution artifacts safely! Double verify deeply your active compilation <code>build.rs</code> natively pushes required arguments integrating effectively through appending <code>println!("cargo:rustc-link-arg=-Trustmeter.x");</code>. No script equals missing dictionaries entirely!</li>
+<li><strong>Execution Artifact Stripping Unintentionally:</strong> Validate completely you lack compilation processes brutally modifying or maliciously physically "stripping" produced debugging parameters externally modifying final ELF structures directly. Missing debug variables directly strips the tool rendering properties heavily matching identifiers.</li>
+</ul>
+<p><strong>My visual rendering stutters severely alongside significant blank data dropouts unexpectedly.</strong></p>
+<ul>
+<li><strong>Overpowering Ring Buffer Maximums:</strong> Tracing remarkably extremely dense looping components incredibly fast repeatedly generates massive internal payloads directly! Background tasks occasionally unfortunately struggle violently attempting maintaining synchronous flow natively resulting dropping traces fully protecting continuous active operations cleanly!
+<ul>
+<li><strong>Remedy 1:</strong> Strongly consider radically reducing tracking occurrences explicitly! Completely bypass wrapping incredibly short computational segments looping fiercely continuously natively eliminating overhead!</li>
+<li><strong>Remedy 2 (Advanced Solutions):</strong> Provided you operate utilizing <code>probe-rs</code> RTT logic gracefully, explore carefully manually elevating underlying RTT buffering capabilities globally inside configuring configurations manually!</li>
+</ul>
+</li>
+</ul>
+<h3 id="contributing-deeper-debugging-tactics"><a class="header" href="#contributing-deeper-debugging-tactics">Contributing Deeper Debugging Tactics</a></h3>
+<p><strong>Is debugging the host <code>rustmeter-cli</code> analyzer explicitly possible?</strong></p>
+<ul>
+<li>Absolutely! The command line application simply acts natively compiling exactly standard Rust architecture smoothly! By cloning the general repository manually, pointing commands traversing the exact local CLI directory securely, and testing features deploying specifically exactly standard <code>cargo run</code> arguments effectively captures output completely:
+<pre><code class="language-shell">cargo run -- run --chip RP2040 --release --project /path/to/your/project
+</code></pre>
+</li>
+<li>Adding explicit <code>println!</code> calls mapping directly inside parsing structures reliably produces tracking logs smoothly providing massive insights naturally manually utilizing native <code>gdb</code> implementations practically efficiently testing natively!</li>
+</ul>
+<p><strong>How do you compress timeline tracking metrics incredibly effectively skipping massive RAM waste logically?</strong></p>
+<ul>
+<li>By completely dodging memory-wasting distributed slice arrays dynamically matching strings inside target memory violently! Alternatively, macro instructions generate perfectly custom static numeric metadata definitions specifically linking textual strings accurately directly onto unique target ELF memory sections explicitly exclusively accessed directly solely by CLI operations effectively entirely bypassing sending text bytes wirelessly dynamically whatsoever! Time constraints effectively reduce radically natively successfully!</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="api-reference"><a class="header" href="#api-reference">API Reference</a></h1>
+<p>Welcome to the API Reference.</p>
+<p>This section is largely dedicated to comprehensively covering every module, structuring macro, and configurable parameter provided natively by the <code>rustmeter-beacon</code> crate. As RustMeter expands, this section is designed to house the low-level signatures and technical requirements expected systematically within the framework.</p>
+<p><em>Currently under construction. For the best insights on applying features immediately, turn toward the <a href="./user_guide.html">User Guide</a>.</em></p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+    </div>
+    </body>
+</html>

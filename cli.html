@@ -1,0 +1,283 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>The rustmeter-cli - RustMeter Usage &amp; Documentation</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="getting_started.html"><strong aria-hidden="true">2.</strong> Getting Started</a></li><li class="chapter-item expanded "><a href="user_guide.html"><strong aria-hidden="true">3.</strong> User Guide</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="user_guide/tracing_embassy_tasks.html"><strong aria-hidden="true">3.1.</strong> Tracing Embassy Tasks</a></li><li class="chapter-item expanded "><a href="user_guide/monitoring_functions.html"><strong aria-hidden="true">3.2.</strong> Monitoring Functions and Scopes</a></li><li class="chapter-item expanded "><a href="user_guide/tracking_values.html"><strong aria-hidden="true">3.3.</strong> Tracking Values</a></li><li class="chapter-item expanded "><a href="user_guide/logging_with_defmt.html"><strong aria-hidden="true">3.4.</strong> Logging with defmt</a></li></ol></li><li class="chapter-item expanded "><a href="cli.html" class="active"><strong aria-hidden="true">4.</strong> The rustmeter-cli</a></li><li class="chapter-item expanded "><a href="advanced.html"><strong aria-hidden="true">5.</strong> Advanced Topics</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="advanced/performance.html"><strong aria-hidden="true">5.1.</strong> Performance & Overhead</a></li><li class="chapter-item expanded "><a href="advanced/troubleshooting.html"><strong aria-hidden="true">5.2.</strong> Troubleshooting</a></li></ol></li><li class="chapter-item expanded "><a href="api_reference.html"><strong aria-hidden="true">6.</strong> API Reference</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">RustMeter Usage &amp; Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="the-rustmeter-cli"><a class="header" href="#the-rustmeter-cli">The <code>rustmeter-cli</code></a></h1>
+<p>The <code>rustmeter-cli</code> is the command-line tool installed on your host PC, and it orchestrates the entire tracing process. You can think of it as a powerful wrapper that takes care of compiling your project, flashing your microcontroller, capturing the outgoing data stream via RTT or a serial port, and finally transforming it all into the standardized format that the Perfetto UI understands.</p>
+<p>In this chapter, we will explain the core commands you use to interact with the CLI and showcase common workflows.</p>
+<h3 id="commands"><a class="header" href="#commands">Commands</a></h3>
+<p>The CLI primarily operates using two subcommands: <code>run</code> and <code>analyze</code>.</p>
+<h4 id="rustmeter-run-the-default-workflow"><a class="header" href="#rustmeter-run-the-default-workflow"><code>rustmeter run</code> (The Default Workflow)</a></h4>
+<p>This is the command you will use most often. It takes care of the entire end-to-end continuous loop from code to trace visualizer:</p>
+<ol>
+<li><strong>Builds your firmware</strong>: First, it invokes <code>cargo build</code> on your embedded project.</li>
+<li><strong>Flashes the device</strong>: Next, it utilizes tools like <code>probe-rs</code> or <code>espflash</code> to write the newly compiled ELF binary onto your target.</li>
+<li><strong>Captures trace data</strong>: Once the device starts running, it persistently listens for the event stream sent by the <code>rustmeter-beacon</code> running on your chip.</li>
+<li><strong>Analyzes the data</strong>: The moment you end the session by pressing <code>Ctrl+C</code>, the CLI processes the raw incoming data. It efficiently references your local ELF file and ultimately saves the result as <code>rustmeter-perfetto.json</code>.</li>
+</ol>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-shell">rustmeter run [OPTIONS] [EXECUTABLE]
+</code></pre>
+<p><strong>Options for <code>run</code>:</strong></p>
+<ul>
+<li><code>--chip &lt;CHIP_NAME&gt;</code>: <strong>(Required)</strong> This tells the CLI which specific microcontroller model you are aiming to trace. The flasher needs this accurate name to establish a connection. Examples include <code>--chip RP2040</code> or <code>--chip ESP32-S3</code>.</li>
+<li><code>--release</code>: This tells the tool to compile the project in release mode (<code>cargo build --release</code>). We highly recommend doing this since optimizations make performance measurements much more reliable and representative of your real-world application.</li>
+<li><code>--project &lt;PATH&gt;</code>: With this option, you can specify exactly where your embedded project's root folder is located. By default, it operates in the current directory (<code>.</code>).</li>
+<li><code>--tool &lt;TOOL_NAME&gt;</code>: By default, RustMeter tries to guess the flashing tool. However, you can manually dictate which tool handles flashing and monitoring:
+<ul>
+<li><code>probe-rs</code>: Use <code>probe-rs</code>, which uses RTT for communication and is the standard for non-Espressif controllers.</li>
+<li><code>espflash</code>: The default standard for Espressif chips that heavily use serial port communication.</li>
+<li><code>auto</code>: (Default) Let RustMeter use heuristics based on your <code>--chip</code> setting to pick the correct background tool.</li>
+</ul>
+</li>
+</ul>
+<p>Sometimes you don't even want to rebuild from scratch but start right from a pre-compiled <code>.elf</code> executable. You can provide its path directly as the final argument (e.g. <code>rustmeter run --chip RP2040 ./target/thumbv.../release/my_binary</code>). <strong>Please note</strong>: Giving an <code>&lt;EXECUTABLE&gt;</code> conflicts directly with <code>--release</code> and <code>--project</code>, making them unavailable for that launch.</p>
+<h4 id="rustmeter-analyze"><a class="header" href="#rustmeter-analyze"><code>rustmeter analyze</code></a></h4>
+<p>If you ever wish to skip the compiling and flashing stages entirely—perhaps to rerun an analysis step on historical trace files—you can reach for the <code>analyze</code> subcommand.</p>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-shell">rustmeter analyze [PATH_TO_TRACING_FOLDER]
+</code></pre>
+<ul>
+<li><strong>Why use this?</strong> Every time you utilize <code>rustmeter run</code>, the underlying raw raw trace streams are preserved quietly inside your build folder (typically somewhere like <code>target/rustmeter/tracing/&lt;timestamp&gt;</code>). Should you wish to re-evaluate those traces (for instance, to experiment with a newer analyzer algorithm), you can command the <code>analyze</code> action directly to interpret that particular folder. If you omit the folder path, it defaults to the current working directory <code>.</code>.</li>
+</ul>
+<h3 id="common-workflows--questions"><a class="header" href="#common-workflows--questions">Common Workflows &amp; Questions</a></h3>
+<p><strong>How do I run my project for tracing normally?</strong></p>
+<p>The clearest approach involves opening a terminal in your project's root folder and launching:</p>
+<pre><code class="language-shell">rustmeter run --chip &lt;YOUR_CHIP&gt; --release
+</code></pre>
+<p><strong>Can I still use <code>cargo run</code>?</strong></p>
+<p>Absolutely! Integrating <code>rustmeter</code> to impersonate your default cargo runner is delightfully convenient. In your project, locate or create a <code>.cargo/config.toml</code> file at the root, and configure it similarly to the snippet below. Be sure to substitute your correct target architecture and chip:</p>
+<pre><code class="language-toml">[target.thumbv7em-none-eabihf] # &lt;-- Substitute your specific build target
+runner = "rustmeter run --chip STM32F746ZGT6" # &lt;-- Make sure to declare your exact chip
+
+[build]
+target = "thumbv7em-none-eabihf" # &lt;-- Similarly, specify your target here
+</code></pre>
+<p>Now, every time you execute <code>cargo run --release</code>, Cargo natively delegates the final step directly to <code>rustmeter</code>, which gracefully compiles, flashes, and jumps into trace-listening mode.</p>
+<p><strong>Where is the output file stored?</strong></p>
+<p>You will find the generated timeline trace file, <code>rustmeter-perfetto.json</code>, happily sitting in the directory from which you invoked the command.</p>
+<p><strong>What does the CLI do with the ELF file?</strong></p>
+<p>The host PC's locally stored ELF file serves a profound purpose. The <code>rustmeter-beacon</code> running on your device strictly sends over lightweight numerical IDs, saving precious network bandwidth entirely by skipping raw string text. It is the job of the <code>rustmeter-cli</code> analyzer to meticulously map these numerical IDs back into their original, human-readable function and log names found hidden inside the ELF file. This maps cleanly into Perfetto, making custom linker script integration deeply essential.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="user_guide/logging_with_defmt.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="advanced.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="user_guide/logging_with_defmt.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="advanced.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

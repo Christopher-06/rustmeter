@@ -1,0 +1,285 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Tracing Embassy Tasks - RustMeter Usage &amp; Documentation</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="../introduction.html"><strong aria-hidden="true">1.</strong> Introduction</a></li><li class="chapter-item expanded "><a href="../getting_started.html"><strong aria-hidden="true">2.</strong> Getting Started</a></li><li class="chapter-item expanded "><a href="../user_guide.html"><strong aria-hidden="true">3.</strong> User Guide</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../user_guide/tracing_embassy_tasks.html" class="active"><strong aria-hidden="true">3.1.</strong> Tracing Embassy Tasks</a></li><li class="chapter-item expanded "><a href="../user_guide/monitoring_functions.html"><strong aria-hidden="true">3.2.</strong> Monitoring Functions and Scopes</a></li><li class="chapter-item expanded "><a href="../user_guide/tracking_values.html"><strong aria-hidden="true">3.3.</strong> Tracking Values</a></li><li class="chapter-item expanded "><a href="../user_guide/logging_with_defmt.html"><strong aria-hidden="true">3.4.</strong> Logging with defmt</a></li></ol></li><li class="chapter-item expanded "><a href="../cli.html"><strong aria-hidden="true">4.</strong> The rustmeter-cli</a></li><li class="chapter-item expanded "><a href="../advanced.html"><strong aria-hidden="true">5.</strong> Advanced Topics</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../advanced/performance.html"><strong aria-hidden="true">5.1.</strong> Performance & Overhead</a></li><li class="chapter-item expanded "><a href="../advanced/troubleshooting.html"><strong aria-hidden="true">5.2.</strong> Troubleshooting</a></li></ol></li><li class="chapter-item expanded "><a href="../api_reference.html"><strong aria-hidden="true">6.</strong> API Reference</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">RustMeter Usage &amp; Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="tracing-embassy-tasks"><a class="header" href="#tracing-embassy-tasks">Tracing Embassy Tasks</a></h1>
+<p>One of RustMeter's most attractive highlights is its deep, transparent integration with the <code>embassy</code> framework. By turning on a single feature, RustMeter <strong>automatically</strong> begins tracing the lifecycle of your asynchronous tasks without forcing you to litter your elegant code with manual instrumentation.</p>
+<p>This means you can instantly observe when tasks start, when they wake up, when they pause, and crucially, when they find themselves hopelessly waiting.</p>
+<h3 id="how-to-enable-task-tracing"><a class="header" href="#how-to-enable-task-tracing">How to Enable Task Tracing</a></h3>
+<p>Enabling this feature acts as a massive quality-of-life boost for async engineers.</p>
+<p>To activate it, you merely need to expose the <code>trace</code> feature flag provided universally down inside the <code>embassy-executor</code> dependency itself. Within your <code>Cargo.toml</code>, ensure that your dependencies block resembles the example below:</p>
+<pre><code class="language-toml">[dependencies]
+embassy-executor = { 
+    version = "0.5.0", 
+    features = [
+        # ... other features you might use like "executor-thread" etc.
+        "trace" 
+    ] 
+}
+</code></pre>
+<p>Beyond that flag, you absolutely still must initialize the <code>rustmeter-beacon</code> instance during your program's earliest startup routine (usually early inside <code>main</code>), exactly as you would have done while reading the Getting Started guide. No extra magical lines are needed per task.</p>
+<pre><pre class="playground"><code class="language-rust">// In your main.rs, ensure you load your settings.
+use rustmeter_beacon::{init_rustmeter_beacon, RustmeterConfig};
+use embassy_executor::Spawner;
+
+#[embassy_executor::main]
+async fn main(spawner: Spawner) {
+    // Determine your system frequency
+    let config = RustmeterConfig::new(120_000_000); 
+
+    // This single robust line unlocks all automatic framework tracing!
+    init_rustmeter_beacon(config, &amp;spawner).unwrap();
+
+    // From here, peacefully just spawn your normal tasks
+    spawner.spawn(task_one()).unwrap();
+    spawner.spawn(task_two()).unwrap();
+}</code></pre></pre>
+<h3 id="unveiling-the-task-lifecycle"><a class="header" href="#unveiling-the-task-lifecycle">Unveiling The Task Lifecycle</a></h3>
+<p>The moment you run your connected chip via <code>rustmeter run</code> and load the produced file into Perfetto, you will delightfully be presented with a beautifully organized, dedicated timeline track representing each distinct task spawned.</p>
+<p>RustMeter intrinsically captures the following dynamic statuses across the lifetime of these tasks:</p>
+<ul>
+<li><strong>Spawned</strong>: At this instantaneous fraction of time, the task was just cleanly created. It signifies the task is completely ready to run, but merely waiting for the CPU to actually get around to executing it.</li>
+<li><strong><code>Running</code></strong>: Simply put, the task currently owns your CPU. Code is successfully calculating.</li>
+<li><strong><code>Idle</code></strong>: Often the most frequent and healthy async state, this simply denotes that your task has suspended execution awaiting a real-life event, such as an upcoming <code>Timer</code>, an ongoing sensor DMA reading, or a filled data channel.</li>
+<li><strong><code>Ready</code></strong>: The task successfully received its event and is completely ready to run—but sadly, it sits stuck waiting because your executor chose to process a different active task first. Frequent blocks of <code>Ready</code> vividly highlight when your CPU simply has too much to do, pointing directly to potential real-time starvation.</li>
+<li><strong><code>End</code></strong>: Peace at last. The task naturally completed computing to the full end and has been peacefully laid to rest.</li>
+</ul>
+<p>Suddenly, grasping your software’s concurrency becomes incredibly accessible. You can instantly spot misbehaving routines monopolizing processor time, visibly check if tasks take an unusual duration to resume after waking up, and cleanly prove exactly which task executes at every specific millisecond!</p>
+<h3 id="visualizing-the-executor-state"><a class="header" href="#visualizing-the-executor-state">Visualizing The Executor State</a></h3>
+<p>Additionally, RustMeter goes a step further and traces the overarching state of the <code>embassy-executor</code> machine itself.</p>
+<p>By observing the timeline track named typically as <code>embassy-executor</code>, you gain a profound bird’s-eye perspective depicting when your entire central processor activates versus when it falls comfortably asleep:</p>
+<ul>
+<li><strong><code>Running</code></strong>: The broader executor is explicitly running an active task process. You usually even get the visual identifier showcasing strictly which task identifier it is managing.</li>
+<li><strong><code>POLLING</code></strong>: The engine is furiously looping through its internal checklists to figure out which waiting routines have recently became ready. This transition logically occurs right after an event executes, or before scheduling kicks off.</li>
+<li><strong><code>Idle</code></strong>: Complete silence. No tasks are asking to be run. Embassy seizes this magnificent opportunity to command the whole MCU core to fall right into deep low-power sleep modes, drastically saving your battery capacity dynamically.</li>
+</ul>
+<h3 id="what-to-pay-attention-to"><a class="header" href="#what-to-pay-attention-to">What to Pay Attention To</a></h3>
+<ul>
+<li><strong>Naming Tasks Automatically:</strong> RustMeter dynamically snags the exact name of the function you wrap and spawn to label the timeline block comfortably. So whenever you call <code>spawner.spawn(my_cool_task())</code>, you will see a track confidently labeled <code>my_cool_task</code>. It makes navigating chaotic logs visually intuitive.</li>
+<li><strong>A Missing <code>trace</code> Feature:</strong> Should your Perfetto timeline seem oddly devoid of any task event state, the overwhelming reason typically stems from simply forgetting to append that subtle <code>"trace"</code> flag onto the <code>embassy-executor</code> list within <code>Cargo.toml</code>.</li>
+<li><strong>Free of Manual Macros:</strong> Keep closely in mind you absolutely do <strong>not</strong> need to artificially place the <code>#[monitor_fn]</code> macro above your background tasks sequentially just to view this behavior. Everything here is wonderfully autonomous. The only reason to deploy <code>#[monitor_fn]</code> over an overarching task is purely if you aim to map its unified total calculation length spanning as a single massive timeline block apart from observing its detailed sleep cycles.</li>
+<li><strong>Future Multi-Priority Support:</strong> In the future, as we expand to support multi-priority executors in analysis, you may see additional states like <code>Preempted</code> in the executor track. For now, you can identify preemption on multi-core systems by correlating if multiple executors are running on the same core simultaneously.</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../user_guide.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../user_guide/monitoring_functions.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../user_guide.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../user_guide/monitoring_functions.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>
