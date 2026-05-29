@@ -25,8 +25,12 @@ fn delay_cycles(cycles: u32) {
 fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     // Take time and block other core / interrupts
     let panic_sys_time = get_system_time_us();
-    let mut panic_time_delta = TimeDelta::from_now();
     let rs = unsafe { critical_section::acquire() };
+
+    let mut panic_time_delta = unsafe {
+        // safe because critical section was acquired
+        TimeDelta::from_now(critical_section::CriticalSection::new())
+    }; 
 
     unsafe {
         panic_pre_hook(info);
