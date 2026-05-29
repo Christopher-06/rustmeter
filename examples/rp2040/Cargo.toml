@@ -16,7 +16,7 @@ cortex-m-rt = "0.7.0"
 
 static_cell = "2.1"
 portable-atomic = { version = "1.5.0", features = ["critical-section"] }
-rustmeter-beacon = { version = "0.2.0", features = ["rp2040", "defmt"], path = "../../rustmeter-beacon" }
+rustmeter-beacon = { version = "0.2.1", features = ["rp2040", "defmt"], path = "../../rustmeter-beacon" }
 
 [patch.crates-io] # Currently needed to enable "trace" feature in embassy crates
 embassy-time = { git = "https://github.com/embassy-rs/embassy.git", rev = "d41b6b00d00cf13b4fa9b5923ac445e33cc7607f" }

@@ -909,7 +909,7 @@ dependencies = [
 
 [[package]]
 name = "rustmeter-beacon-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "arbitrary-int",
  "critical-section",
@@ -919,7 +919,7 @@ dependencies = [
 
 [[package]]
 name = "rustmeter-beacon-proc-macros"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",
@@ -931,7 +931,7 @@ dependencies = [
 
 [[package]]
 name = "rustmeter-beacon-target"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "arbitrary-int",
  "cfg-if",

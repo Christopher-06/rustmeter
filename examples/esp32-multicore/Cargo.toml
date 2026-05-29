@@ -20,7 +20,7 @@ embassy-time = { version = "0.5.0", features = ["defmt", "defmt-timestamp-uptime
 
 critical-section = "1.2.0"
 static_cell = "2.1.1"
-rustmeter-beacon = { version = "0.2.0", features = ["esp32", "defmt"], path = "../../rustmeter-beacon" }
+rustmeter-beacon = { version = "0.2.1", features = ["esp32", "defmt"], path = "../../rustmeter-beacon" }
 
 [profile.dev]
 # Rust debug is too slow.

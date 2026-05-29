@@ -19,7 +19,7 @@ embassy-time = { version = "0.5.1", features = ["defmt", "defmt-timestamp-uptime
 
 critical-section = "1.2.0"
 static_cell = "2.1.1"
-rustmeter-beacon = { version = "0.2.0", features = ["esp32s3", "defmt"], path = "../../rustmeter-beacon" }
+rustmeter-beacon = { version = "0.2.1", features = ["esp32s3", "defmt"], path = "../../rustmeter-beacon" }
 # esp-hal-smartled = { version = "0.17.0", features = ["esp32s3"] }
 embedded-io-async = "0.7.0"
 
