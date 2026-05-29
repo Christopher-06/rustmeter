@@ -62,7 +62,7 @@ fn write_tracing_data(data: &[u8]) {
         let mut buffer = [0u8; 12];
         buffer[0] = event_ids::DATA_LOSS_EVENT << 3;
         buffer[1..5].copy_from_slice(&dropped_events.to_le_bytes());
-        let timestamp = TimeDelta::from_now();
+        let timestamp = critical_section::with(|cs| TimeDelta::from_now(cs));
         let pos = timestamp.write_bytes_mut(&mut buffer[5..]);
 
         // Try to write dropped events data

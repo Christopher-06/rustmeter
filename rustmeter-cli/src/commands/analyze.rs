@@ -139,7 +139,9 @@ pub fn do_analyze_command(args: &AnalyzeArgs, exit_flag: Arc<AtomicBool>) -> any
         .collect()
         .context("Can't collect temp dumped perfetto trace!")?; // collect to sink it
 
-    // Export as perfetto JSON
+    // Export as perfetto JSON. Write the JSON into the tracing folder rather
+    // than the current working directory so it lives next to the trace data
+    // it was derived from and can be cleanly removed/regenerated.
     let filename = format!(
         "rustmeter-perfetto-{}.json",
         if summary.is_release() {
@@ -148,10 +150,12 @@ pub fn do_analyze_command(args: &AnalyzeArgs, exit_flag: Arc<AtomicBool>) -> any
             "debug"
         }
     );
-    json_sink::JsonSink::new_folder(filename.into(), perfetto_trace)
+    let json_path = folder.join(&filename);
+    json_sink::JsonSink::new_folder(json_path.clone(), perfetto_trace)
         .context("Error while creating JSON sink")?
         .finish()
         .context("Error while sinking perfetto JSON")?;
+    println!("Perfetto trace written to: {}", json_path.display());
 
     pb_overall.finish_with_message("Analysis complete");
 

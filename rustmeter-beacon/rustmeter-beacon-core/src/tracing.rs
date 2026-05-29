@@ -20,7 +20,7 @@ pub fn write_tracing_event(event: EventPayload) {
     critical_section::with(|cs| {
         let _lock = TRACE_WRITING.borrow(cs);
 
-        let timestamp = TimeDelta::from_now();
+        let timestamp = TimeDelta::from_now(cs);
 
         // Write event data
         let mut buffer = SimpleBufferWriter::new();

@@ -20,8 +20,8 @@ pub async fn connector(config: RustmeterConfig) {
         let n = rtt_read_down_channel(&mut buffer);
         if n > 0 {
             // Push to ringbuffer or drain old data
-            let to_drain = n - recvd_buffer.free();
-            if to_drain > 0 {
+            if n > recvd_buffer.free() {
+                let to_drain = n - recvd_buffer.free();
                 recvd_buffer.drain(to_drain);
             }
             let _ = recvd_buffer.push_slice(&buffer[0..n]);

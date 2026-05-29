@@ -1,5 +1,6 @@
 #![allow(unused)] // in test mode, things might be unused
 use arbitrary_int::traits::Integer;
+use critical_section::CriticalSection;
 
 use crate::{
     buffer::{BufferReader, BufferWriter},
@@ -89,7 +90,7 @@ impl TimeDelta {
     /// This has to be called inside a critical section
     #[inline(always)]
     #[cfg(not(test))]
-    pub fn from_now() -> Self {
+    pub fn from_now<'cs>(_cs: CriticalSection<'cs>) -> Self {
         let core_id = unsafe { crate::get_current_core_id() as usize };
         if !CORE_CLOCK_REFERENCED[core_id].load(portable_atomic::Ordering::Relaxed) {
             do_core_clock_referencing(core_id);
@@ -111,7 +112,7 @@ impl TimeDelta {
     }
 
     #[cfg(test)]
-    pub fn from_now() -> Self {
+    pub fn from_now<'cs>(_cs: CriticalSection<'cs>) -> Self {
         let now = unsafe { get_tracing_raw_ticks() };
         TimeDelta { delta: now }
     }
