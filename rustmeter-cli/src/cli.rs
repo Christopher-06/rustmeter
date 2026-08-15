@@ -30,6 +30,15 @@ pub struct RunArgs {
     #[clap(long)]
     pub chip: String,
 
+    /// Erase the entire chip before flashing, rather than only the sectors
+    /// the image occupies.
+    ///
+    /// Off by default, because a chip erase also destroys flash the image
+    /// says nothing about — a bootloader below the application's origin, a
+    /// settings page, a second slot — and the loss is silent.
+    #[clap(long, action)]
+    pub chip_erase: bool,
+
     /// Choose third party flashing and monitoring tool (optional)
     /// If not provided, default tool for the chip will be used:
     /// - espflash for all espresso chips (with serialport target)

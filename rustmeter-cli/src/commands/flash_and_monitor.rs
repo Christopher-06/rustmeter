@@ -25,6 +25,7 @@ pub fn flash_and_monitor_chip(
     tool: FlashingTool,
     elf_path: &PathBuf,
     fw_addr_map: &FirmwareInfo,
+    chip_erase: bool,
 ) -> anyhow::Result<Box<dyn ChipMonitoringTool>> {
     match tool {
         FlashingTool::Espflash => {
@@ -39,7 +40,7 @@ pub fn flash_and_monitor_chip(
             // establish probe-rs connection and flash
             let probe = connect_to_first_probe()?;
             let session = probe.attach(chip, Default::default())?.into();
-            flash_and_start_controller(&session, elf_path)?;
+            flash_and_start_controller(&session, elf_path, chip_erase)?;
 
             // Get Rtt listener (sleep a bit to allow target to initialize RTT)
             std::thread::sleep(Duration::from_millis(100));
@@ -50,9 +51,21 @@ pub fn flash_and_monitor_chip(
         FlashingTool::Auto => {
             // Choose default tool based on chip name
             if chip.to_lowercase().starts_with("esp32") {
-                flash_and_monitor_chip(chip, FlashingTool::Espflash, elf_path, fw_addr_map)
+                flash_and_monitor_chip(
+                    chip,
+                    FlashingTool::Espflash,
+                    elf_path,
+                    fw_addr_map,
+                    chip_erase,
+                )
             } else {
-                flash_and_monitor_chip(chip, FlashingTool::ProbeRs, elf_path, fw_addr_map)
+                flash_and_monitor_chip(
+                    chip,
+                    FlashingTool::ProbeRs,
+                    elf_path,
+                    fw_addr_map,
+                    chip_erase,
+                )
             }
         }
     }

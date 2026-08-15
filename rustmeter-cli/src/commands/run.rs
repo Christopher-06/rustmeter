@@ -39,7 +39,13 @@ pub fn do_run_command(mut args: RunArgs, exit_flag: Arc<AtomicBool>) -> anyhow::
     let fw_info = FirmwareInfo::new(&elf_path)?;
 
     // flash and start monitoring
-    let monitor = flash_and_monitor_chip(&args.chip, args.tool.clone(), &elf_path, &fw_info)?;
+    let monitor = flash_and_monitor_chip(
+        &args.chip,
+        args.tool.clone(),
+        &elf_path,
+        &fw_info,
+        args.chip_erase,
+    )?;
     let tracing_bytes_recver = monitor.get_tracing_bytes_recver();
     let req_sender = monitor.get_request_sender();
 
