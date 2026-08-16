@@ -101,9 +101,11 @@ impl TracingSummary {
             .and_then(|container| container.panic.as_ref())
     }
 
-    /// Get the symbol name for a given firmware address
+    /// Get the symbol name for a given firmware address, demangled.
     pub fn get_fw_symbol_name(&self, addr: u64) -> Option<String> {
-        self.fw_addr_map.get(&addr).cloned()
+        self.fw_addr_map
+            .get(&addr)
+            .map(|name| format!("{:#}", rustc_demangle::demangle(name)))
     }
 
     /// Set the end datetime of the tracing session
