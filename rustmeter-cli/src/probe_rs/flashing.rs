@@ -7,12 +7,12 @@ use crate::probe_rs::{
     flash_progress::{progress_handler, reset_progress},
 };
 
-fn define_download_options<'a>() -> DownloadOptions<'a> {
+fn define_download_options<'a>(chip_erase: bool) -> DownloadOptions<'a> {
     reset_progress();
 
     let mut download_options = DownloadOptions::default();
     download_options.verify = true;
-    download_options.do_chip_erase = true;
+    download_options.do_chip_erase = chip_erase;
     download_options.progress = FlashProgress::new(Box::new(progress_handler));
 
     download_options
@@ -22,6 +22,7 @@ fn define_download_options<'a>() -> DownloadOptions<'a> {
 pub fn flash_and_start_controller(
     session: &AtomicSession,
     elf_path: &PathBuf,
+    chip_erase: bool,
 ) -> anyhow::Result<()> {
     let mut session = session.lock();
 
@@ -30,7 +31,7 @@ pub fn flash_and_start_controller(
         &mut session,
         elf_path,
         flashing::Format::Elf(ElfOptions::default()),
-        define_download_options(),
+        define_download_options(chip_erase),
     )?;
 
     // Reset and run the core
